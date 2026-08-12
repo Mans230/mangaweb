@@ -1,0 +1,342 @@
+import { asc, count, eq } from "drizzle-orm";
+import { chapters, manga, sources } from "@db/schema";
+import { getDb } from "../queries/connection";
+import { getScraper } from "../scrapers";
+import type { SeriesInfo } from "../scrapers";
+
+/** تطبيع العنوان للمطابقة بين المصادر */
+export function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/** تواريخ المصادر: ISO أو نص حر — نعيد Date صالحة أو null */
+function parseDate(d: string | null | undefined): Date | null {
+  if (!d) return null;
+  const t = Date.parse(d);
+  return Number.isNaN(t) ? null : new Date(t);
+}
+
+function mapStatus(s?: string): "ongoing" | "completed" {
+  if (!s) return "ongoing";
+  return /complete|finished|ended|مكتمل|منتهي/i.test(s) ? "completed" : "ongoing";
+}
+
+function mapType(t?: string): "manga" | "manhwa" | "manhua" {
+  if (!t) return "manhwa";
+  if (/manhua|صيني/i.test(t)) return "manhua";
+  if (/manga|يابان/i.test(t)) return "manga";
+  return "manhwa";
+}
+
+/** rating في schema هو decimal(3,2) أي بحد أقصى 9.99 */
+function mapRating(r?: number): number {
+  if (r == null || !Number.isFinite(r) || r <= 0) return 0;
+  let v = r;
+  if (v > 100) v = v / 100;
+  if (v > 10) v = v / 10;
+  return Math.min(9.99, Math.max(0, Math.round(v * 100) / 100));
+}
+
+const ADULT_GENRE_RE = /(\+18|adult|mature|hentai|هنتاي|للكبار)/i;
+
+function mapAdult(s: SeriesInfo): boolean {
+  if (s.isAdult) return true;
+  return (s.genres ?? []).some((g) => ADULT_GENRE_RE.test(g));
+}
+
+const SOURCE_SITE_URLS: Record<string, string> = {
+  kawaiimanga: "https://kawaiimanga.org",
+  olympustaff: "https://olympustaff.com",
+  azorafly: "https://azorafly.com",
+  mangatime: "https://mangatime.org",
+  rocksmanga: "https://rocksmanga.com",
+  "3asq": "https://3asq.online",
+  despair: "https://despair-manga.net",
+  mangadar: "https://mangadar.com",
+};
+
+/** أوجد صف المصدر بالاسم أو أنشئه */
+async function ensureSource(sourceKey: string): Promise<typeof sources.$inferSelect> {
+  const db = getDb();
+  const existing = await db.query.sources.findFirst({
+    where: eq(sources.name, sourceKey),
+  });
+  if (existing) return existing;
+  const scraper = getScraper(sourceKey);
+  const baseUrl = SOURCE_SITE_URLS[sourceKey] ?? scraper?.baseUrl ?? "";
+  const [{ id }] = await db
+    .insert(sources)
+    .values({
+      name: sourceKey,
+      baseUrl,
+      status: scraper?.enabled === false ? "paused" : "active",
+      mangaCount: 0,
+    })
+    .$returningId();
+  const created = await db.query.sources.findFirst({ where: eq(sources.id, id) });
+  return created!;
+}
+
+function sanitizeSlug(slug: string, fallback: string): string {
+  const clean = decodeURIComponent(slug || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF-]+/gi, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 280);
+  return clean || fallback;
+}
+
+async function upsertChapters(
+  mangaId: number,
+  list: SeriesInfo["chapters"],
+): Promise<number> {
+  if (!list.length) return 0;
+  const db = getDb();
+  const existing = await db
+    .select({ number: chapters.number })
+    .from(chapters)
+    .where(eq(chapters.mangaId, mangaId));
+  const existingNums = new Set(existing.map((r) => Number(r.number)));
+
+  const rows = list
+    .filter((c) => Number.isFinite(c.number))
+    .map((c) => ({
+      mangaId,
+      number: c.number,
+      title: c.title || null,
+      url: c.url || null,
+      publishedAt: parseDate(c.date),
+    }));
+
+  // أزل التكرار داخل الدفعة نفسها (نفس الرقم)
+  const seen = new Set<number>();
+  const deduped = rows.filter((r) => {
+    const key = Number(r.number);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // أدخل الفصول الجديدة فقط — (mangaId, number) فريد
+  const fresh = deduped.filter((r) => !existingNums.has(Number(r.number)));
+  for (let i = 0; i < fresh.length; i += 200) {
+    await db.insert(chapters).values(fresh.slice(i, i + 200));
+  }
+  return fresh.length;
+}
+
+export interface ImportResult {
+  manga: typeof manga.$inferSelect;
+  chaptersAdded: number;
+  duplicate: boolean;
+  created: boolean;
+}
+
+/**
+ * استيراد سلسلة واحدة من مصدر: getSeries → upsert manga + chapters.
+ * المطابقة: slug فريد؛ العنوان المُطبَّع المكرر من مصدر آخر يُتخطَّى كمكرر.
+ */
+export async function importSeries(
+  sourceKey: string,
+  seriesUrl: string,
+): Promise<ImportResult> {
+  const scraper = getScraper(sourceKey);
+  if (!scraper) throw new Error(`مصدر غير معروف: ${sourceKey}`);
+  if (!scraper.enabled) throw new Error(`المصدر معطّل: ${sourceKey}`);
+
+  const info = await scraper.getSeries(seriesUrl);
+  const db = getDb();
+  const source = await ensureSource(sourceKey);
+  const normTitle = normalizeTitle(info.title);
+
+  const baseSlug = sanitizeSlug(info.slug, `${sourceKey}-${Date.now()}`);
+  const existingBySlug = await db.query.manga.findFirst({
+    where: eq(manga.slug, baseSlug),
+  });
+
+  let target = existingBySlug && existingBySlug.sourceId === source.id ? existingBySlug : null;
+  let finalSlug = baseSlug;
+
+  if (!target) {
+    // تكرار بالعنوان المُطبَّع من مصدر آخر؟
+    const allTitles = await db
+      .select({ id: manga.id, title: manga.title, sourceId: manga.sourceId })
+      .from(manga);
+    const dup = allTitles.find(
+      (r) => r.sourceId !== source.id && normalizeTitle(r.title) === normTitle,
+    );
+    if (dup) {
+      const dupManga = await db.query.manga.findFirst({ where: eq(manga.id, dup.id) });
+      return { manga: dupManga!, chaptersAdded: 0, duplicate: true, created: false };
+    }
+    if (existingBySlug) {
+      // slug محجوز من مصدر آخر لعنوان مختلف — ألحق مفتاح المصدر
+      finalSlug = sanitizeSlug(`${baseSlug}-${sourceKey}`, baseSlug);
+      const alt = await db.query.manga.findFirst({ where: eq(manga.slug, finalSlug) });
+      if (alt && alt.sourceId === source.id) target = alt;
+    }
+  }
+
+  const values = {
+    title: info.title.slice(0, 500),
+    altTitles: info.altTitles ?? [],
+    description: info.description ?? null,
+    coverUrl: info.cover ?? null,
+    type: mapType(info.type),
+    status: mapStatus(info.status),
+    genres: info.genres ?? [],
+    rating: mapRating(info.rating),
+    viewCount: info.views && Number.isFinite(info.views) ? Math.round(info.views) : 0,
+    chapterCount: info.chapters.length,
+    isAdult: mapAdult(info),
+    sourceId: source.id,
+    sourceUrl: info.url || seriesUrl,
+  };
+
+  let mangaRow: typeof manga.$inferSelect;
+  let created = false;
+  if (target) {
+    await db.update(manga).set(values).where(eq(manga.id, target.id));
+    mangaRow = (await db.query.manga.findFirst({ where: eq(manga.id, target.id) }))!;
+  } else {
+    const [{ id }] = await db
+      .insert(manga)
+      .values({ slug: finalSlug, ...values })
+      .$returningId();
+    mangaRow = (await db.query.manga.findFirst({ where: eq(manga.id, id) }))!;
+    created = true;
+  }
+
+  const chaptersAdded = await upsertChapters(mangaRow.id, info.chapters);
+  const [[{ total }]] = await Promise.all([
+    db.select({ total: count() }).from(chapters).where(eq(chapters.mangaId, mangaRow.id)),
+  ]);
+  await db
+    .update(manga)
+    .set({ chapterCount: total, updatedAt: new Date() })
+    .where(eq(manga.id, mangaRow.id));
+  // حدّث عدّاد المصدر
+  const [[{ total: srcTotal }]] = await Promise.all([
+    db.select({ total: count() }).from(manga).where(eq(manga.sourceId, source.id)),
+  ]);
+  await db.update(sources).set({ mangaCount: srcTotal }).where(eq(sources.id, source.id));
+
+  return {
+    manga: { ...mangaRow, chapterCount: total },
+    chaptersAdded,
+    duplicate: false,
+    created,
+  };
+}
+
+/** استيراد أحدث السلاسل من مصدر (صفحة أو صفحتين من getLatest) حتى limit */
+export async function importLatest(
+  sourceKey: string,
+  limit = 12,
+): Promise<{ imported: number; failed: number; errors: string[] }> {
+  const scraper = getScraper(sourceKey);
+  if (!scraper) throw new Error(`مصدر غير معروف: ${sourceKey}`);
+  if (!scraper.enabled) return { imported: 0, failed: 0, errors: [`${sourceKey} معطّل`] };
+
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const page of [1, 2]) {
+    if (urls.length >= limit) break;
+    try {
+      const items = await scraper.getLatest(page);
+      for (const it of items) {
+        if (!it.seriesUrl || seen.has(it.seriesUrl)) continue;
+        seen.add(it.seriesUrl);
+        urls.push(it.seriesUrl);
+        if (urls.length >= limit) break;
+      }
+    } catch (e) {
+      console.warn(`[importer] getLatest(${sourceKey}, page=${page}) فشل: ${(e as Error).message}`);
+      break;
+    }
+  }
+
+  let imported = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  for (const url of urls) {
+    try {
+      const res = await importSeries(sourceKey, url);
+      if (!res.duplicate) imported += 1;
+    } catch (e) {
+      failed += 1;
+      errors.push(`${url}: ${(e as Error).message}`);
+      console.warn(`[importer] فشل استيراد ${url}: ${(e as Error).message}`);
+    }
+  }
+  return { imported, failed, errors };
+}
+
+/** تحديث فصول مانجا موجودة من مصدرها — يضيف الجديد فقط */
+export async function refreshChapters(mangaId: number): Promise<{ chaptersAdded: number }> {
+  const db = getDb();
+  const row = await db
+    .select({ manga: manga, source: sources })
+    .from(manga)
+    .innerJoin(sources, eq(manga.sourceId, sources.id))
+    .where(eq(manga.id, mangaId))
+    .limit(1);
+  if (!row.length) throw new Error(`مانجا غير موجودة: ${mangaId}`);
+  const { manga: m, source } = row[0];
+  const scraper = getScraper(source.name);
+  if (!scraper || !scraper.enabled || !m.sourceUrl) {
+    return { chaptersAdded: 0 };
+  }
+
+  const info = await scraper.getSeries(m.sourceUrl);
+  const chaptersAdded = await upsertChapters(m.id, info.chapters);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(chapters)
+    .where(eq(chapters.mangaId, m.id));
+  await db
+    .update(manga)
+    .set({
+      chapterCount: total,
+      status: info.status ? mapStatus(info.status) : m.status,
+      coverUrl: info.cover || m.coverUrl,
+      updatedAt: new Date(),
+    })
+    .where(eq(manga.id, m.id));
+  return { chaptersAdded };
+}
+
+/** تحديث كل المانجا — أخطاء كل عنصر تُلتقط بلا إيقاف */
+export async function refreshAll(): Promise<{
+  total: number;
+  updated: number;
+  chaptersAdded: number;
+  failed: number;
+}> {
+  const db = getDb();
+  const all = await db
+    .select({ id: manga.id })
+    .from(manga)
+    .orderBy(asc(manga.id));
+  let updated = 0;
+  let chaptersAdded = 0;
+  let failed = 0;
+  for (const { id } of all) {
+    try {
+      const r = await refreshChapters(id);
+      if (r.chaptersAdded > 0) updated += 1;
+      chaptersAdded += r.chaptersAdded;
+    } catch (e) {
+      failed += 1;
+      console.warn(`[importer] refreshChapters(${id}) فشل: ${(e as Error).message}`);
+    }
+  }
+  return { total: all.length, updated, chaptersAdded, failed };
+}
