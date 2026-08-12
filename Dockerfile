@@ -6,7 +6,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit
+RUN npm install --no-audit
 
 COPY . .
 
@@ -24,7 +24,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # drizzle-kit مطلوب وقت التشغيل لتنفيذ المايغريشن
 RUN apk add --no-cache python3 make g++ \
-  && npm ci --omit=dev --no-audit \
+  && npm install --omit=dev --no-audit \
   && apk del python3 make g++
 
 COPY --from=build /app/dist ./dist
