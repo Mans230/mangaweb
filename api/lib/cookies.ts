@@ -1,18 +1,26 @@
 import type { CookieOptions } from "hono/utils/cookie";
 import { env } from "./env";
 
-function isLocalhost(headers: Headers): boolean {
-  const host = headers.get("host") || "";
-  return host.startsWith("localhost:") || host.startsWith("127.0.0.1:");
-}
-
+/**
+ * خيارات كوكي الجلسة — يجب أن تتطابق السمات (path/sameSite/secure)
+ * بين الإنشاء والمسح حتى يلتزم المتصفح بحذف الكوكي فعلياً.
+ *
+ * `secure` يُحدَّد من ترويسة `x-forwarded-proto` (بروكسي Railway) أول قيمة،
+ * مع الرجوع إلى `env.isProduction` عند غيابها (تطوير محلي مباشر).
+ */
 export function getSessionCookieOptions(headers: Headers): CookieOptions {
-  const insecure = isLocalhost(headers) && !env.isProduction;
+  const forwardedProto = headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+
+  const secure = forwardedProto ? forwardedProto === "https" : env.isProduction;
 
   return {
     httpOnly: true,
     path: "/",
     sameSite: "Lax",
-    secure: !insecure,
+    secure,
   };
 }

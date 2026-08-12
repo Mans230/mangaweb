@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -8,13 +9,120 @@ import { env } from "./lib/env";
 import { linkVerifyHandler } from "./lib/link";
 import { googleAuthStartHandler, googleCallbackHandler } from "./lib/google";
 import { Paths } from "@contracts/constants";
+import { BROWSER_UA, imageHostPolicy } from "./scrapers";
+
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB
+
+/** بروكسي صور فصول المصادر — whitelist صارمة ضد SSRF */
+async function imageProxyHandler(c: Context) {
+  const raw = c.req.query("u") ?? "";
+  let target: URL;
+  try {
+    target = new URL(raw);
+    if (target.protocol !== "https:" && target.protocol !== "http:") {
+      throw new Error("bad protocol");
+    }
+  } catch {
+    return c.json({ error: "Invalid URL" }, 400);
+  }
+
+  const host = target.hostname.toLowerCase();
+  let referer: string | undefined;
+  let allowed = false;
+  for (const [allowedHost, ref] of imageHostPolicy()) {
+    if (host === allowedHost || host.endsWith(`.${allowedHost}`)) {
+      allowed = true;
+      referer = ref;
+      break;
+    }
+  }
+  if (!allowed) return c.json({ error: "Forbidden host" }, 403);
+
+  const headers: Record<string, string> = {
+    "User-Agent": BROWSER_UA,
+    Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+  };
+  if (referer) headers.Referer = referer;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const upstream = await fetch(target.href, {
+      headers,
+      signal: controller.signal,
+      redirect: "follow",
+    });
+    if (!upstream.ok || !upstream.body) {
+      return c.json({ error: `Upstream error ${upstream.status}` }, 502);
+    }
+    const contentType = (upstream.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (!contentType.startsWith("image/")) {
+      return c.json({ error: "Not an image" }, 415);
+    }
+    const declared = Number(upstream.headers.get("content-length") ?? 0);
+    if (declared > MAX_IMAGE_BYTES) return c.json({ error: "Image too large" }, 413);
+
+    const reader = upstream.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_IMAGE_BYTES) {
+        await reader.cancel().catch(() => {});
+        return c.json({ error: "Image too large" }, 413);
+      }
+      chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      out.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return c.body(out, 200, {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=86400, immutable",
+    });
+  } catch (e) {
+    const isAbort = (e as Error).name === "AbortError";
+    return c.json({ error: isAbort ? "Upstream timeout" : "Fetch failed" }, 502);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://telegram.org",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src * data: blob:",
+  "connect-src 'self'",
+  "frame-src https://telegram.org https://oauth.telegram.org",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+].join("; ");
+
+// ترويسات أمان على كل الردود
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  c.header("Content-Security-Policy", CSP);
+  c.res.headers.delete("x-powered-by");
+});
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.get(Paths.googleAuth, googleAuthStartHandler());
 app.get(Paths.googleCallback, googleCallbackHandler());
 app.post(Paths.linkVerify, linkVerifyHandler());
+app.get("/api/img", imageProxyHandler);
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",
@@ -36,4 +144,72 @@ if (env.isProduction) {
   serve({ fetch: app.fetch, port }, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // ===== محرك البيانات: استيراد أولي + تحديث دوري (لا يُسقط السيرفر أبداً) =====
+  try {
+    const { count } = await import("drizzle-orm");
+    const { getDb } = await import("./queries/connection");
+    const { manga } = await import("@db/schema");
+    const { enabledScrapers } = await import("./scrapers");
+    const { importLatest, refreshAll } = await import("./services/importer");
+
+    const importOnEmpty = (process.env.IMPORT_ON_EMPTY ?? "true") !== "false";
+    const limitPerSource = Math.max(
+      1,
+      parseInt(process.env.IMPORT_LIMIT_PER_SOURCE || "12", 10) || 12,
+    );
+    const refreshMin = Math.max(
+      5,
+      parseInt(process.env.SCRAPER_REFRESH_MIN || "30", 10) || 30,
+    );
+
+    const db = getDb();
+    const [{ total: mangaTotal }] = await db
+      .select({ total: count() })
+      .from(manga);
+
+    if (importOnEmpty && mangaTotal === 0) {
+      console.log(
+        `[scraper-job] قاعدة البيانات فارغة — استيراد أولي (${limitPerSource} سلسلة لكل مصدر)…`,
+      );
+      void (async () => {
+        for (const s of enabledScrapers()) {
+          try {
+            console.log(`[scraper-job] importLatest(${s.name})…`);
+            const r = await importLatest(s.name, limitPerSource);
+            console.log(
+              `[scraper-job] ${s.name}: استُوردت ${r.imported}، فشلت ${r.failed}`,
+            );
+          } catch (e) {
+            console.error(
+              `[scraper-job] فشل الاستيراد من ${s.name}: ${(e as Error).message}`,
+            );
+          }
+        }
+        console.log("[scraper-job] اكتمل الاستيراد الأولي.");
+      })();
+    }
+
+    // تحديث دوري بلا تداخل
+    let refreshing = false;
+    setInterval(() => {
+      if (refreshing) return;
+      refreshing = true;
+      console.log("[scraper-job] بدء refreshAll الدوري…");
+      refreshAll()
+        .then((r) => {
+          console.log(
+            `[scraper-job] refreshAll: ${r.total} مانجا، ${r.chaptersAdded} فصل جديد، ${r.failed} فشل`,
+          );
+        })
+        .catch((e) => {
+          console.error(`[scraper-job] refreshAll فشل: ${(e as Error).message}`);
+        })
+        .finally(() => {
+          refreshing = false;
+        });
+    }, refreshMin * 60 * 1000);
+  } catch (e) {
+    console.error(`[scraper-job] تعذّر تشغيل مهام الخلفية: ${(e as Error).message}`);
+  }
 }

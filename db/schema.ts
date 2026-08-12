@@ -112,6 +112,7 @@ export const chapters = mysqlTable(
       .references(() => manga.id),
     number: decimal("number", { precision: 8, scale: 1, mode: "number" }).notNull(),
     title: varchar("title", { length: 500 }),
+    url: text("url"),
     pageCount: int("pageCount").default(0).notNull(),
     publishedAt: timestamp("publishedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -119,6 +120,10 @@ export const chapters = mysqlTable(
   (table) => ({
     mangaIdx: index("chapters_manga_idx").on(table.mangaId),
     publishedIdx: index("chapters_published_idx").on(table.publishedAt),
+    mangaNumberUnique: uniqueIndex("chapters_manga_number_unique").on(
+      table.mangaId,
+      table.number,
+    ),
   }),
 );
 

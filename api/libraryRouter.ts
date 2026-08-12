@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
-import { chapters, favorites, follows, manga, readingProgress } from "@db/schema";
+import { chapters, favorites, follows, manga, readingProgress, sources } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, authedQuery } from "./middleware";
 
@@ -39,31 +39,34 @@ export const libraryRouter = createRouter({
     const userId = ctx.user.id;
     const [favRows, followRows, historyRows] = await Promise.all([
       db
-        .select({ entry: favorites, manga: manga })
+        .select({ entry: favorites, manga: manga, source: sources })
         .from(favorites)
         .innerJoin(manga, eq(favorites.mangaId, manga.id))
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
         .where(eq(favorites.userId, userId))
         .orderBy(desc(favorites.createdAt)),
       db
-        .select({ entry: follows, manga: manga })
+        .select({ entry: follows, manga: manga, source: sources })
         .from(follows)
         .innerJoin(manga, eq(follows.mangaId, manga.id))
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
         .where(eq(follows.userId, userId))
         .orderBy(desc(follows.createdAt)),
       db
-        .select({ entry: readingProgress, manga: manga, chapter: chapters })
+        .select({ entry: readingProgress, manga: manga, chapter: chapters, source: sources })
         .from(readingProgress)
         .innerJoin(manga, eq(readingProgress.mangaId, manga.id))
         .innerJoin(chapters, eq(readingProgress.chapterId, chapters.id))
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
         .where(eq(readingProgress.userId, userId))
         .orderBy(desc(readingProgress.updatedAt)),
     ]);
     return {
-      favorites: favRows.map((r) => ({ ...r.entry, manga: r.manga })),
-      following: followRows.map((r) => ({ ...r.entry, manga: r.manga })),
+      favorites: favRows.map((r) => ({ ...r.entry, manga: { ...r.manga, source: r.source } })),
+      following: followRows.map((r) => ({ ...r.entry, manga: { ...r.manga, source: r.source } })),
       history: historyRows.map((r) => ({
         ...r.entry,
-        manga: r.manga,
+        manga: { ...r.manga, source: r.source },
         chapter: r.chapter,
       })),
     };

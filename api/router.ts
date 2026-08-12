@@ -4,6 +4,7 @@ import { engagementRouter } from "./engagementRouter";
 import { libraryRouter } from "./libraryRouter";
 import { mangaRouter } from "./mangaRouter";
 import { requestRouter } from "./requestRouter";
+import { importRouter } from "./importRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -13,6 +14,7 @@ export const appRouter = createRouter({
   library: libraryRouter,
   engagement: engagementRouter,
   request: requestRouter,
+  import: importRouter,
   admin: adminRouter,
 });
 

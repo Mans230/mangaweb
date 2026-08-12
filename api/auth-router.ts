@@ -14,7 +14,22 @@ import {
   findUserByTelegramId,
   touchLastSignIn,
 } from "./queries/users";
+import { checkRateLimit, clientIp } from "./lib/rateLimit";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
+
+/** حد المحاولات لإجراءات auth الحساسة: 10 محاولات / 5 دقائق / IP */
+const AUTH_RATE_LIMIT = 10;
+const AUTH_RATE_WINDOW_MS = 5 * 60 * 1000;
+
+function assertAuthRateLimit(action: string, req: Request) {
+  const key = `${action}:${clientIp(req)}`;
+  if (!checkRateLimit(key, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW_MS)) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "محاولات كثيرة، جرب بعد شوية",
+    });
+  }
+}
 
 const credentialsSchema = z.object({
   email: z.string().email("Invalid email address").max(320),
@@ -55,6 +70,7 @@ export const authRouter = createRouter({
   register: publicQuery
     .input(registerSchema)
     .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("register", ctx.req);
       const email = input.email.toLowerCase();
       const existing = await findUserByEmail(email);
       if (existing) {
@@ -64,7 +80,7 @@ export const authRouter = createRouter({
         });
       }
 
-      const passwordHash = await bcrypt.hash(input.password, 10);
+      const passwordHash = await bcrypt.hash(input.password, 12);
       let user;
       try {
         user = await createUser({
@@ -90,6 +106,7 @@ export const authRouter = createRouter({
   login: publicQuery
     .input(credentialsSchema)
     .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("login", ctx.req);
       const user = await findUserByEmail(input.email);
       const invalid = () =>
         new TRPCError({
@@ -111,6 +128,7 @@ export const authRouter = createRouter({
   telegramLogin: publicQuery
     .input(telegramAuthSchema)
     .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("telegramLogin", ctx.req);
       if (!env.telegramBotToken) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
