@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useRef, useState } from "react"
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Info, XCircle } from "lucide-react";
-import { EASE } from "./adminMock";
+import { EASE } from "./adminUtils";
 
 export type ToastTone = "success" | "danger" | "info";
 

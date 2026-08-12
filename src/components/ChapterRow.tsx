@@ -1,10 +1,10 @@
 import { Link } from "react-router";
 import { motion } from "framer-motion";
-import type { LatestChapter } from "@/data/mock";
+import type { LatestChapterData } from "@/lib/manga";
 import { useLanguage } from "./LanguageProvider";
 
 interface ChapterRowProps {
-  item: LatestChapter;
+  item: LatestChapterData;
 }
 
 /** LatestChapterRow — صف فصل حديث: غلاف 56×84 + عنوان + شريحة فصل + وقت + مصدر */

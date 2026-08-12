@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { motion } from "framer-motion";
 import { Lock, Star } from "lucide-react";
-import type { Manga } from "@/data/mock";
+import type { MangaCardData } from "@/lib/manga";
 import AgeGateModal, { isAgeConfirmed } from "./AgeGateModal";
 import { useLanguage } from "./LanguageProvider";
 
 interface MangaCardProps {
-  manga: Manga;
+  manga: MangaCardData;
   rank?: number;
   className?: string;
 }
