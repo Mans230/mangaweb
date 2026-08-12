@@ -12,14 +12,9 @@ import {
 import EmptyState from "@/components/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import {
-  detectSourceFromUrl,
-  EASE,
-  mockAdminRequests,
-  requestStatusLabel,
-  timeAgo,
-} from "./adminMock";
-import type { AdminRequestRow, RequestStatus, RouterOutputs } from "./adminMock";
+import { detectSourceFromUrl, timeAgo } from "@/lib/manga";
+import { EASE, requestStatusLabel } from "./adminUtils";
+import type { AdminRequestRow, RequestStatus, RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
 
 type ApiRequest = RouterOutputs["admin"]["listRequests"]["items"][number];
@@ -71,16 +66,10 @@ export default function RequestsManager() {
     onSuccess: () => query.refetch(),
   });
 
-  // TODO: fallback للـ mock عند تعذّر الـ API (مع فلترة محلية)
   const rows: AdminRequestRow[] = useMemo(() => {
-    let list: AdminRequestRow[];
-    if (query.data) {
-      list = query.data.items.map(mapApiRequest);
-    } else {
-      list = filter === "all" ? mockAdminRequests : mockAdminRequests.filter((r) => r.status === filter);
-    }
+    const list = (query.data?.items ?? []).map(mapApiRequest);
     return list.map((r) => ({ ...r, status: overrides[r.id] ?? r.status }));
-  }, [query.data, filter, overrides]);
+  }, [query.data, overrides]);
 
   const setStatus = (id: number, status: RequestStatus) => {
     setOverrides((prev) => ({ ...prev, [id]: status }));
@@ -88,7 +77,13 @@ export default function RequestsManager() {
       { id, status },
       {
         onError: () => {
-          // TODO: fallback محلي حتى يستقر الـ API
+          // تراجع عن التغيير المحلي عند فشل الـ API
+          setOverrides((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+          toast(t("تعذّر تحديث حالة الطلب", "Couldn't update request status"), "danger");
         },
       },
     );

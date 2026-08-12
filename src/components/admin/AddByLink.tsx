@@ -1,38 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
-  CheckCircle2,
   ClipboardPaste,
-  Crown,
-  Layers,
   Link2,
   RotateCcw,
-  ShieldAlert,
   XCircle,
 } from "lucide-react";
+import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { mangaList } from "@/data/mock";
-import { detectSourceFromUrl, EASE, formatNum } from "./adminMock";
+import { detectSourceFromUrl } from "@/lib/manga";
+import { EASE } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
 
-interface Preview {
-  title: string;
-  cover: string;
-  description: string;
-  genres: string[];
-  chapters: number;
+/** استخراج slug محتمل من رابط السلسلة (آخر جزء من المسار) */
+function slugCandidate(raw: string): string | null {
+  const v = raw.trim();
+  if (v.length < 8) return null;
+  try {
+    const url = new URL(v.includes("://") ? v : `https://${v}`);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (!last) return null;
+    const slug = decodeURIComponent(last).toLowerCase().replace(/\s+/g, "-");
+    return /^[\p{L}\p{N}-]{3,}$/u.test(slug) ? slug : null;
+  } catch {
+    return null;
+  }
 }
 
-const LOG_LINES = [
-  "جلب البيانات من المصدر…",
-  "تنزيل الغلاف…",
-  "تحليل قائمة الفصول…",
-  "استيراد الفصول…",
-  "تحديث الفهرس…",
-];
+function humanizeSlug(slug: string): string {
+  return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function AddByLink() {
   const { t } = useLanguage();
@@ -40,28 +41,33 @@ export default function AddByLink() {
 
   const [step, setStep] = useState(0);
   const [url, setUrl] = useState("");
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [importAll, setImportAll] = useState(true);
-  const [featured, setFeatured] = useState(false);
-  const [adult, setAdult] = useState(false);
-  const [logLines, setLogLines] = useState<string[]>([]);
-  const [progress, setProgress] = useState(0);
-  const [done, setDone] = useState(false);
+  const [title, setTitle] = useState("");
+  const [note, setNote] = useState("");
   const [requestId, setRequestId] = useState<number | null>(null);
-  const timers = useRef<number[]>([]);
+  const [matchedSource, setMatchedSource] = useState<string | null>(null);
+  const [imported, setImported] = useState<{
+    slug: string;
+    title: string;
+    chaptersAdded: number;
+  } | null>(null);
 
   const addMutation = trpc.admin.addMangaByUrl.useMutation();
+  const importMutation = trpc.import.importByUrl.useMutation();
 
   const detected = useMemo(() => detectSourceFromUrl(url), [url]);
+  const candidate = useMemo(() => slugCandidate(url), [url]);
 
-  // كشف تكرار محلي: إن احتوى الرابط على slug سلسلة موجودة
-  const duplicate = useMemo(() => {
-    const v = url.toLowerCase();
-    if (v.length < 8) return null;
-    return mangaList.find((m) => v.includes(m.slug)) ?? null;
-  }, [url]);
+  // كشف تكرار حقيقي: هل يوجد slug مطابق في قاعدة البيانات؟
+  const duplicateQuery = trpc.manga.getBySlug.useQuery(
+    { slug: candidate ?? "" },
+    { enabled: !!candidate, retry: false },
+  );
+  const duplicate = duplicateQuery.data ?? null;
 
-  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+  useEffect(() => {
+    if (candidate && !title) setTitle(humanizeSlug(candidate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidate]);
 
   const pasteUrl = async () => {
     try {
@@ -72,70 +78,61 @@ export default function AddByLink() {
     }
   };
 
-  const goPreview = () => {
+  const goConfirm = () => {
     if (!url.trim()) return;
-    // TODO: استبدال بالمعاينة الحقيقية من خدمة السكرابر عند توفرها
-    const sample = mangaList[0];
-    setPreview({
-      title: duplicate?.title ?? sample.title,
-      cover: sample.cover,
-      description: sample.synopsis,
-      genres: [...sample.genres],
-      chapters: sample.chapters,
-    });
     setStep(1);
   };
 
   const startImport = () => {
     setStep(2);
-    setLogLines([]);
-    setProgress(0);
-    setDone(false);
-
+    setRequestId(null);
+    setImported(null);
     const fullUrl = url.trim().includes("://") ? url.trim() : `https://${url.trim()}`;
-    addMutation.mutate(
-      { url: fullUrl, title: preview?.title },
+    importMutation.mutate(
+      { url: fullUrl },
       {
-        onSuccess: (res) => setRequestId(res.requestId),
-        onError: () => {
-          // TODO: fallback محلي — السكرابر الخارجي لم يُربط بعد
-          setRequestId(null);
+        onSuccess: (res) => {
+          setImported({
+            slug: res.manga.slug,
+            title: res.manga.title,
+            chaptersAdded: res.chaptersAdded,
+          });
+          toast(t("تم الاستيراد بنجاح", "Imported successfully"));
+        },
+        onError: (err) => {
+          // مصدر غير معروف/معطّل → المسار القديم: طلب يدوي pending
+          if (err.data?.code === "BAD_REQUEST") {
+            addMutation.mutate(
+              {
+                url: fullUrl,
+                title: title.trim() || undefined,
+                note: note.trim() || undefined,
+              },
+              {
+                onSuccess: (res) => {
+                  setRequestId(res.requestId);
+                  setMatchedSource(res.matchedSource?.name ?? null);
+                  toast(t("سُجّل طلب الاستيراد بنجاح", "Import request registered"));
+                },
+              },
+            );
+          }
         },
       },
-    );
-
-    // سجل متحرك + شريط تقدم
-    LOG_LINES.forEach((line, i) => {
-      timers.current.push(
-        window.setTimeout(() => {
-          setLogLines((prev) => [...prev, line]);
-        }, 500 * (i + 1)),
-      );
-    });
-    for (let p = 12; p <= 100; p += 11) {
-      timers.current.push(
-        window.setTimeout(() => setProgress(Math.min(p, 100)), 420 * (p / 11)),
-      );
-    }
-    timers.current.push(
-      window.setTimeout(() => {
-        setDone(true);
-        toast(t("أُضيفت السلسلة بنجاح", "Series added successfully"));
-      }, 500 * (LOG_LINES.length + 1) + 400),
     );
   };
 
   const reset = () => {
     setStep(0);
     setUrl("");
-    setPreview(null);
-    setLogLines([]);
-    setProgress(0);
-    setDone(false);
+    setTitle("");
+    setNote("");
     setRequestId(null);
+    setMatchedSource(null);
+    setImported(null);
   };
 
-  const steps = [t("الرابط", "Link"), t("المعاينة", "Preview"), t("الاستيراد", "Import")];
+  const steps = [t("الرابط", "Link"), t("التأكيد", "Confirm"), t("التسجيل", "Submit")];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -189,7 +186,7 @@ export default function AddByLink() {
                 {t("الصق رابط السلسلة", "Paste the series link")}
               </h2>
               <p className="mt-1 text-sm text-app-3">
-                {t("من أي مصدر من المصادر الثمانية المدعومة", "From any of the 8 supported sources")}
+                {t("من أي مصدر من المصادر المدعومة", "From any supported source")}
               </p>
               <div className="mt-5 flex gap-2">
                 <div className="relative flex-1">
@@ -198,7 +195,7 @@ export default function AddByLink() {
                     dir="ltr"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && goPreview()}
+                    onKeyDown={(e) => e.key === "Enter" && goConfirm()}
                     placeholder={t("الصق رابط السلسلة من أي مصدر…", "Paste series URL…")}
                     className="input-glass w-full !py-3.5 !ps-11 text-left"
                   />
@@ -236,7 +233,7 @@ export default function AddByLink() {
                 {duplicate && (
                   <motion.div
                     initial={{ y: 12, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
+                    animate={{ y: 1, opacity: 1 }}
                     exit={{ y: 12, opacity: 0 }}
                     className="mt-4 flex items-center gap-3 rounded-2xl border border-warning/40 bg-warning/10 p-3.5"
                   >
@@ -253,17 +250,17 @@ export default function AddByLink() {
               </AnimatePresence>
 
               <button
-                onClick={goPreview}
+                onClick={goConfirm}
                 disabled={!url.trim()}
                 className="btn-primary mt-6 w-full !py-3.5 disabled:opacity-50"
               >
-                {t("متابعة للمعاينة", "Continue to preview")}
+                {t("متابعة للتأكيد", "Continue to confirm")}
               </button>
             </motion.div>
           )}
 
-          {/* الخطوة 2: المعاينة */}
-          {step === 1 && preview && (
+          {/* الخطوة 2: التأكيد */}
+          {step === 1 && (
             <motion.div
               key="s1"
               initial={{ x: 60, opacity: 0 }}
@@ -272,55 +269,46 @@ export default function AddByLink() {
               transition={{ duration: 0.4, ease: EASE }}
             >
               <h2 className="font-display text-lg font-bold text-app">
-                {t("معاينة قبل الاستيراد", "Preview before import")}
+                {t("تأكيد قبل التسجيل", "Confirm before registering")}
               </h2>
-              <div className="mt-5 flex flex-col gap-5 sm:flex-row">
-                <img src={preview.cover} alt="" className="h-44 w-28 shrink-0 rounded-2xl border border-app object-cover" />
-                <div className="min-w-0 flex-1 space-y-3">
+              <p className="mt-1 text-sm text-app-3">
+                {t("سيُسجَّل الرابط كطلب استيراد ويتولى السكرابر جلب البيانات.", "The link will be registered as an import request for the scraper to process.")}
+              </p>
+
+              <div className="mt-5 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-2">{t("الرابط", "URL")}</label>
+                  <div className="glass-chip w-full !justify-start overflow-hidden !px-3.5 !py-2.5 text-xs" dir="ltr">
+                    <span className="truncate">{url.trim()}</span>
+                  </div>
+                  {detected?.source && (
+                    <span className="glass-chip mt-2 !border-success/40 !px-2.5 !py-1 !text-[11px] text-success">
+                      <Check size={12} />
+                      <span dir="ltr">{detected.source}</span>
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-2">{t("العنوان", "Title")}</label>
                   <input
-                    value={preview.title}
-                    onChange={(e) => setPreview({ ...preview, title: e.target.value })}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={t("عنوان السلسلة…", "Series title…")}
                     className="input-glass w-full font-display font-bold"
                   />
-                  <p className="line-clamp-3 text-sm leading-relaxed text-app-2">{preview.description}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {preview.genres.map((g) => (
-                      <span key={g} className="glass-chip !px-2.5 !py-1 !text-[11px]">{g}</span>
-                    ))}
-                    <span className="glass-chip !border-accent-2/40 !px-2.5 !py-1 !text-[11px] text-accent-2">
-                      <Layers size={12} /> {formatNum(preview.chapters)} {t("فصل", "chapters")}
-                    </span>
-                  </div>
                 </div>
-              </div>
-
-              <div className="mt-5 space-y-2.5">
-                {[
-                  { label: t("استيراد كل الفصول", "Import all chapters"), value: importAll, set: setImportAll, icon: Layers },
-                  { label: t("تمييز كمميزة في الرئيسية", "Feature on home"), value: featured, set: setFeatured, icon: Crown },
-                  { label: t("محتوى +18", "Adult +18"), value: adult, set: setAdult, icon: ShieldAlert },
-                ].map((opt) => (
-                  <button
-                    key={opt.label}
-                    type="button"
-                    onClick={() => opt.set(!opt.value)}
-                    className="glass flex w-full items-center gap-3 !rounded-2xl p-3.5 text-start"
-                  >
-                    <opt.icon size={17} className={opt.value ? "text-primary" : "text-app-3"} />
-                    <span className="flex-1 text-sm font-semibold text-app">{opt.label}</span>
-                    <span
-                      className={`relative h-6 w-11 rounded-full transition-colors ${
-                        opt.value ? "gradient-primary" : "bg-[var(--border)]"
-                      }`}
-                    >
-                      <motion.span
-                        animate={{ x: opt.value ? (document.dir === "rtl" ? -20 : 20) : 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute top-1 start-1 h-4 w-4 rounded-full bg-white shadow"
-                      />
-                    </span>
-                  </button>
-                ))}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-2">
+                    {t("ملاحظة", "Note")} <span className="font-normal text-app-3">({t("اختياري", "optional")})</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t("مثال: النسخة الملونة إن توفرت…", "e.g. colored version if available…")}
+                    className="input-glass w-full resize-none text-sm"
+                  />
+                </div>
               </div>
 
               <div className="mt-6 flex gap-3">
@@ -328,50 +316,69 @@ export default function AddByLink() {
                   {t("رجوع", "Back")}
                 </button>
                 <button onClick={startImport} className="btn-primary flex-1 !py-3 text-sm">
-                  {t("بدء الاستيراد", "Start import")}
+                  {t("تسجيل الاستيراد", "Register import")}
                 </button>
               </div>
             </motion.div>
           )}
 
-          {/* الخطوة 3: الاستيراد */}
+          {/* الخطوة 3: التسجيل */}
           {step === 2 && (
             <motion.div
               key="s2"
               initial={{ x: 60, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -60, opacity: 0 }}
               transition={{ duration: 0.4, ease: EASE }}
             >
-              {!done ? (
-                <>
-                  <h2 className="font-display text-lg font-bold text-app">
-                    {t("جارٍ الاستيراد…", "Importing…")}
+              {importMutation.isPending || addMutation.isPending ? (
+                <div className="flex flex-col items-center py-10 text-center">
+                  <span className="h-12 w-12 animate-spin rounded-full border-4 border-primary-soft/40 border-t-primary" />
+                  <h2 className="font-display mt-5 text-lg font-bold text-app">
+                    {importMutation.isPending
+                      ? t("جارٍ الاستيراد من المصدر…", "Importing from source…")
+                      : t("جارٍ تسجيل الطلب…", "Registering request…")}
                   </h2>
-                  <div className="mt-5 space-y-2">
-                    {logLines.map((line, i) => (
-                      <motion.div
-                        key={line}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center gap-2.5 text-sm text-app-2"
-                      >
-                        <CheckCircle2 size={16} className="shrink-0 text-success" />
-                        {line}
-                        {i === LOG_LINES.length - 1 && progress < 100 && (
-                          <span className="tabular-nums text-xs text-app-3">{progress}%</span>
-                        )}
-                      </motion.div>
-                    ))}
+                </div>
+              ) : (importMutation.isError && importMutation.error.data?.code !== "BAD_REQUEST") ||
+                addMutation.isError ? (
+                <ErrorState
+                  title={t("تعذّر الاستيراد", "Couldn't import")}
+                  caption={t("تحقق من الرابط والاتصال بالخادم ثم أعد المحاولة.", "Check the link and server connection, then try again.")}
+                  onRetry={startImport}
+                />
+              ) : imported ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, ease: EASE }}
+                  className="flex flex-col items-center py-6 text-center"
+                >
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 16 }}
+                    className="flex h-20 w-20 items-center justify-center rounded-full"
+                    style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.4)" }}
+                  >
+                    <Check size={40} className="text-success" strokeWidth={3} />
+                  </motion.span>
+                  <h2 className="font-display mt-5 text-xl font-bold text-app">
+                    {t("تم الاستيراد بنجاح", "Imported successfully")}
+                  </h2>
+                  <p className="mt-2 max-w-sm text-sm text-app-2">
+                    «{imported.title}» —{" "}
+                    {t(`${imported.chaptersAdded} فصل`, `${imported.chaptersAdded} chapters`)}
+                  </p>
+                  <div className="mt-6 flex flex-wrap justify-center gap-3">
+                    <button onClick={reset} className="btn-glass !px-5 !py-2.5 text-sm">
+                      <RotateCcw size={15} /> {t("إضافة أخرى", "Add another")}
+                    </button>
+                    <Link to={`/manga/${imported.slug}`} className="btn-primary !px-5 !py-2.5 text-sm">
+                      {t("فتح صفحة المانجا", "Open manga page")}
+                    </Link>
                   </div>
-                  <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-[var(--border)]">
-                    <motion.div
-                      animate={{ width: `${progress}%` }}
-                      transition={{ duration: 0.3 }}
-                      className="gradient-primary h-full rounded-full"
-                    />
-                  </div>
-                </>
+                </motion.div>
               ) : (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -389,11 +396,13 @@ export default function AddByLink() {
                     <Check size={40} className="text-success" strokeWidth={3} />
                   </motion.span>
                   <h2 className="font-display mt-5 text-xl font-bold text-app">
-                    {t("أُضيفت بنجاح", "Added successfully")}
+                    {t("سُجّل الطلب بنجاح", "Request registered")}
                   </h2>
                   <p className="mt-2 max-w-sm text-sm text-app-2">
-                    «{preview?.title}» — {importAll ? formatNum(preview?.chapters ?? 0) : 0}{" "}
-                    {t("فصل مستورد", "chapters imported")}
+                    {title.trim() ? `«${title.trim()}» — ` : ""}
+                    {matchedSource
+                      ? t(`سيُستورد من ${matchedSource} عند توفر السكرابر`, `Will be imported from ${matchedSource} once the scraper runs`)
+                      : t("سيُراجع يدوياً لأن المصدر غير معروف", "Will be reviewed manually (unknown source)")}
                     {requestId ? ` · ${t("رقم التتبع", "Ref")} #${requestId}` : ""}
                   </p>
                   <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -401,7 +410,7 @@ export default function AddByLink() {
                       <RotateCcw size={15} /> {t("إضافة أخرى", "Add another")}
                     </button>
                     <Link to="/browse" className="btn-primary !px-5 !py-2.5 text-sm">
-                      {t("عرض الصفحة", "View page")}
+                      {t("تصفّح المكتبة", "Browse library")}
                     </Link>
                   </div>
                 </motion.div>

@@ -24,18 +24,12 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { genres as allGenres } from "@/data/mock";
-import {
-  ALL_SOURCES,
-  EASE,
-  mangaStatusLabel,
-  mockAdminManga,
-  timeAgo,
-  typeLabel,
-} from "./adminMock";
-import type { AdminMangaRow, RouterOutputs } from "./adminMock";
+import { GENRES, mangaStatusLabel, timeAgo, typeLabel } from "@/lib/manga";
+import { EASE } from "./adminUtils";
+import type { AdminMangaRow, RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
 
 const TYPE_FILTERS = ["الكل", "مانهوا", "مانجا", "مانها"];
@@ -87,24 +81,21 @@ export default function MangaManager() {
     { retry: false, placeholderData: (prev) => prev },
   );
 
-  // TODO: fallback للـ mock عند تعذّر الـ API (فلترة محلية)
+  const sourcesQuery = trpc.manga.sources.useQuery(undefined, { retry: false });
+  const sourceOptions = useMemo(
+    () => (sourcesQuery.data ?? []).map((s) => s.name),
+    [sourcesQuery.data],
+  );
+
   const { rows, total } = useMemo(() => {
-    if (query.data) {
-      return { rows: query.data.items.map(mapApiManga), total: query.data.total };
-    }
-    let list = mockAdminManga;
-    if (search) {
-      const q = search.trim();
-      list = list.filter(
-        (m) => m.title.includes(q) || (m.altTitle ?? "").toLowerCase().includes(q.toLowerCase()),
-      );
-    }
+    if (!query.data) return { rows: [] as AdminMangaRow[], total: 0 };
+    let list = query.data.items.map(mapApiManga);
+    // فلاتر المصدر/الحالة/النوع تُطبّق محلياً على نتائج الصفحة
     if (sourceFilter !== "الكل") list = list.filter((m) => m.source === sourceFilter);
     if (statusFilter !== "الكل") list = list.filter((m) => m.status === statusFilter);
     if (typeFilter !== "الكل") list = list.filter((m) => m.type === typeFilter);
-    const start = (page - 1) * perPage;
-    return { rows: list.slice(start, start + perPage), total: list.length };
-  }, [query.data, search, sourceFilter, statusFilter, typeFilter, page, perPage]);
+    return { rows: list, total: query.data.total };
+  }, [query.data, sourceFilter, statusFilter, typeFilter]);
 
   const visible = useMemo(
     () =>
@@ -197,7 +188,7 @@ export default function MangaManager() {
         </div>
         <select value={sourceFilter} onChange={(e) => { setSourceFilter(e.target.value); setPage(1); }} className="input-glass !py-2.5 text-sm">
           <option value="الكل">{t("كل المصادر", "All sources")}</option>
-          {ALL_SOURCES.map((s) => (
+          {sourceOptions.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
@@ -250,6 +241,10 @@ export default function MangaManager() {
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="skeleton h-16" />
           ))}
+        </div>
+      ) : query.isError ? (
+        <div className="glass">
+          <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
         </div>
       ) : visible.length === 0 ? (
         <div className="glass">
@@ -460,7 +455,7 @@ export default function MangaManager() {
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-app-2">{t("التصنيفات", "Genres")}</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {allGenres.filter((g) => !g.adult).map((g) => (
+                    {GENRES.filter((g) => !g.adult).map((g) => (
                       <button
                         key={g.name}
                         type="button"

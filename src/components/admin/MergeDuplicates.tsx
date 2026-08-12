@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { GitMerge, Layers, Star } from "lucide-react";
 import {
@@ -10,11 +10,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { EASE, mockDuplicateGroups } from "./adminMock";
-import type { DuplicateGroup } from "./adminMock";
+import { timeAgo } from "@/lib/manga";
+import { EASE } from "./adminUtils";
+import type { DuplicateGroup, DuplicateItem, RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
+
+type ApiMangaItem = RouterOutputs["admin"]["listManga"]["items"][number];
 
 const qualityStyles: Record<string, string> = {
   عالية: "!border-success/40 text-success",
@@ -22,20 +26,86 @@ const qualityStyles: Record<string, string> = {
   منخفضة: "!border-danger/40 text-danger",
 };
 
+/** تطبيع العنوان للكشف عن التكرار: توحيد الحروف العربية وإزالة الرموز */
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function qualityOf(rating: number): DuplicateItem["quality"] {
+  if (rating >= 4.5) return "عالية";
+  if (rating >= 3.5) return "متوسطة";
+  return "منخفضة";
+}
+
+/** كشف مجموعات التكرار من بيانات المانجا الحقيقية (عنوان أو عنوان بديل متطابق) */
+function detectDuplicateGroups(items: ApiMangaItem[]): DuplicateGroup[] {
+  const buckets = new Map<string, DuplicateItem[]>();
+  for (const m of items) {
+    const item: DuplicateItem = {
+      id: Number(m.id),
+      title: m.title,
+      cover: m.coverUrl || "/cover-01.png",
+      source: m.source.name,
+      chapters: m.chapterCount,
+      updatedAt: timeAgo(m.updatedAt),
+      quality: qualityOf(m.rating ?? 0),
+      description: m.description ?? "",
+    };
+    const keys = new Set(
+      [m.title, ...(m.altTitles ?? [])]
+        .map(normalizeTitle)
+        .filter((k) => k.length >= 3),
+    );
+    for (const key of keys) {
+      const list = buckets.get(key) ?? [];
+      if (!list.some((x) => x.id === item.id)) list.push(item);
+      buckets.set(key, list);
+    }
+  }
+
+  const groups: DuplicateGroup[] = [];
+  const seen = new Set<string>();
+  for (const [key, list] of buckets) {
+    if (list.length < 2) continue;
+    const memberSig = list
+      .map((x) => x.id)
+      .sort((a, b) => a - b)
+      .join("-");
+    if (seen.has(memberSig)) continue;
+    seen.add(memberSig);
+    groups.push({ id: `g-${key}-${memberSig}`, title: list[0].title, items: list });
+  }
+  return groups;
+}
+
 export default function MergeDuplicates() {
   const { t } = useLanguage();
   const toast = useAdminToast();
 
-  const [groups, setGroups] = useState<DuplicateGroup[]>(mockDuplicateGroups);
-  const [activeId, setActiveId] = useState<string | null>(mockDuplicateGroups[0]?.id ?? null);
+  const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [baseId, setBaseId] = useState<number | null>(null);
   const [fieldPicks, setFieldPicks] = useState<Record<string, number>>({});
   const [confirmGroup, setConfirmGroup] = useState<DuplicateGroup | null>(null);
   const [merging, setMerging] = useState(false);
 
+  const query = trpc.admin.listManga.useQuery(
+    { page: 1, limit: 100 },
+    { retry: false },
+  );
   const mergeMutation = trpc.admin.mergeDuplicates.useMutation();
 
-  const active = groups.find((g) => g.id === activeId) ?? null;
+  const groups = useMemo(() => {
+    const detected = detectDuplicateGroups(query.data?.items ?? []);
+    return detected.filter((g) => !ignoredIds.has(g.id));
+  }, [query.data, ignoredIds]);
+
+  const active = groups.find((g) => g.id === activeId) ?? groups[0] ?? null;
   const base = baseId ?? active?.items[0]?.id ?? null;
 
   const selectGroup = (id: string) => {
@@ -45,8 +115,7 @@ export default function MergeDuplicates() {
   };
 
   const ignoreGroup = (id: string) => {
-    // TODO: ربط بـ API تجاهل مجموعة الدمج عند توفره
-    setGroups((prev) => prev.filter((g) => g.id !== id));
+    setIgnoredIds((prev) => new Set([...prev, id]));
     if (activeId === id) setActiveId(null);
     toast(t("تم تجاهل المجموعة", "Group ignored"), "info");
   };
@@ -56,26 +125,53 @@ export default function MergeDuplicates() {
     setMerging(true);
     const duplicates = confirmGroup.items.filter((it) => it.id !== base);
 
-    // دمج كل نسخة مكررة في الأساسية عبر الـ API (مع fallback محلي)
+    // دمج كل نسخة مكررة في الأساسية عبر الـ API — المجموعة تُزال فقط عند نجاح الكل
     let pending = duplicates.length;
-    const finishOne = () => {
+    let failed = false;
+    const finishOne = (ok: boolean) => {
+      if (!ok) failed = true;
       pending -= 1;
-      if (pending <= 0) {
-        setGroups((prev) => prev.filter((g) => g.id !== confirmGroup.id));
-        setConfirmGroup(null);
-        setMerging(false);
-        setActiveId(null);
-        setBaseId(null);
-        toast(t("تم الدمج بنجاح", "Merged successfully"));
+      if (pending > 0) return;
+      setMerging(false);
+      if (failed) {
+        toast(t("فشل دمج بعض النسخ — حاول مجدداً", "Some copies failed to merge — try again"), "danger");
+        void query.refetch();
+        return;
       }
+      setConfirmGroup(null);
+      setActiveId(null);
+      setBaseId(null);
+      void query.refetch();
+      toast(t("تم الدمج بنجاح", "Merged successfully"));
     };
     duplicates.forEach((d) => {
       mergeMutation.mutate(
         { primaryId: base, duplicateId: d.id },
-        { onSuccess: finishOne, onError: finishOne }, // TODO: خطأ الـ API هنا يعني بيانات mock — يُدمج محلياً
+        { onSuccess: () => finishOne(true), onError: () => finishOne(false) },
       );
     });
   };
+
+  if (query.isLoading) {
+    return (
+      <div className="flex flex-col gap-5 lg:flex-row">
+        <div className="w-full shrink-0 space-y-2.5 lg:w-80">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton h-20" />
+          ))}
+        </div>
+        <div className="skeleton h-64 flex-1" />
+      </div>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <div className="glass">
+        <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5 lg:flex-row">
@@ -101,7 +197,7 @@ export default function MergeDuplicates() {
                 <button
                   onClick={() => selectGroup(g.id)}
                   className={`glass w-full !rounded-2xl p-3.5 text-start transition-all ${
-                    activeId === g.id ? "ring-2 ring-[var(--border-glow)]" : ""
+                    active?.id === g.id ? "ring-2 ring-[var(--border-glow)]" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
