@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useInView } from "framer-motion";
 import {
   ArrowLeft,
   BookOpen,
-  Bookmark,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -14,15 +13,8 @@ import {
   Send,
   Star,
 } from "lucide-react";
-import {
-  genres,
-  heroSlides,
-  latestAdditions,
-  latestChapters,
-  popularManga,
-  quickStats,
-  sources,
-} from "@/data/mock";
+import { trpc } from "@/providers/trpc";
+import { GENRES, adaptLatestChapter, adaptMangaRow, formatNum } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import ChapterRow from "@/components/ChapterRow";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
@@ -79,23 +71,39 @@ function SectionHeader({ title, moreTo }: { title: string; moreTo?: string }) {
   );
 }
 
-/* ================= 1. Hero slider ================= */
+/* ================= 1. Hero slider — أعلى 5 شعبية ببيانات حقيقية ================= */
 function HeroSlider() {
   const { t } = useLanguage();
+  const query = trpc.manga.popular.useQuery({ limit: 5 }, { retry: false });
+  const slides = (query.data ?? []).map((m) => adaptMangaRow(m));
+
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const slide = heroSlides[index];
 
+  const count = slides.length;
   const go = useCallback(
-    (dir: 1 | -1) => setIndex((i) => (i + dir + heroSlides.length) % heroSlides.length),
-    []
+    (dir: 1 | -1) => setIndex((i) => (count ? (i + dir + count) % count : 0)),
+    [count],
   );
 
   useEffect(() => {
-    if (paused) return;
+    if (paused || count < 2) return;
     const id = setInterval(() => go(1), AUTOPLAY_MS);
     return () => clearInterval(id);
-  }, [paused, go, index]);
+  }, [paused, go, index, count]);
+
+  if (query.isLoading) {
+    return (
+      <section className="m-3 mt-4 md:m-4 md:mt-6">
+        <div className="skeleton !rounded-[28px]" style={{ minHeight: "min(560px, calc(100svh - 88px))" }} />
+      </section>
+    );
+  }
+  // لا بيانات وهمية: بدون شعبية حقيقية يُخفى الهيرو
+  if (count === 0) return null;
+
+  const safeIndex = index % count;
+  const slide = slides[safeIndex];
 
   const contentStagger = {
     hidden: {},
@@ -118,7 +126,7 @@ function HeroSlider() {
       {/* slides */}
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.div
-          key={index}
+          key={slide.slug}
           className="absolute inset-0"
           initial={{ scale: 1.08, x: -60, opacity: 0.6 }}
           animate={{ scale: 1, x: 0, opacity: 1 }}
@@ -133,7 +141,7 @@ function HeroSlider() {
             else if (info.offset.x < -60) go(-1);
           }}
         >
-          <img src={slide.image} alt={slide.title} className="h-full w-full object-cover" />
+          <img src={slide.cover} alt={slide.title} className="h-full w-full object-cover object-top" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
         </motion.div>
       </AnimatePresence>
@@ -144,14 +152,14 @@ function HeroSlider() {
         style={{ WebkitTextStroke: "2px rgba(255,255,255,0.35)", opacity: 0.5 }}
         dir="ltr"
       >
-        {String(index + 1).padStart(2, "0")}
+        {String(safeIndex + 1).padStart(2, "0")}
       </span>
 
       {/* content panel */}
       <div className="absolute inset-x-3 bottom-3 md:inset-x-6 md:bottom-6 md:max-w-2xl">
         <AnimatePresence mode="wait">
           <motion.div
-            key={index}
+            key={slide.slug}
             variants={contentStagger}
             initial="hidden"
             animate="show"
@@ -159,100 +167,103 @@ function HeroSlider() {
             className="glass rounded-3xl p-5 md:p-7"
             style={{ background: "rgba(20,16,40,0.42)", borderColor: "rgba(255,255,255,0.14)" }}
           >
-            <motion.div variants={contentItem} className="flex flex-wrap gap-2">
-              {slide.genres.map((g) => (
-                <span
-                  key={g}
-                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md"
-                >
-                  {g}
-                </span>
-              ))}
-            </motion.div>
+            {slide.genres.length > 0 && (
+              <motion.div variants={contentItem} className="flex flex-wrap gap-2">
+                {slide.genres.slice(0, 4).map((g) => (
+                  <span
+                    key={g}
+                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md"
+                  >
+                    {g}
+                  </span>
+                ))}
+              </motion.div>
+            )}
             <motion.h1
               variants={contentItem}
               className="font-display mt-3 text-[26px] font-extrabold leading-snug text-white md:text-4xl"
             >
               {slide.title}
             </motion.h1>
-            <motion.p variants={contentItem} className="mt-2 line-clamp-2 text-sm text-white/80 md:text-[15px]">
-              {slide.synopsis}
-            </motion.p>
+            {slide.synopsis && (
+              <motion.p variants={contentItem} className="mt-2 line-clamp-2 text-sm text-white/80 md:text-[15px]">
+                {slide.synopsis}
+              </motion.p>
+            )}
             <motion.div variants={contentItem} className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/85">
               <span className="flex items-center gap-1 font-bold text-warning">
                 <Star size={14} fill="currentColor" /> {slide.rating.toFixed(1)}
               </span>
               <span>{slide.chapters} {t("فصل", "chapters")}</span>
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-warning" />
+                <span className={`h-1.5 w-1.5 rounded-full ${slide.status === "مستمر" ? "animate-pulse-soft bg-warning" : "bg-success"}`} />
                 {slide.status}
               </span>
               <span>{slide.type}</span>
             </motion.div>
             <motion.div variants={contentItem} className="mt-5 flex items-center gap-2.5">
-              <Link to={`/manga/${slide.mangaSlug}/chapter/1`} className="btn-primary !py-3 text-sm">
+              <Link to={`/manga/${slide.slug}/chapter/1`} className="btn-primary !py-3 text-sm">
                 <BookOpen size={16} />
                 {t("اقرأ الآن", "Read now")}
               </Link>
               <Link
-                to={`/manga/${slide.mangaSlug}`}
+                to={`/manga/${slide.slug}`}
                 className="btn-glass !border-white/25 !bg-white/10 !py-3 text-sm !text-white"
               >
                 {t("التفاصيل", "Details")}
               </Link>
-              <button className="btn-icon !border-white/25 !bg-white/10 !text-white" aria-label={t("حفظ", "Bookmark")}>
-                <Bookmark size={17} />
-              </button>
             </motion.div>
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* indicators — bottom center mobile / right vertical desktop */}
-      <div className="absolute bottom-6 end-1/2 translate-x-1/2 flex items-center gap-2 md:bottom-1/2 md:end-6 md:translate-x-0 md:translate-y-1/2 md:flex-col">
-        {heroSlides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setIndex(i)}
-            aria-label={`slide ${i + 1}`}
-            className="relative h-2 overflow-hidden rounded-full transition-all duration-500 md:h-auto md:w-2"
-            style={{
-              width: i === index ? 28 : 8,
-              height: undefined,
-              ...(i === index ? {} : {}),
-              background: i === index ? "transparent" : "rgba(255,255,255,0.4)",
-            }}
-          >
-            {i === index && (
-              <>
-                <span className="absolute inset-0 rounded-full bg-white/30" />
-                <motion.span
-                  key={`p-${index}-${paused}`}
-                  className="gradient-primary absolute inset-y-0 start-0 rounded-full"
-                  initial={{ width: "0%" }}
-                  animate={{ width: paused ? "0%" : "100%" }}
-                  transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
-                />
-              </>
-            )}
-          </button>
-        ))}
-      </div>
+      {count > 1 && (
+        <div className="absolute bottom-6 end-1/2 flex translate-x-1/2 items-center gap-2 md:bottom-1/2 md:end-6 md:translate-x-0 md:translate-y-1/2 md:flex-col">
+          {slides.map((s, i) => (
+            <button
+              key={s.slug}
+              onClick={() => setIndex(i)}
+              aria-label={`slide ${i + 1}`}
+              className="relative h-2 overflow-hidden rounded-full transition-all duration-500 md:h-auto md:w-2"
+              style={{
+                width: i === safeIndex ? 28 : 8,
+                background: i === safeIndex ? "transparent" : "rgba(255,255,255,0.4)",
+              }}
+            >
+              {i === safeIndex && (
+                <>
+                  <span className="absolute inset-0 rounded-full bg-white/30" />
+                  <motion.span
+                    key={`p-${safeIndex}-${paused}`}
+                    className="gradient-primary absolute inset-y-0 start-0 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: paused ? "0%" : "100%" }}
+                    transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
+                  />
+                </>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* desktop arrows */}
-      <div className="absolute end-16 top-1/2 hidden -translate-y-1/2 flex-col gap-2 opacity-0 transition-opacity duration-300 group-hover/hero:opacity-100 md:flex">
-        <button onClick={() => go(1)} className="btn-icon !border-white/20 !bg-black/25 !text-white" aria-label="next">
-          <ChevronRight size={18} className="rtl:-scale-x-100" />
-        </button>
-        <button onClick={() => go(-1)} className="btn-icon !border-white/20 !bg-black/25 !text-white" aria-label="prev">
-          <ChevronLeft size={18} className="rtl:-scale-x-100" />
-        </button>
-      </div>
+      {count > 1 && (
+        <div className="absolute end-16 top-1/2 hidden -translate-y-1/2 flex-col gap-2 opacity-0 transition-opacity duration-300 group-hover/hero:opacity-100 md:flex">
+          <button onClick={() => go(1)} className="btn-icon !border-white/20 !bg-black/25 !text-white" aria-label="next">
+            <ChevronRight size={18} className="rtl:-scale-x-100" />
+          </button>
+          <button onClick={() => go(-1)} className="btn-icon !border-white/20 !bg-black/25 !text-white" aria-label="prev">
+            <ChevronLeft size={18} className="rtl:-scale-x-100" />
+          </button>
+        </div>
+      )}
     </section>
   );
 }
 
-/* ================= 2. Quick stats ================= */
+/* ================= 2. Quick stats — إحصاءات حقيقية من manga.publicStats ================= */
 function useCountUp(target: number, active: boolean, duration = 1200) {
   const [value, setValue] = useState(0);
   useEffect(() => {
@@ -271,21 +282,20 @@ function useCountUp(target: number, active: boolean, duration = 1200) {
   return value;
 }
 
-const statIcons = { database: Database, "book-open": BookOpen, layers: Layers, "refresh-cw": RefreshCw };
-
-function StatChip({ stat, delay }: { stat: (typeof quickStats)[number]; delay: number }) {
+function StatChip({
+  icon: Icon,
+  label,
+  value,
+  delay,
+}: {
+  icon: typeof Database;
+  label: string;
+  value: number;
+  delay: number;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-20% 0px" });
-  const value = useCountUp(stat.value, inView);
-  const Icon = statIcons[stat.icon];
-  const { t } = useLanguage();
-
-  const formatted =
-    stat.id === "series"
-      ? value.toLocaleString("en-US")
-      : stat.id === "chapters"
-        ? `${value}`
-        : `${value}`;
+  const display = useCountUp(value, inView);
 
   return (
     <motion.div
@@ -300,23 +310,63 @@ function StatChip({ stat, delay }: { stat: (typeof quickStats)[number]; delay: n
       </span>
       <div>
         <div className="font-display text-lg font-extrabold leading-tight text-app" dir="ltr">
-          {stat.suffix === "K+" ? `${formatted}K+` : `${stat.suffix}${formatted}`}
+          {display.toLocaleString("en-US")}
         </div>
-        <div className="text-xs text-app-3">
-          {stat.id === "refresh" ? t("تحديث كل 30 دقيقة", "Refresh every 30 min") : stat.label}
-        </div>
+        <div className="text-xs text-app-3">{label}</div>
       </div>
     </motion.div>
   );
 }
 
 function QuickStats() {
+  const { t } = useLanguage();
+  const query = trpc.manga.publicStats.useQuery(undefined, { retry: false });
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 pt-8 md:px-6">
+        <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-4 md:overflow-visible">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton h-[74px] min-w-44 flex-1 !rounded-2xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  // عند الفشل يُخفى الشريط بدل أرقام مزيفة
+  if (query.isError || !query.data) return null;
+
+  const { sourceCount, mangaCount, chapterCount } = query.data;
+  const stats = [
+    { icon: Database, label: t("مصادر نشطة", "Active sources"), value: sourceCount },
+    { icon: BookOpen, label: t("سلسلة متاحة", "Series available"), value: mangaCount },
+    { icon: Layers, label: t("فصل مفهرس", "Indexed chapters"), value: chapterCount },
+  ];
+
   return (
     <section className="mx-auto max-w-7xl px-4 pt-8 md:px-6">
       <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-4 md:overflow-visible">
-        {quickStats.map((s, i) => (
-          <StatChip key={s.id} stat={s} delay={i * 0.1} />
+        {stats.map((s, i) => (
+          <StatChip key={s.label} icon={s.icon} label={s.label} value={s.value} delay={i * 0.1} />
         ))}
+        {/* معلومة ثابتة عن دورية التحديث */}
+        <motion.div
+          initial={{ y: 30, opacity: 0 }}
+          whileInView={{ y: 0, opacity: 1 }}
+          viewport={{ once: true, margin: "-20% 0px" }}
+          transition={{ duration: 0.6, ease: EASE, delay: 0.3 }}
+          className="glass flex shrink-0 items-center gap-3 !rounded-2xl px-5 py-4"
+        >
+          <span className="gradient-primary flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-md">
+            <RefreshCw size={18} />
+          </span>
+          <div>
+            <div className="font-display text-lg font-extrabold leading-tight text-app" dir="ltr">
+              30 {t("دقيقة", "min")}
+            </div>
+            <div className="text-xs text-app-3">{t("تحديث تلقائي للفصول", "Auto chapter refresh")}</div>
+          </div>
+        </motion.div>
       </div>
     </section>
   );
@@ -325,11 +375,28 @@ function QuickStats() {
 /* ================= 3. Latest chapters ================= */
 function LatestChapters() {
   const { t } = useLanguage();
+  const query = trpc.manga.latest.useQuery({ limit: 9 }, { retry: false });
+  const items = (query.data ?? []).map((c) => adaptLatestChapter(c));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
+        <SectionHeader title={t("أحدث الفصول", "Latest chapters")} moreTo="/browse?sort=latest" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="skeleton h-[104px] !rounded-2xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
       <SectionHeader title={t("أحدث الفصول", "Latest chapters")} moreTo="/browse?sort=latest" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {latestChapters.map((item, i) => (
+        {items.map((item, i) => (
           <motion.div
             key={item.id}
             initial={{ y: 30, opacity: 0 }}
@@ -349,6 +416,8 @@ function LatestChapters() {
 function PopularCarousel() {
   const { t } = useLanguage();
   const trackRef = useRef<HTMLDivElement>(null);
+  const query = trpc.manga.popular.useQuery({ limit: 10 }, { retry: false });
+  const items = (query.data ?? []).map((m) => adaptMangaRow(m));
 
   const scroll = (dir: 1 | -1) => {
     const el = trackRef.current;
@@ -356,6 +425,22 @@ function PopularCarousel() {
     // RTL: الاتجاه المرئي معكوس
     el.scrollBy({ left: dir * -el.clientWidth * 0.7, behavior: "smooth" });
   };
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-2 md:px-6">
+        <div className="mb-6"><div className="skeleton h-7 w-40" /></div>
+        <div className="flex gap-3 overflow-hidden md:gap-5">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="w-[42vw] shrink-0 sm:w-[30vw] md:w-[calc((100%-5*20px)/6)]">
+              <div className="skeleton aspect-[2/3] !rounded-2xl" />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-2 md:px-6">
@@ -386,7 +471,7 @@ function PopularCarousel() {
         ref={trackRef}
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-5"
       >
-        {popularManga.map((manga, i) => (
+        {items.map((manga, i) => (
           <motion.div
             key={manga.id}
             initial={{ y: 40, opacity: 0, rotate: 2 }}
@@ -413,11 +498,34 @@ function PopularCarousel() {
 /* ================= 5. Latest additions ================= */
 function LatestAdditions() {
   const { t } = useLanguage();
-  const [featured, ...rest] = latestAdditions;
+  const query = trpc.manga.list.useQuery(
+    { page: 1, limit: 9, sort: "latest" },
+    { retry: false },
+  );
+  const items = (query.data?.items ?? []).map((m) => adaptMangaRow(m));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
+        <SectionHeader title={t("أحدث الإضافات", "Latest additions")} moreTo="/browse?sort=latest" />
+        <div className="grid gap-5 lg:grid-cols-3">
+          <div className="skeleton aspect-[16/10] !rounded-3xl lg:col-span-1" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:col-span-2 lg:grid-cols-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="skeleton aspect-[2/3] !rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  const [featured, ...rest] = items;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
-      <SectionHeader title={t("أحدث الإضافات", "Latest additions")} moreTo="/browse?sort=new" />
+      <SectionHeader title={t("أحدث الإضافات", "Latest additions")} moreTo="/browse?sort=latest" />
       <div className="grid gap-5 lg:grid-cols-3">
         {/* large showcase card */}
         <motion.div
@@ -439,12 +547,14 @@ function LatestAdditions() {
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <span className="glass-chip absolute end-3 top-3 !border-accent-2/40 !text-[10.5px] font-bold text-accent-2">
-                {t("أُضيفت اليوم", "Added today")}
+                {t("أحدث إضافة", "Latest addition")}
               </span>
             </div>
             <div className="flex flex-1 flex-col p-5">
               <h3 className="font-display text-lg font-bold text-app">{featured.title}</h3>
-              <p className="mt-2 line-clamp-2 text-sm text-app-2">{featured.synopsis}</p>
+              {featured.synopsis && (
+                <p className="mt-2 line-clamp-2 text-sm text-app-2">{featured.synopsis}</p>
+              )}
               <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-app-3">
                 <span className="flex items-center gap-1 font-semibold text-warning">
                   <Star size={12} fill="currentColor" /> {featured.rating.toFixed(1)}
@@ -466,9 +576,6 @@ function LatestAdditions() {
               viewport={{ once: true, margin: "-15%" }}
               transition={{ duration: 0.55, ease: EASE, delay: (i % 4) * 0.08 }}
             >
-              <span className="glass-chip mb-2 !px-2.5 !py-0.5 !text-[10.5px]">
-                {i % 2 === 0 ? t("أُضيفت اليوم", "Today") : t("أمس", "Yesterday")}
-              </span>
               <MangaCard manga={manga} />
             </motion.div>
           ))}
@@ -503,7 +610,7 @@ function GenreCloud() {
         className="glass rounded-3xl p-6 md:p-8"
       >
         <div className="flex flex-wrap items-center gap-2.5 md:gap-3">
-          {genres.map((g, i) => {
+          {GENRES.map((g, i) => {
             const chip = (
               <motion.span
                 custom={i}
@@ -518,7 +625,6 @@ function GenreCloud() {
                 style={g.popular && !g.adult ? { borderColor: "var(--border-glow)" } : undefined}
               >
                 {g.name}
-                <span className="text-[10.5px] font-medium opacity-70" dir="ltr">{g.count}</span>
               </motion.span>
             );
             if (g.adult) {
@@ -529,7 +635,7 @@ function GenreCloud() {
               );
             }
             return (
-              <Link key={g.name} to={`/browse?genre=${encodeURIComponent(g.name)}`}>
+              <Link key={g.name} to={`/browse?genres=${encodeURIComponent(g.name)}`}>
                 {chip}
               </Link>
             );
@@ -541,9 +647,14 @@ function GenreCloud() {
   );
 }
 
-/* ================= 7. Sources marquee ================= */
+/* ================= 7. Sources marquee — مصادر حقيقية من manga.sources ================= */
 function SourcesStrip() {
   const { t } = useLanguage();
+  const query = trpc.manga.sources.useQuery(undefined, { retry: false });
+  const sources = query.data ?? [];
+
+  if (query.isLoading || query.isError || sources.length === 0) return null;
+
   const doubled = [...sources, ...sources];
   return (
     <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
@@ -556,9 +667,9 @@ function SourcesStrip() {
       >
         <div className="animate-marquee flex w-max items-center gap-10 px-6" dir="ltr">
           {doubled.map((s, i) => (
-            <span key={i} className="flex items-center gap-2.5 whitespace-nowrap">
+            <span key={`${s.id}-${i}`} className="flex items-center gap-2.5 whitespace-nowrap">
               <span
-                className={`h-2 w-2 rounded-full ${s.status === "نشط" ? "bg-success" : "bg-warning"}`}
+                className={`h-2 w-2 rounded-full ${s.status === "active" ? "bg-success" : "bg-warning"}`}
               />
               <span className="text-sm font-semibold uppercase tracking-widest text-app-2" style={{ letterSpacing: "0.08em" }}>
                 {s.name}
@@ -567,7 +678,10 @@ function SourcesStrip() {
           ))}
         </div>
         <p className="mt-5 text-center text-sm text-app-3">
-          {t("نجمع لك أحدث الفصول من 8 مصادر — تلقائياً كل 30 دقيقة", "We aggregate the latest chapters from 8 sources — automatically, every 30 minutes")}
+          {t(
+            `نجمع لك أحدث الفصول من ${formatNum(sources.length)} مصادر — تلقائياً كل 30 دقيقة`,
+            `We aggregate the latest chapters from ${sources.length} sources — automatically, every 30 minutes`,
+          )}
         </p>
       </motion.div>
     </section>

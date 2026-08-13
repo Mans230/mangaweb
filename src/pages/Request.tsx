@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -19,19 +19,16 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
+import { typeLabel } from "@/lib/manga";
 import { trpc } from "@/providers/trpc";
-import { mangaList } from "@/data/mock";
-import type { SourceName } from "@/data/mock";
-import {
-  detectSourceFromUrl,
-  mockMyRequests,
-  requestStatusLabel,
-  timeAgo,
-} from "@/components/admin/adminMock";
-import type { AdminRequestRow, RequestStatus } from "@/components/admin/adminMock";
+import { detectSourceFromUrl, timeAgo } from "@/lib/manga";
+import type { SourceName } from "@/lib/manga";
+import { requestStatusLabel } from "@/components/admin/adminUtils";
+import type { AdminRequestRow, RequestStatus } from "@/components/admin/adminUtils";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -123,30 +120,37 @@ function RequestForm() {
 
   const createMutation = trpc.request.create.useMutation();
 
-  // اقتراحات التكرار من الكتالوج الحالي (mock حتى يتصل كتالوج الـ API)
-  const suggestions = useMemo(() => {
-    const q = title.trim();
-    if (q.length < 2) return [];
-    return mangaList
-      .filter(
-        (m) =>
-          m.title.includes(q) ||
-          (m.altTitle ?? "").toLowerCase().includes(q.toLowerCase()),
-      )
-      .slice(0, 5);
+  // اقتراحات التكرار من كتالوج الـ API الحقيقي (بحث مؤجل 300ms)
+  const [debouncedTitle, setDebouncedTitle] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedTitle(title.trim()), 300);
+    return () => clearTimeout(timer);
   }, [title]);
 
+  const suggestQuery = trpc.manga.list.useQuery(
+    { page: 1, limit: 5, search: debouncedTitle || undefined },
+    { enabled: debouncedTitle.length >= 2, retry: false },
+  );
+  const suggestions = (suggestQuery.data?.items ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type),
+    chapters: m.chapterCount,
+  }));
+
   const exactDuplicate = useMemo(() => {
-    const q = title.trim();
+    const q = title.trim().toLowerCase();
     if (!q) return null;
     return (
-      mangaList.find(
+      (suggestQuery.data?.items ?? []).find(
         (m) =>
-          m.title === q ||
-          (m.altTitle ?? "").toLowerCase() === q.toLowerCase(),
+          m.title.toLowerCase() === q ||
+          (m.altTitles ?? []).some((a) => a.toLowerCase() === q),
       ) ?? null
     );
-  }, [title]);
+  }, [title, suggestQuery.data]);
 
   const detected = useMemo(() => detectSourceFromUrl(url), [url]);
 
@@ -180,8 +184,9 @@ function RequestForm() {
       {
         onSuccess: (res) => setSubmittedId(res.id),
         onError: () => {
-          // TODO: إزالة الـ fallback عند استقرار الـ API — نحاكي نجاح الإرسال محلياً
-          setSubmittedId(1043);
+          setLocalError(
+            t("تعذّر إرسال الطلب — تحقق من اتصالك وحاول مجدداً.", "Couldn't send the request — check your connection and try again."),
+          );
         },
       },
     );
@@ -477,10 +482,9 @@ function MyRequests() {
     retry: false,
   });
 
-  // TODO: fallback للـ mock عند تعذّر الـ API
-  const rows: AdminRequestRow[] = useMemo(() => {
-    if (query.data) {
-      return query.data.map((r) => {
+  const rows: AdminRequestRow[] = useMemo(
+    () =>
+      (query.data ?? []).map((r) => {
         const det = r.sourceUrl ? detectSourceFromUrl(r.sourceUrl) : null;
         return {
           id: r.id,
@@ -492,10 +496,9 @@ function MyRequests() {
           note: r.note ?? undefined,
           status: r.status,
         };
-      });
-    }
-    return mockMyRequests;
-  }, [query.data]);
+      }),
+    [query.data],
+  );
 
   const filtered = filter === "all" ? rows : rows.filter((r) => r.status === filter);
 
@@ -557,7 +560,11 @@ function MyRequests() {
             ))}
           </div>
 
-          {filtered.length === 0 ? (
+          {query.isError ? (
+            <div className="glass mt-5">
+              <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="glass mt-5">
               <EmptyState title={t("لم ترسل أي طلب بعد", "No requests yet")} caption={t("املأ النموذج بالأعلى وسيظهر طلبك هنا.", "Fill the form above and your request will appear here.")} />
             </div>
