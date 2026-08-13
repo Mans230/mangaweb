@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Star } from "lucide-react";
-import type { Manga } from "@/data/mock";
+import type { MangaCardData } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { ViewMode } from "./constants";
@@ -45,7 +45,7 @@ export function ResultsSkeleton({ view }: { view: ViewMode }) {
 }
 
 /* ================= صف عرض القائمة ================= */
-function MangaListRow({ manga }: { manga: Manga }) {
+function MangaListRow({ manga }: { manga: MangaCardData }) {
   const { t } = useLanguage();
   return (
     <motion.div whileHover={{ x: -4 }} transition={{ duration: 0.25 }}>
@@ -108,7 +108,7 @@ function MangaListRow({ manga }: { manga: Manga }) {
 
 /* ================= شبكة/قائمة النتائج ================= */
 interface ResultsGridProps {
-  items: Manga[];
+  items: MangaCardData[];
   view: ViewMode;
   animKey: string;
 }

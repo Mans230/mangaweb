@@ -5,31 +5,29 @@ import MangaCard from "@/components/MangaCard";
 import EmptyState from "@/components/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { mangaList } from "@/data/mock";
-import type { Manga } from "@/data/mock";
+import type { MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
 import type { LibManga } from "./data";
 import { useToast } from "./toast";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-/** تحويل LibManga إلى شكل Manga الكامل الذي تتوقعه MangaCard (مع إثراء من mock إن توفر). */
-function toCardManga(lib: LibManga): Manga {
-  const fromMock = mangaList.find((m) => m.slug === lib.slug);
-  if (fromMock) return fromMock;
+/** تحويل LibManga إلى شكل MangaCardData الذي تتوقعه MangaCard (بيانات حقيقية من الـ API). */
+function toCardManga(lib: LibManga): MangaCardData {
   return {
     id: lib.id,
     slug: lib.slug,
     title: lib.title,
     cover: lib.cover,
-    type: (lib.type as Manga["type"]) ?? "مانهوا",
-    status: (lib.status as Manga["status"]) ?? "مستمر",
-    rating: 4.5,
-    ratingCount: 0,
+    type: (lib.type as MangaType) || "مانهوا",
+    status: (lib.status as MangaStatus) || "مستمر",
+    rating: lib.rating,
+    ratingCount: lib.ratingCount,
     chapters: lib.chapters,
-    views: "—",
-    genres: [],
-    synopsis: "",
-    source: "azorafly",
+    views: lib.views,
+    genres: lib.genres,
+    synopsis: lib.synopsis,
+    source: lib.source,
+    isAdult: lib.isAdult,
     updatedAt: "",
   };
 }

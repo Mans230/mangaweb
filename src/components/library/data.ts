@@ -1,8 +1,8 @@
-import { mangaList } from "@/data/mock";
+import type { Lang } from "@/lib/manga";
+import { STATUS_AR, TYPE_AR, formatViews, timeAgo } from "@/lib/manga";
 
 /**
- * أنواع موحّدة لصفحة المكتبة + بيانات بديلة (mock fallback).
- * TODO(api): إزالة الـ fallback عند استقرار واجهة library.getLibrary في الإنتاج.
+ * أنواع موحّدة لصفحة المكتبة — البيانات تأتي حصرياً من library.getLibrary.
  */
 
 export interface LibManga {
@@ -13,6 +13,13 @@ export interface LibManga {
   chapters: number;
   type: string; // عربي: مانهوا/مانجا/مانها
   status: string; // عربي: مستمر/مكتمل
+  rating: number;
+  ratingCount: number;
+  views: string;
+  genres: string[];
+  synopsis: string;
+  source: string;
+  isAdult: boolean;
 }
 
 export interface FollowItem {
@@ -35,9 +42,6 @@ export interface LibraryData {
   history: HistoryItem[];
 }
 
-const TYPE_AR: Record<string, string> = { manhwa: "مانهوا", manga: "مانجا", manhua: "مانها" };
-const STATUS_AR: Record<string, string> = { ongoing: "مستمر", completed: "مكتمل" };
-
 /** تطبيع سجل مانجا قادم من الـ API إلى شكل العرض. */
 export function normalizeApiManga(m: {
   id: number;
@@ -47,6 +51,13 @@ export function normalizeApiManga(m: {
   chapterCount: number;
   type: string;
   status: string;
+  rating?: number;
+  ratingCount?: number;
+  viewCount?: number;
+  genres?: string[] | null;
+  description?: string | null;
+  isAdult?: boolean;
+  source?: { name: string } | null;
 }): LibManga {
   return {
     id: m.id,
@@ -56,18 +67,18 @@ export function normalizeApiManga(m: {
     chapters: m.chapterCount,
     type: TYPE_AR[m.type] ?? m.type,
     status: STATUS_AR[m.status] ?? m.status,
+    rating: m.rating ?? 0,
+    ratingCount: m.ratingCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: m.description ?? "",
+    source: m.source?.name ?? "",
+    isAdult: m.isAdult ?? false,
   };
 }
 
 export function timeAgoAr(date: Date): string {
-  const mins = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
-  if (mins < 60) return mins === 1 ? "قبل دقيقة" : `قبل ${mins} د`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return hours === 1 ? "قبل ساعة" : `قبل ${hours} س`;
-  const days = Math.round(hours / 24);
-  if (days === 1) return "أمس";
-  if (days < 30) return `قبل ${days} يوم`;
-  return date.toLocaleDateString("ar", { day: "numeric", month: "long" });
+  return timeAgo(date, "ar" as Lang);
 }
 
 export function dayLabel(date: Date): string {
@@ -90,50 +101,3 @@ export function groupByDay(items: HistoryItem[]): { label: string; items: Histor
   return groups;
 }
 
-/* ---------------- mock fallback ---------------- */
-
-function toLibManga(i: number): LibManga {
-  const m = mangaList[i % mangaList.length];
-  return {
-    id: m.id,
-    slug: m.slug,
-    title: m.title,
-    cover: m.cover,
-    chapters: m.chapters,
-    type: m.type,
-    status: m.status,
-  };
-}
-
-export const mockLibrary: LibraryData = (() => {
-  const favorites: LibManga[] = [0, 6, 2, 4, 7, 1, 8, 10].map(toLibManga);
-
-  const following: FollowItem[] = [0, 6, 4, 2, 8, 5].map((i) => ({
-    manga: toLibManga(i),
-    updatedAt: mangaList[i % mangaList.length].updatedAt,
-  }));
-
-  const history: HistoryItem[] = [];
-  let id = 1;
-  // توزيع واقعي على آخر 9 أيام لإظهار الرسم البياني والمجموعات
-  const pattern = [3, 2, 0, 4, 1, 2, 5, 1, 3];
-  pattern.forEach((perDay, dayIdx) => {
-    for (let k = 0; k < perDay; k++) {
-      const m = toLibManga((dayIdx * 3 + k) % mangaList.length);
-      const date = new Date();
-      date.setDate(date.getDate() - dayIdx);
-      date.setHours(22 - k * 3, (k * 17 + dayIdx * 11) % 60, 0, 0);
-      history.push({
-        id: id++,
-        manga: m,
-        chapter: Math.max(1, m.chapters - ((dayIdx + k) % 9) - 1),
-        lastPage: (k * 5 + dayIdx) % 12,
-        date,
-        timeLabel: date.toLocaleTimeString("ar", { hour: "numeric", minute: "2-digit" }),
-      });
-    }
-  });
-  history.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-  return { favorites, following, history };
-})();

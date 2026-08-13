@@ -1,7 +1,7 @@
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../api/router";
-import type { Manga, MangaStatus, MangaType, SourceName } from "@/data/mock";
-import { mangaList } from "@/data/mock";
+import type { MangaCardData, MangaType } from "@/lib/manga";
+import { adaptMangaRow } from "@/lib/manga";
 
 /* ====== أنواع مستنتجة من tRPC (لا واجهات يدوية لكيانات DB) ====== */
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -91,63 +91,17 @@ export function filtersKey(f: BrowseFilters): string {
   return JSON.stringify({ ...f, page: 1 });
 }
 
-/* ====== تحويل صف tRPC إلى شكل Manga الذي تتوقعه المكونات المشتركة ====== */
-const TYPE_TO_AR: Record<MangaListItem["type"], MangaType> = {
-  manga: "مانجا",
-  manhwa: "مانهوا",
-  manhua: "مانها",
-};
-const STATUS_TO_AR: Record<MangaListItem["status"], MangaStatus> = {
-  ongoing: "مستمر",
-  completed: "مكتمل",
-};
-
-// TODO(backend): manga.list لا يعيد اسم المصدر حالياً — خريطة مؤقتة لمطابقة
-// ترتيب الـ seed حتى يتوفّر endpoint عام لقائمة المصادر.
-const SOURCE_ID_TO_NAME: Record<number, SourceName> = {
-  1: "kawaiimanga",
-  2: "olympustaff",
-  3: "azorafly",
-  4: "mangatime",
-  5: "rocksmanga",
-  6: "3asq",
-  7: "despair-manga",
-  8: "mangadar",
-};
-
-export function formatViews(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
-  return String(n);
+/* ====== تحويل صف tRPC إلى شكل MangaCardData ====== */
+export function adaptListItem(m: MangaListItem): MangaCardData {
+  return adaptMangaRow(m);
 }
 
-export function adaptListItem(m: MangaListItem): Manga {
-  return {
-    id: Number(m.id),
-    slug: m.slug,
-    title: m.title,
-    altTitle: m.altTitles?.[0],
-    cover: m.coverUrl || "/cover-01.png",
-    type: TYPE_TO_AR[m.type] ?? "مانهوا",
-    status: STATUS_TO_AR[m.status] ?? "مستمر",
-    rating: m.rating,
-    ratingCount: m.ratingCount,
-    chapters: m.chapterCount,
-    views: formatViews(m.viewCount),
-    genres: m.genres ?? [],
-    synopsis: m.description ?? "",
-    source: SOURCE_ID_TO_NAME[m.sourceId] ?? "kawaiimanga",
-    isAdult: m.isAdult,
-    updatedAt: "",
-  };
+export function adaptPopularItem(m: PopularItem): MangaCardData {
+  return adaptMangaRow(m);
 }
 
-export function adaptPopularItem(m: PopularItem): Manga {
-  return adaptListItem(m as MangaListItem);
-}
-
-/* ====== فلاتر تُطبّق محلياً (النوع/المصدر غير مدعومين في الـ API حالياً) ====== */
-export function applyLocalOnlyFilters(list: Manga[], f: BrowseFilters): Manga[] {
+/* ====== فلاتر تُطبّق محلياً فوق نتائج الـ API (النوع/المصدر/التصنيفات الإضافية/الأبجدي) ====== */
+export function applyLocalOnlyFilters(list: MangaCardData[], f: BrowseFilters): MangaCardData[] {
   let out = list;
   // التصنيف الأول يُرسل للـ API؛ الباقي يُفلتر محلياً
   if (f.genres.length > 1) {
@@ -160,48 +114,4 @@ export function applyLocalOnlyFilters(list: Manga[], f: BrowseFilters): Manga[] 
     out = [...out].sort((a, b) => a.title.localeCompare(b.title, "ar"));
   }
   return out;
-}
-
-/** فلترة كاملة محلياً — تُستخدم لوضع الـ fallback على بيانات mock */
-export function applyAllFiltersLocally(f: BrowseFilters): Manga[] {
-  let out: Manga[] = mangaList;
-  const q = f.q.trim().toLowerCase();
-  if (q) {
-    out = out.filter(
-      (m) =>
-        m.title.toLowerCase().includes(q) ||
-        (m.altTitle ?? "").toLowerCase().includes(q) ||
-        m.genres.some((g) => g.toLowerCase().includes(q)),
-    );
-  }
-  if (f.genres.length) {
-    out = out.filter((m) => f.genres.every((g) => m.genres.includes(g)));
-  }
-  if (f.status !== "all") {
-    const target: MangaStatus = f.status === "ongoing" ? "مستمر" : "مكتمل";
-    out = out.filter((m) => m.status === target);
-  }
-  out = out.filter((m) => m.chapters >= f.chMin && m.chapters <= f.chMax);
-  if (f.types.length) out = out.filter((m) => f.types.includes(m.type));
-  if (f.sources.length) out = out.filter((m) => f.sources.includes(m.source));
-  if (f.sort === "alpha") {
-    out = [...out].sort((a, b) => a.title.localeCompare(b.title, "ar"));
-  }
-  return out;
-}
-
-/* ====== وقت نسبي بسيط (قبل س/د/يوم) ====== */
-export function timeAgo(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  const diff = Date.now() - d.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "الآن";
-  if (mins < 60) return `قبل ${mins} د`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `قبل ${hours} س`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "أمس";
-  if (days < 7) return `قبل ${days} أيام`;
-  const weeks = Math.floor(days / 7);
-  return `منذ ${weeks} أسبوع`;
 }

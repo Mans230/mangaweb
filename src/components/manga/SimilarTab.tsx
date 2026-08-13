@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
 import MangaCard from "@/components/MangaCard";
-import type { Manga } from "@/data/mock";
+import type { MangaCardData } from "@/lib/manga";
 import { useLanguage } from "@/components/LanguageProvider";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 interface SimilarTabProps {
-  items: Manga[];
+  items: MangaCardData[];
 }
 
 /** شبكة أعمال مشابهة (6 بطاقات) */

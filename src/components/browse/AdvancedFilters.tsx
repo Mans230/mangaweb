@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, RotateCcw, ShieldAlert } from "lucide-react";
-import { genres as allGenres, sources } from "@/data/mock";
-import type { MangaType } from "@/data/mock";
+import { GENRES } from "@/lib/manga";
+import type { MangaType } from "@/lib/manga";
+import { trpc } from "@/providers/trpc";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Slider } from "@/components/ui/slider";
@@ -54,6 +55,9 @@ export default function AdvancedFilters({
   const { t } = useLanguage();
   const [gateOpen, setGateOpen] = useState(false);
 
+  // قائمة المصادر الحقيقية من الـ API
+  const sourcesQuery = trpc.manga.sources.useQuery(undefined, { retry: false });
+
   const toggleGenre = (name: string, adult?: boolean) => {
     const selected = filters.genres.includes(name);
     if (!selected && adult && !isAgeConfirmed()) {
@@ -95,7 +99,7 @@ export default function AdvancedFilters({
           <div className="lg:col-span-2">
             <span className={fieldLabel}>{t("التصنيف", "Genres")}</span>
             <div className="flex flex-wrap gap-2">
-              {allGenres.map((g) => {
+              {GENRES.map((g) => {
                 const selected = filters.genres.includes(g.name);
                 return (
                   <motion.button
@@ -113,9 +117,6 @@ export default function AdvancedFilters({
                     {selected && <Check size={12} />}
                     {g.adult && !selected && <ShieldAlert size={12} className="text-danger" />}
                     {g.name}
-                    <span className={`text-[10px] ${selected ? "text-white/80" : "text-app-3"}`}>
-                      {g.count}
-                    </span>
                   </motion.button>
                 );
               })}
@@ -226,35 +227,46 @@ export default function AdvancedFilters({
             </div>
 
             {/* المصدر */}
-            <div>
-              <span className={fieldLabel}>{t("المصدر", "Source")}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {sources.map((s) => {
-                  const selected = filters.sources.includes(s.name);
-                  return (
-                    <button
-                      key={s.name}
-                      type="button"
-                      onClick={() =>
-                        onChange({ sources: toggleIn(filters.sources, s.name), page: 1 })
-                      }
-                      aria-pressed={selected}
-                      className={`glass-chip !px-2.5 !py-1 !text-[11px] font-semibold ${
-                        selected ? "!border-[var(--border-glow)] text-primary" : ""
-                      }`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          s.status === "نشط" ? "bg-success" : "animate-pulse-soft bg-warning"
-                        }`}
-                      />
-                      {s.name}
-                      {selected && <Check size={11} />}
-                    </button>
-                  );
-                })}
+            {sourcesQuery.isLoading ? (
+              <div>
+                <span className={fieldLabel}>{t("المصدر", "Source")}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="skeleton h-6 w-20 !rounded-full" />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : !sourcesQuery.isError && (sourcesQuery.data?.length ?? 0) > 0 ? (
+              <div>
+                <span className={fieldLabel}>{t("المصدر", "Source")}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(sourcesQuery.data ?? []).map((s) => {
+                    const selected = filters.sources.includes(s.name);
+                    return (
+                      <button
+                        key={s.name}
+                        type="button"
+                        onClick={() =>
+                          onChange({ sources: toggleIn(filters.sources, s.name), page: 1 })
+                        }
+                        aria-pressed={selected}
+                        className={`glass-chip !px-2.5 !py-1 !text-[11px] font-semibold ${
+                          selected ? "!border-[var(--border-glow)] text-primary" : ""
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            s.status === "active" ? "bg-success" : "animate-pulse-soft bg-warning"
+                          }`}
+                        />
+                        {s.name}
+                        {selected && <Check size={11} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {/* الترتيب */}
             <div>

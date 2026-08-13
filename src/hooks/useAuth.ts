@@ -27,9 +27,13 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: async () => {
-      await utils.invalidate();
-      navigate(redirectPath);
+    onSuccess: () => {
+      // 1) امسح بيانات الجلسة المخزّنة فوراً حتى لا يتسابق staleTime (5 دقائق) مع الجلب
+      utils.auth.me.setData(undefined, null as never);
+      // 2) عُد للرئيسية (وليس صفحة الدخول) حتى لا يبدو الخروج وكأنه فشل
+      navigate("/");
+      // 3) أبطِل باقي الاستعلامات في الخلفية
+      void utils.invalidate();
     },
   });
 
