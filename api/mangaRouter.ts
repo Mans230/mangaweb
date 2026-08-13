@@ -209,7 +209,12 @@ export const mangaRouter = createRouter({
         .select({ manga: manga, source: sources })
         .from(manga)
         .innerJoin(sources, eq(manga.sourceId, sources.id))
-        .orderBy(desc(manga.viewCount), desc(manga.chapterCount), desc(manga.id))
+        .orderBy(
+          desc(manga.isTrending),
+          desc(manga.viewCount),
+          desc(manga.chapterCount),
+          desc(manga.id),
+        )
         .limit(input.limit);
       return rows.map((r) => ({ ...r.manga, source: r.source }));
     }),

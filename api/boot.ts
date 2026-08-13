@@ -7,6 +7,9 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 import { linkVerifyHandler } from "./lib/link";
+import { telegramResetHandler } from "./lib/telegramReset";
+import { isIpBanned } from "./lib/ipBan";
+import { clientIp } from "./lib/rateLimit";
 import { googleAuthStartHandler, googleCallbackHandler } from "./lib/google";
 import { Paths } from "@contracts/constants";
 import { BROWSER_UA, imageHostPolicy } from "./scrapers";
@@ -121,9 +124,20 @@ app.use("*", async (c, next) => {
 });
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+
+// فرض حظر الـ IP على كل /api/* (كاش 60 ثانية)
+app.use("/api/*", async (c, next) => {
+  const ip = clientIp(c.req.raw);
+  if (ip !== "unknown" && (await isIpBanned(ip))) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  return next();
+});
+
 app.get(Paths.googleAuth, googleAuthStartHandler());
 app.get(Paths.googleCallback, googleCallbackHandler());
 app.post(Paths.linkVerify, linkVerifyHandler());
+app.post("/api/auth/telegram-reset", telegramResetHandler());
 app.get("/api/img", imageProxyHandler);
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
