@@ -11,6 +11,7 @@ import {
   MessageSquare,
   ShieldX,
   Users,
+  UsersRound,
   BookOpen,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -27,13 +28,14 @@ import UsersManager from "@/components/admin/UsersManager";
 import RequestsManager from "@/components/admin/RequestsManager";
 import ReportsManager from "@/components/admin/ReportsManager";
 import CommentsManager from "@/components/admin/CommentsManager";
+import CommunitiesManager from "@/components/admin/CommunitiesManager";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "reports" | "comments";
+type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "reports" | "comments" | "communities";
 
 const shortcutKeys: Record<string, AdminView> = {
   d: "dashboard",
-  m: "manga",
+  b: "manga",
   a: "add",
   s: "sources",
   g: "merge",
@@ -41,6 +43,7 @@ const shortcutKeys: Record<string, AdminView> = {
   r: "requests",
   p: "reports",
   c: "comments",
+  m: "communities",
 };
 
 function AdminShell() {
@@ -62,6 +65,7 @@ function AdminShell() {
         { id: "requests", label: t("الطلبات", "Requests"), icon: Inbox, badge: pendingCount },
         { id: "reports", label: t("التبليغات", "Reports"), icon: Flag },
         { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
+        { id: "communities", label: t("المجتمعات", "Communities"), icon: UsersRound },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
     [t, pendingCount],
   );
@@ -203,6 +207,7 @@ function AdminShell() {
             {view === "requests" && <RequestsManager />}
             {view === "reports" && <ReportsManager />}
             {view === "comments" && <CommentsManager />}
+            {view === "communities" && <CommunitiesManager />}
           </motion.div>
         </AnimatePresence>
       </div>
