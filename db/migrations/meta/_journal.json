@@ -29,6 +29,13 @@
       "when": 1786610542633,
       "tag": "0003_bans_and_trending",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1786637040510,
+      "tag": "0004_soft_vulture",
+      "breakpoints": true
     }
   ]
 }

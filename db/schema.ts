@@ -11,6 +11,7 @@ import {
   json,
   uniqueIndex,
   index,
+  primaryKey,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -20,7 +21,10 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }).unique(),
   passwordHash: varchar("passwordHash", { length: 255 }),
   name: varchar("name", { length: 255 }),
+  username: varchar("username", { length: 24 }).unique(),
+  usernameChangedAt: timestamp("usernameChangedAt"),
   avatarUrl: text("avatarUrl"),
+  bannerUrl: text("bannerUrl"),
   telegramId: varchar("telegramId", { length: 64 }).unique(),
   telegramUsername: varchar("telegramUsername", { length: 64 }),
   googleId: varchar("googleId", { length: 255 }).unique(),
@@ -305,3 +309,107 @@ export const bannedIps = mysqlTable("banned_ips", {
 });
 
 export type BannedIp = typeof bannedIps.$inferSelect;
+
+// ================= قوائم المستخدم / التقارير / رسائل المجتمع =================
+
+export const userLists = mysqlTable(
+  "user_lists",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 80 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    userNameUnique: uniqueIndex("user_lists_user_name_unique").on(
+      table.userId,
+      table.name,
+    ),
+  }),
+);
+
+export type UserList = typeof userLists.$inferSelect;
+export type InsertUserList = typeof userLists.$inferInsert;
+
+export const userListItems = mysqlTable(
+  "user_list_items",
+  {
+    listId: bigint("listId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => userLists.id, { onDelete: "cascade" }),
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => manga.id, { onDelete: "cascade" }),
+    addedAt: timestamp("addedAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.listId, table.mangaId] }),
+  }),
+);
+
+export type UserListItem = typeof userListItems.$inferSelect;
+
+export const reports = mysqlTable(
+  "reports",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true }).references(
+      () => manga.id,
+    ),
+    chapterId: bigint("chapterId", {
+      mode: "number",
+      unsigned: true,
+    }).references(() => chapters.id),
+    reason: mysqlEnum("reason", [
+      "porn",
+      "broken",
+      "wrong_translation",
+      "other",
+    ]).notNull(),
+    details: text("details"),
+    status: mysqlEnum("status", ["pending", "resolved", "dismissed"])
+      .default("pending")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("reports_status_idx").on(table.status),
+    userIdx: index("reports_user_idx").on(table.userId),
+  }),
+);
+
+export type Report = typeof reports.$inferSelect;
+
+export const communityMessages = mysqlTable(
+  "community_messages",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => manga.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    mangaIdIdx: index("community_messages_manga_id_idx").on(
+      table.mangaId,
+      table.id,
+    ),
+  }),
+);
+
+export type CommunityMessage = typeof communityMessages.$inferSelect;

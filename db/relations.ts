@@ -2,13 +2,17 @@ import { relations } from "drizzle-orm";
 import {
   chapters,
   comments,
+  communityMessages,
   favorites,
   follows,
   manga,
   ratings,
   readingProgress,
+  reports,
   requests,
   sources,
+  userListItems,
+  userLists,
   users,
 } from "./schema";
 
@@ -72,3 +76,42 @@ export const ratingsRelations = relations(ratings, ({ one }) => ({
 export const requestsRelations = relations(requests, ({ one }) => ({
   user: one(users, { fields: [requests.userId], references: [users.id] }),
 }));
+
+export const userListsRelations = relations(userLists, ({ one, many }) => ({
+  user: one(users, { fields: [userLists.userId], references: [users.id] }),
+  items: many(userListItems),
+}));
+
+export const userListItemsRelations = relations(userListItems, ({ one }) => ({
+  list: one(userLists, {
+    fields: [userListItems.listId],
+    references: [userLists.id],
+  }),
+  manga: one(manga, {
+    fields: [userListItems.mangaId],
+    references: [manga.id],
+  }),
+}));
+
+export const reportsRelations = relations(reports, ({ one }) => ({
+  user: one(users, { fields: [reports.userId], references: [users.id] }),
+  manga: one(manga, { fields: [reports.mangaId], references: [manga.id] }),
+  chapter: one(chapters, {
+    fields: [reports.chapterId],
+    references: [chapters.id],
+  }),
+}));
+
+export const communityMessagesRelations = relations(
+  communityMessages,
+  ({ one }) => ({
+    manga: one(manga, {
+      fields: [communityMessages.mangaId],
+      references: [manga.id],
+    }),
+    user: one(users, {
+      fields: [communityMessages.userId],
+      references: [users.id],
+    }),
+  }),
+);
