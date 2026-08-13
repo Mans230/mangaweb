@@ -31,6 +31,7 @@ export const users = mysqlTable("users", {
     .notNull()
     .$onUpdate(() => new Date()),
   lastSignInAt: timestamp("lastSignInAt").defaultNow().notNull(),
+  bannedAt: timestamp("banned_at"),
 });
 
 export type User = typeof users.$inferSelect;
@@ -69,8 +70,8 @@ export const manga = mysqlTable(
   "manga",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     slug: varchar("slug", { length: 300 }).notNull().unique(),
     title: varchar("title", { length: 500 }).notNull(),
     altTitles: json("altTitles").$type<string[]>(),
@@ -92,6 +93,7 @@ export const manga = mysqlTable(
       .notNull(),
     chapterCount: int("chapterCount").default(0).notNull(),
     isAdult: boolean("isAdult").default(false).notNull(),
+    isTrending: boolean("is_trending").default(false).notNull(),
     sourceId: bigint("sourceId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => sources.id),
@@ -116,8 +118,8 @@ export const chapters = mysqlTable(
   "chapters",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     mangaId: bigint("mangaId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => manga.id),
@@ -145,8 +147,8 @@ export const favorites = mysqlTable(
   "favorites",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -169,8 +171,8 @@ export const follows = mysqlTable(
   "follows",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -193,8 +195,8 @@ export const readingProgress = mysqlTable(
   "reading_progress",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -224,8 +226,8 @@ export const comments = mysqlTable(
   "comments",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -251,8 +253,8 @@ export const ratings = mysqlTable(
   "ratings",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -276,8 +278,8 @@ export const requests = mysqlTable(
   "requests",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true }).references(
       () => users.id,
     ),
@@ -295,3 +297,11 @@ export const requests = mysqlTable(
 );
 
 export type Request = typeof requests.$inferSelect;
+
+export const bannedIps = mysqlTable("banned_ips", {
+  ip: varchar("ip", { length: 45 }).primaryKey(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BannedIp = typeof bannedIps.$inferSelect;
