@@ -1,55 +1,26 @@
-import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Archive, FileText, Send, X } from "lucide-react";
+import { Archive, Check, FileText, Send, X } from "lucide-react";
+import { useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 
-type Phase = "pick" | "progress" | "done";
 type Format = "pdf" | "cbz";
+
+/** اسم بوت التحميل على تليجرام */
+const TELEGRAM_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "egmangabot";
 
 interface DownloadModalProps {
   open: boolean;
   onClose: () => void;
+  slug: string;
   chapterNumber: number;
 }
 
-const SIZES: Record<Format, string> = { pdf: "~12MB", cbz: "~9MB" };
-
-export default function DownloadModal({ open, onClose, chapterNumber }: DownloadModalProps) {
+/** تحميل الفصل الحالي عبر بوت تليجرام — deep link حقيقي بصيغة PDF أو CBZ */
+export default function DownloadModal({ open, onClose, slug, chapterNumber }: DownloadModalProps) {
   const { t } = useLanguage();
-  const [phase, setPhase] = useState<Phase>("pick");
   const [format, setFormat] = useState<Format>("pdf");
-  const [pct, setPct] = useState(0);
-  const timerRef = useRef<number | null>(null);
 
-  // reset when reopened
-  useEffect(() => {
-    if (open) {
-      setPhase("pick");
-      setPct(0);
-    }
-    return () => {
-      if (timerRef.current) window.clearInterval(timerRef.current);
-    };
-  }, [open]);
-
-  // TODO: hook to the real export endpoint; progress below is simulated per design.
-  const startDownload = (fmt: Format) => {
-    setFormat(fmt);
-    setPhase("progress");
-    setPct(0);
-    const started = Date.now();
-    timerRef.current = window.setInterval(() => {
-      const p = Math.min(1, (Date.now() - started) / 1500);
-      setPct(p);
-      if (p >= 1 && timerRef.current) {
-        window.clearInterval(timerRef.current);
-        setPhase("done");
-      }
-    }, 50);
-  };
-
-  const R = 30;
-  const CIRC = 2 * Math.PI * R;
+  const botLink = `https://t.me/${TELEGRAM_BOT}?start=dl_${slug}_c${chapterNumber}_${format}`;
 
   return (
     <AnimatePresence>
@@ -61,7 +32,7 @@ export default function DownloadModal({ open, onClose, chapterNumber }: Download
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[72] bg-black/45 backdrop-blur-sm"
-            onClick={phase === "progress" ? undefined : onClose}
+            onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
@@ -82,128 +53,41 @@ export default function DownloadModal({ open, onClose, chapterNumber }: Download
               </button>
             </div>
 
-            {phase === "pick" && (
-              <div className="grid grid-cols-2 gap-3">
-                <FormatTile
-                  icon={<FileText size={26} />}
-                  label="PDF"
-                  size={SIZES.pdf}
-                  onClick={() => startDownload("pdf")}
-                />
-                <FormatTile
-                  icon={<Archive size={26} />}
-                  label="CBZ"
-                  size={SIZES.cbz}
-                  onClick={() => startDownload("cbz")}
-                />
-              </div>
-            )}
+            <p className="text-xs leading-relaxed text-app-2">
+              {t(
+                "يُرسل الفصل إليك عبر بوت تليجرام مباشرة بالصيغة التي تختارها.",
+                "The chapter is delivered to you via our Telegram bot in your chosen format.",
+              )}
+            </p>
 
-            {phase !== "pick" && (
-              <div className="flex flex-col items-center gap-3 py-4">
-                <div className="relative h-24 w-24">
-                  <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90">
-                    <circle
-                      cx="36"
-                      cy="36"
-                      r={R}
-                      fill="none"
-                      stroke="var(--border)"
-                      strokeWidth="5"
-                    />
-                    {phase === "progress" ? (
-                      <circle
-                        cx="36"
-                        cy="36"
-                        r={R}
-                        fill="none"
-                        stroke="url(#dl-grad)"
-                        strokeWidth="5"
-                        strokeLinecap="round"
-                        strokeDasharray={CIRC}
-                        strokeDashoffset={CIRC * (1 - pct)}
-                        style={{ transition: "stroke-dashoffset 0.08s linear" }}
-                      />
-                    ) : (
-                      <motion.circle
-                        cx="36"
-                        cy="36"
-                        r={R}
-                        fill="none"
-                        stroke="var(--success)"
-                        strokeWidth="5"
-                        strokeLinecap="round"
-                        strokeDasharray={CIRC}
-                        initial={{ strokeDashoffset: CIRC }}
-                        animate={{ strokeDashoffset: 0 }}
-                        transition={{ duration: 0.4 }}
-                      />
-                    )}
-                    <defs>
-                      <linearGradient id="dl-grad" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#7c3aed" />
-                        <stop offset="55%" stopColor="#a78bfa" />
-                        <stop offset="100%" stopColor="#e879f9" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    {phase === "progress" ? (
-                      <span className="text-sm font-bold tabular-nums text-app" dir="ltr">
-                        {Math.round(pct * 100)}%
-                      </span>
-                    ) : (
-                      <motion.svg
-                        viewBox="0 0 24 24"
-                        className="h-8 w-8 text-success"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <motion.path
-                          d="M4 12.5l5 5L20 6.5"
-                          initial={{ pathLength: 0 }}
-                          animate={{ pathLength: 1 }}
-                          transition={{ duration: 0.4, delay: 0.15 }}
-                        />
-                      </motion.svg>
-                    )}
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-app">
-                  {phase === "progress"
-                    ? t("جارٍ تجهيز الملف…", "Preparing file…")
-                    : t("تم الحفظ", "Saved")}
-                </p>
-                {phase === "done" && (
-                  <p className="text-xs text-app-3" dir="ltr">
-                    {t("الفصل", "chapter")} {chapterNumber}.{format}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Telegram bot note */}
-            <div className="mt-4 rounded-2xl border border-app bg-app/40 p-3">
-              <p className="mb-2 text-xs leading-relaxed text-app-2">
-                {t(
-                  "لتحميل المانجا كاملة (50 فصل/جزء) استخدم بوت تليجرام الخاص بنا — يصلك التحميل هناك مباشرة.",
-                  "To download the whole manga (50 chapters/part) use our Telegram bot — your download arrives there directly.",
-                )}
-              </p>
-              {/* TODO: replace with the real bot username once provisioned */}
-              <a
-                href="https://t.me/zeko_manga_bot"
-                target="_blank"
-                rel="noreferrer"
-                className="btn-glass w-full !py-2 text-xs"
-              >
-                <Send size={14} />
-                {t("فتح بوت التحميل", "Open download bot")}
-              </a>
+            {/* الصيغة */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <FormatTile
+                icon={<FileText size={26} />}
+                label="PDF"
+                active={format === "pdf"}
+                onClick={() => setFormat("pdf")}
+              />
+              <FormatTile
+                icon={<Archive size={26} />}
+                label="CBZ"
+                active={format === "cbz"}
+                onClick={() => setFormat("cbz")}
+              />
             </div>
+
+            <a
+              href={botLink}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary mt-5 w-full !py-3 text-sm"
+            >
+              <Send size={15} className="rtl:-scale-x-100" />
+              {t("استلام عبر البوت", "Receive via bot")}
+            </a>
+            <p className="mt-2 text-center text-[10.5px] text-app-3" dir="ltr">
+              dl_{slug}_c{chapterNumber}_{format}
+            </p>
           </motion.div>
         </>
       )}
@@ -214,12 +98,12 @@ export default function DownloadModal({ open, onClose, chapterNumber }: Download
 function FormatTile({
   icon,
   label,
-  size,
+  active,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
-  size: string;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
@@ -227,11 +111,15 @@ function FormatTile({
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      className="glass flex flex-col items-center gap-2 rounded-2xl px-4 py-5 text-app transition-colors hover:border-[var(--border-glow)]"
+      className={`glass flex flex-col items-center gap-2 rounded-2xl px-4 py-5 text-app transition-colors hover:border-[var(--border-glow)] ${
+        active ? "!border-[var(--border-glow)]" : ""
+      }`}
     >
       <span className="text-primary">{icon}</span>
-      <span className="text-base font-bold">{label}</span>
-      <span className="text-xs text-app-3" dir="ltr">{size}</span>
+      <span className="flex items-center gap-1.5 text-base font-bold">
+        {label}
+        {active && <Check size={14} className="text-success" />}
+      </span>
     </motion.button>
   );
 }

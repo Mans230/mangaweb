@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Link2,
   ListMusic,
+  MessageSquare,
   ShieldX,
   Users,
   BookOpen,
@@ -23,9 +24,10 @@ import AdminSources from "@/components/admin/Sources";
 import MergeDuplicates from "@/components/admin/MergeDuplicates";
 import UsersManager from "@/components/admin/UsersManager";
 import RequestsManager from "@/components/admin/RequestsManager";
+import CommentsManager from "@/components/admin/CommentsManager";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests";
+type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "comments";
 
 const shortcutKeys: Record<string, AdminView> = {
   d: "dashboard",
@@ -35,6 +37,7 @@ const shortcutKeys: Record<string, AdminView> = {
   g: "merge",
   u: "users",
   r: "requests",
+  c: "comments",
 };
 
 function AdminShell() {
@@ -54,6 +57,7 @@ function AdminShell() {
         { id: "merge", label: t("دمج المكرر", "Merge duplicates"), icon: GitMerge },
         { id: "users", label: t("المستخدمون", "Users"), icon: Users },
         { id: "requests", label: t("الطلبات", "Requests"), icon: Inbox, badge: pendingCount },
+        { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
     [t, pendingCount],
   );
@@ -132,7 +136,7 @@ function AdminShell() {
           );
         })}
         <div className="mt-3 border-t border-app px-2 pt-3 text-[10px] leading-relaxed text-app-3">
-          {t("اختصارات: g ثم d/m/a/s/g/u/r للتنقل", "Shortcuts: g then d/m/a/s/g/u/r")}
+          {t("اختصارات: g ثم d/m/a/s/g/u/r/c للتنقل", "Shortcuts: g then d/m/a/s/g/u/r/c")}
         </div>
       </motion.aside>
 
@@ -193,6 +197,7 @@ function AdminShell() {
             {view === "merge" && <MergeDuplicates />}
             {view === "users" && <UsersManager />}
             {view === "requests" && <RequestsManager />}
+            {view === "comments" && <CommentsManager />}
           </motion.div>
         </AnimatePresence>
       </div>

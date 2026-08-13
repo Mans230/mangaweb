@@ -40,6 +40,8 @@ export interface AdminMangaRow {
   rating: number;
   source: string;
   isAdult: boolean;
+  isTrending: boolean;
+  statusRaw: string;
   lastScan: string;
   genres: string[];
   description: string;
@@ -63,6 +65,7 @@ export interface AdminUserRow {
   avatar: string | null;
   role: "admin" | "user";
   joinedAt: string;
+  bannedAt: string | Date | null;
 }
 
 export interface AdminRequestRow {
