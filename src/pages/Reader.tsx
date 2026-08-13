@@ -99,7 +99,7 @@ export default function Reader() {
   );
   const rawPages = useMemo(() => pagesQuery.data?.pages ?? [], [pagesQuery.data]);
   const pages = useMemo(
-    () => rawPages.map((u) => `/api/img?u=${encodeURIComponent(u)}`),
+    () => rawPages.map((u) => `/api/img?u=${encodeURIComponent(u)}&s=1`),
     [rawPages],
   );
   const pagesLoading = !!current && pagesQuery.isLoading;

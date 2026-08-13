@@ -87,7 +87,9 @@ async function imageProxyHandler(c: Context) {
     }
     return c.body(out, 200, {
       "Content-Type": contentType,
-      "Cache-Control": "public, max-age=86400, immutable",
+      // s=1 = صفحة فصل داخل القارئ — لا تُخزَّن في كاش المتصفح (يتراكم بسرعة لمئات الميغا)
+      "Cache-Control":
+        c.req.query("s") === "1" ? "no-store" : "public, max-age=86400, immutable",
     });
   } catch (e) {
     const isAbort = (e as Error).name === "AbortError";
