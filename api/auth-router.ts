@@ -123,6 +123,12 @@ export const authRouter = createRouter({
       if (!ok) {
         throw invalid();
       }
+      if (user.bannedAt) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "هذا الحساب محظور",
+        });
+      }
       // Upgrade existing accounts whose email is in ADMIN_EMAILS on every login
       if (
         user.role !== "admin" &&
@@ -156,6 +162,12 @@ export const authRouter = createRouter({
 
       const telegramId = String(input.id);
       let user = await findUserByTelegramId(telegramId);
+      if (user?.bannedAt) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "هذا الحساب محظور",
+        });
+      }
       if (!user) {
         try {
           user = await createUser({

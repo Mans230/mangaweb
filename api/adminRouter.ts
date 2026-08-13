@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { and, count, desc, eq, like } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import {
+  bannedIps,
   chapters,
   comments,
   favorites,
@@ -14,6 +16,9 @@ import {
 } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, adminQuery } from "./middleware";
+import { enabledScrapers } from "./scrapers";
+import { importSeries, normalizeTitle } from "./services/importer";
+import { invalidateIpBanCache } from "./lib/ipBan";
 
 const sourceStatusEnum = z.enum(["active", "paused", "blocked"]);
 const requestStatusEnum = z.enum(["pending", "added", "rejected"]);
@@ -204,6 +209,238 @@ export const adminRouter = createRouter({
       });
 
       return { success: true, primaryId: primary.id };
+    }),
+
+  /** حذف مانجا وكل البيانات التابعة لها داخل transaction */
+  deleteManga: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const existing = await db.query.manga.findFirst({
+        where: eq(manga.id, input.id),
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المانجا غير موجودة" });
+      }
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(readingProgress)
+          .where(eq(readingProgress.mangaId, input.id));
+        await tx.delete(comments).where(eq(comments.mangaId, input.id));
+        await tx.delete(ratings).where(eq(ratings.mangaId, input.id));
+        await tx.delete(favorites).where(eq(favorites.mangaId, input.id));
+        await tx.delete(follows).where(eq(follows.mangaId, input.id));
+        await tx.delete(chapters).where(eq(chapters.mangaId, input.id));
+        await tx.delete(manga).where(eq(manga.id, input.id));
+      });
+      // حدّث عدّاد المصدر
+      const [{ total: srcTotal }] = await db
+        .select({ total: count() })
+        .from(manga)
+        .where(eq(manga.sourceId, existing.sourceId));
+      await db
+        .update(sources)
+        .set({ mangaCount: srcTotal })
+        .where(eq(sources.id, existing.sourceId));
+      return { success: true };
+    }),
+
+  /** تحديث جزئي لبيانات مانجا */
+  updateManga: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        title: z.string().trim().min(1).max(500).optional(),
+        coverUrl: z.string().trim().max(2000).optional(),
+        description: z.string().max(10000).optional(),
+        status: z.enum(["ongoing", "completed"]).optional(),
+        isTrending: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const existing = await db.query.manga.findFirst({
+        where: eq(manga.id, input.id),
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المانجا غير موجودة" });
+      }
+      const patch: Partial<typeof manga.$inferInsert> = {};
+      if (input.title !== undefined) patch.title = input.title;
+      if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
+      if (input.description !== undefined) patch.description = input.description;
+      if (input.status !== undefined) patch.status = input.status;
+      if (input.isTrending !== undefined) patch.isTrending = input.isTrending;
+      if (Object.keys(patch).length) {
+        await db.update(manga).set(patch).where(eq(manga.id, input.id));
+      }
+      const updated = await db.query.manga.findFirst({
+        where: eq(manga.id, input.id),
+      });
+      return updated!;
+    }),
+
+  /** حظر / فك حظر مستخدم — لا يمكن للأدمن حظر نفسه */
+  banUser: adminQuery
+    .input(z.object({ userId: z.number().int().positive(), banned: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId === Number(ctx.user.id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "لا يمكنك حظر حسابك الخاص",
+        });
+      }
+      const db = getDb();
+      const target = await db.query.users.findFirst({
+        where: eq(users.id, input.userId),
+      });
+      if (!target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المستخدم غير موجود" });
+      }
+      await db
+        .update(users)
+        .set({ bannedAt: input.banned ? new Date() : null })
+        .where(eq(users.id, input.userId));
+      return { success: true, banned: input.banned };
+    }),
+
+  banIp: adminQuery
+    .input(
+      z.object({
+        ip: z.string().trim().min(3).max(45),
+        reason: z.string().trim().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db
+        .insert(bannedIps)
+        .values({ ip: input.ip, reason: input.reason ?? null })
+        .onDuplicateKeyUpdate({ set: { reason: input.reason ?? null } });
+      invalidateIpBanCache();
+      return { success: true };
+    }),
+
+  unbanIp: adminQuery
+    .input(z.object({ ip: z.string().trim().min(3).max(45) }))
+    .mutation(async ({ input }) => {
+      await getDb().delete(bannedIps).where(eq(bannedIps.ip, input.ip));
+      invalidateIpBanCache();
+      return { success: true };
+    }),
+
+  listBans: adminQuery.query(() =>
+    getDb().select().from(bannedIps).orderBy(desc(bannedIps.createdAt)),
+  ),
+
+  listComments: adminQuery
+    .input(
+      z.object({
+        mangaId: z.number().int().positive().optional(),
+        limit: z.number().int().min(1).max(100).default(50),
+        offset: z.number().int().min(0).default(0),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const where = input.mangaId
+        ? eq(comments.mangaId, input.mangaId)
+        : undefined;
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            comment: comments,
+            user: { id: users.id, name: users.name },
+            manga: { id: manga.id, title: manga.title },
+          })
+          .from(comments)
+          .innerJoin(users, eq(comments.userId, users.id))
+          .innerJoin(manga, eq(comments.mangaId, manga.id))
+          .where(where)
+          .orderBy(desc(comments.createdAt))
+          .limit(input.limit)
+          .offset(input.offset),
+        db.select({ total: count() }).from(comments).where(where),
+      ]);
+      return {
+        items: rows.map((r) => ({ ...r.comment, user: r.user, manga: r.manga })),
+        total,
+        limit: input.limit,
+        offset: input.offset,
+      };
+    }),
+
+  deleteComment: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await getDb().delete(comments).where(eq(comments.id, input.id));
+      return { success: true };
+    }),
+
+  /**
+   * استيراد بالاسم: بحث متوازٍ في كل المصادر المفعّلة، اختيار أفضل تطابق
+   * (تطبيع العنوان)، ثم الاستيراد بنفس منطق importByUrl.
+   */
+  addMangaByName: adminQuery
+    .input(z.object({ name: z.string().trim().min(1).max(300) }))
+    .mutation(async ({ input }) => {
+      const normQuery = normalizeTitle(input.name);
+      const results = await Promise.all(
+        enabledScrapers().map(async (s) => {
+          try {
+            const items = await s.search(input.name);
+            return { source: s.name, items };
+          } catch (e) {
+            console.warn(
+              `[admin] بحث ${s.name} عن "${input.name}" فشل: ${(e as Error).message}`,
+            );
+            return { source: s.name, items: [] };
+          }
+        }),
+      );
+
+      // أفضل تطابق: تطابق تام مُطبَّع أولاً، ثم احتواء، ثم أول نتيجة
+      let best: { source: string; title: string; url: string } | null = null;
+      let fallback: { source: string; title: string; url: string } | null = null;
+      for (const r of results) {
+        for (const it of r.items) {
+          if (!it.url) continue;
+          const cand = { source: r.source, title: it.title, url: it.url };
+          if (!fallback) fallback = cand;
+          const norm = normalizeTitle(it.title ?? "");
+          if (norm === normQuery) {
+            best = cand;
+            break;
+          }
+          if (!best && (norm.includes(normQuery) || normQuery.includes(norm))) {
+            best = cand;
+          }
+        }
+        if (best && normalizeTitle(best.title) === normQuery) break;
+      }
+      const pick = best ?? fallback;
+      if (!pick) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `لا نتائج عن "${input.name}" في أي مصدر مفعّل`,
+        });
+      }
+
+      try {
+        const res = await importSeries(pick.source, pick.url);
+        return {
+          imported: !res.duplicate,
+          title: res.manga.title,
+          slug: res.manga.slug,
+          source: pick.source,
+          duplicate: res.duplicate,
+        };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `فشل الاستيراد من ${pick.source}: ${(e as Error).message}`,
+        });
+      }
     }),
 
   listUsers: adminQuery
