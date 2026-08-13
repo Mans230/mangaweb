@@ -53,10 +53,10 @@ export const mangaRouter = createRouter({
 
     const orderBy =
       input.sort === "latest"
-        ? [desc(manga.updatedAt)]
+        ? [desc(manga.updatedAt), desc(manga.id)]
         : input.sort === "rating"
-          ? [desc(manga.rating), desc(manga.ratingCount)]
-          : [desc(manga.viewCount)];
+          ? [desc(manga.rating), desc(manga.ratingCount), desc(manga.id)]
+          : [desc(manga.viewCount), desc(manga.chapterCount), desc(manga.id)];
 
     const [items, [{ total }]] = await Promise.all([
       db
@@ -209,7 +209,7 @@ export const mangaRouter = createRouter({
         .select({ manga: manga, source: sources })
         .from(manga)
         .innerJoin(sources, eq(manga.sourceId, sources.id))
-        .orderBy(desc(manga.viewCount))
+        .orderBy(desc(manga.viewCount), desc(manga.chapterCount), desc(manga.id))
         .limit(input.limit);
       return rows.map((r) => ({ ...r.manga, source: r.source }));
     }),

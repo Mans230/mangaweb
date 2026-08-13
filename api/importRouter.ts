@@ -13,7 +13,7 @@ export const importRouter = createRouter({
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input }) => {
       const scraper = scraperForUrl(input.url);
-      if (!scraper) {
+      if (!scrapr) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "مصدر غير معروف لهذا الرابط",
@@ -46,7 +46,7 @@ export const importRouter = createRouter({
     .input(
       z.object({
         sourceKey: z.string().trim().min(1),
-        limit: z.number().int().min(1).max(50).default(12),
+        limit: z.number().int().min(1).max(200).default(12),
       }),
     )
     .mutation(async ({ input }) => {
