@@ -18,11 +18,27 @@ import { GENRES, adaptLatestChapter, adaptMangaRow, formatNum } from "@/lib/mang
 import type { LatestChapterData } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import ChapterRow from "@/components/ChapterRow";
+import LazySection from "@/components/LazySection";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import { useLanguage } from "@/components/LanguageProvider";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const AUTOPLAY_MS = 6000;
+
+/** مطابقة media query مع تحديث تفاعلي — لتفادي تحميل صور الديسكتوب على الموبايل */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [query]);
+  return matches;
+}
 
 /* ================= Ambient background ================= */
 function AmbientBackground() {
@@ -75,6 +91,8 @@ function SectionHeader({ title, moreTo }: { title: string; moreTo?: string }) {
 /* ================= 1. Hero slider — أعلى 5 شعبية ببيانات حقيقية ================= */
 function HeroSlider() {
   const { t } = useLanguage();
+  // على الموبايل لا تُرسم نسخ الديسكتوب المكررة من الغلاف إطلاقاً (توفير تحميل)
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const query = trpc.manga.popular.useQuery({ limit: 5 }, { retry: false });
   const slides = (query.data ?? []).map((m) => adaptMangaRow(m));
 
@@ -142,19 +160,34 @@ function HeroSlider() {
             else if (info.offset.x < -60) go(-1);
           }}
         >
-          {/* الموبايل: غلاف بملء البطاقة + تدرج غامق قوي من الأسفل */}
-          <img src={slide.cover} alt={slide.title} className="h-full w-full object-cover object-top md:hidden" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10 md:hidden" />
+          {/* الموبايل: نسخة واحدة فقط من الغلاف + تدرج غامق قوي من الأسفل */}
+          {!isDesktop && (
+            <>
+              <img
+                src={slide.cover}
+                alt={slide.title}
+                decoding="async"
+                fetchPriority={safeIndex === 0 ? "high" : "auto"}
+                loading={safeIndex === 0 ? "eager" : "lazy"}
+                className="h-full w-full object-cover object-top"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10" />
+            </>
+          )}
           {/* الديسكتوب: خلفية ambient blur من نفس الغلاف — بلا تمديد للبورتريه */}
-          <div className="absolute inset-0 hidden md:block">
-            <img
-              src={slide.cover}
-              alt=""
-              aria-hidden
-              className="h-full w-full scale-125 object-cover opacity-40 blur-3xl"
-            />
-            <div className="absolute inset-0 bg-black/55" />
-          </div>
+          {isDesktop && (
+            <div className="absolute inset-0">
+              <img
+                src={slide.cover}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full scale-125 object-cover opacity-40 blur-3xl"
+              />
+              <div className="absolute inset-0 bg-black/55" />
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 
@@ -245,8 +278,9 @@ function HeroSlider() {
         </AnimatePresence>
       </div>
 
-      {/* بطاقة Featured — ديسكتوب: نص + غلاف بورتريه */}
-      <div className="absolute inset-x-6 bottom-6 hidden md:block">
+      {/* بطاقة Featured — ديسكتوب: نص + غلاف بورتريه (لا تُرسم على الموبايل لتفادي تحميل الغلاف مرتين) */}
+      {isDesktop && (
+      <div className="absolute inset-x-6 bottom-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.slug}
@@ -311,17 +345,22 @@ function HeroSlider() {
                 src={slide.cover}
                 alt=""
                 aria-hidden
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 scale-110 rounded-2xl object-cover opacity-60 blur-2xl"
               />
               <img
                 src={slide.cover}
                 alt={slide.title}
+                decoding="async"
+                fetchPriority={safeIndex === 0 ? "high" : "auto"}
                 className="relative aspect-[2/3] max-h-[calc(100svh_-_240px)] w-[340px] rounded-2xl object-cover shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
               />
             </motion.div>
           </motion.div>
         </AnimatePresence>
       </div>
+      )}
 
       {/* مؤشرات الديسكتوب العمودية — بلا style inline متعارض */}
       {count > 1 && (
@@ -490,6 +529,7 @@ function ChapterTile({ item }: { item: LatestChapterData }) {
           src={item.cover}
           alt={item.mangaTitle}
           loading="lazy"
+          decoding="async"
           className="aspect-[2/3] w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         {item.isNew && (
@@ -858,6 +898,8 @@ function TelegramCTA() {
             src={c.src}
             alt=""
             aria-hidden
+            loading="lazy"
+            decoding="async"
             style={{ animationDelay: c.delay }}
             className={`animate-bob absolute hidden h-24 w-16 rounded-lg object-cover opacity-80 shadow-[0_12px_30px_rgba(0,0,0,0.35)] blur-[0.5px] md:block ${c.className}`}
           />
@@ -880,7 +922,7 @@ function TelegramCTA() {
           <motion.a
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
-            href="https://t.me/zekomanga"
+            href="https://t.me/dateranime"
             target="_blank"
             rel="noreferrer"
             className="group inline-flex items-center gap-2 rounded-2xl bg-white px-7 py-3.5 font-bold text-[#7C3AED] shadow-xl transition-colors hover:bg-[#EDE9FE]"
@@ -904,8 +946,12 @@ export default function Home() {
       <LatestChapters />
       <PopularCarousel />
       <LatestAdditions />
-      <GenreCloud />
-      <SourcesStrip />
+      <LazySection minHeight={260}>
+        <GenreCloud />
+      </LazySection>
+      <LazySection minHeight={220}>
+        <SourcesStrip />
+      </LazySection>
       <TelegramCTA />
     </>
   );
