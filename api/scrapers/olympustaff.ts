@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { BaseScraper } from "./base";
+import { BaseScraper, extractChapterDateText } from "./base";
 import type { LatestItem, SearchItem, SeriesInfo } from "./base";
 
 /**
@@ -99,7 +99,7 @@ export class OlympusStaffScraper extends BaseScraper {
           number: Number(m[1]),
           title: $page(a).text().trim().replace(/\s+/g, " ").slice(0, 120),
           url: href,
-          date: null,
+          date: extractChapterDateText($page(a)),
         });
       });
     };

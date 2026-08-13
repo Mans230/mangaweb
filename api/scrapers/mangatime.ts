@@ -87,25 +87,34 @@ export class MangaTimeScraper extends BaseScraper {
   }
 
   async getLatest(page = 1): Promise<LatestItem[]> {
-    const res = await this.trpc("content.getLatestChapters", { page, limit: 30 }).catch(
+    // content.getLatestChapters غير موجود (404) — الصحيح homepage.getLatestReleases
+    // يعيد { items: [{ slug, title, coverUrl, latestChapter: { number }, lastChapterAt }] } ويدعم الترقيم page
+    const res = await this.trpc("homepage.getLatestReleases", { page, limit: 30 }).catch(
       () => null,
     );
-    const list = Array.isArray(res) ? res : res?.chapters || res?.items || [];
+    const list = Array.isArray(res) ? res : res?.items || res?.releases || [];
     return list
-      .map((c: any) => ({
-        seriesTitle: c.seriesTitle || c.series?.title || c.seriesSlug,
-        seriesUrl: `${this.baseUrl}/series/${c.seriesSlug || c.series?.slug}`,
-        cover: this.abs(c.cover || c.series?.cover || ""),
-        chapter: {
-          number: Number(c.number ?? c.chapterNumber ?? 0),
-          title: c.title || "",
-          url:
-            c.url ||
-            `${this.baseUrl}/series/${c.seriesSlug}/chapter/${c.number ?? c.chapterNumber}`,
-          date: c.createdAt || c.date || null,
-        },
-      }))
-      .filter((it: LatestItem) => it.chapter.number > 0);
+      .map((it: any): LatestItem | null => {
+        const slug = it.slug || it.seriesSlug || it.series?.slug;
+        const num = Number(it.latestChapter?.number ?? it.chapter?.number ?? it.number ?? 0);
+        if (!slug || !(num > 0)) return null;
+        return {
+          seriesTitle: it.title || it.series?.title || slug,
+          seriesUrl: `${this.baseUrl}/series/${slug}`,
+          cover: this.abs(it.coverUrl || it.cover || it.series?.coverUrl || ""),
+          chapter: {
+            number: num,
+            title: it.latestChapter?.title || it.chapter?.title || "",
+            url: `${this.baseUrl}/series/${slug}/chapter/${num}`,
+            date:
+              it.lastChapterAt ||
+              it.latestChapter?.createdAt ||
+              it.latestChapter?.date ||
+              null,
+          },
+        };
+      })
+      .filter((it: LatestItem | null): it is LatestItem => it !== null);
   }
 }
 

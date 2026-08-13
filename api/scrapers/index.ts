@@ -37,13 +37,18 @@ let scrapers: BaseScraper[] | null = null;
 
 /** أنشئ كل السكرابرز وطبّق التفعيل من env (ENABLED_SOURCES + FLARESOLVERR_URL) */
 export function initScrapers(): BaseScraper[] {
-  const enabledList = (process.env.ENABLED_SOURCES ?? DEFAULT_ENABLED.join(","))
+  const enabledSourcesEnv = (process.env.ENABLED_SOURCES ?? "").trim();
+  const enabledList = (enabledSourcesEnv || DEFAULT_ENABLED.join(","))
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   const enabledSet = new Set(enabledList);
-  // mangadar يُفعّل فقط لو FlareSolverr متاح وكان مدرجاً صراحة
-  if (process.env.FLARESOLVERR_URL && enabledList.length === 0) {
+  // mangadar محجوب بـ Cloudflare Managed Challenge: يُفعّل فقط لو FlareSolverr
+  // مضبوط و(ENABLED_SOURCES غير مضبوط أو يتضمن mangadar صراحة)
+  if (
+    process.env.FLARESOLVERR_URL &&
+    (!enabledSourcesEnv || enabledSet.has("mangadar"))
+  ) {
     enabledSet.add("mangadar");
   }
 

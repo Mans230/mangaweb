@@ -1,11 +1,46 @@
 import axios from "axios";
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import type { Cheerio } from "cheerio";
 
 export const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * استخرج نص تاريخ الفصل من رابط في قائمة فصول HTML.
+ * قوالب Madara تعرض span.chapter-release-date > i بجانب كل فصل؛
+ * قوالب أخرى قد تستخدم <time datetime> أو <i>/<small> داخل الرابط أو بجواره.
+ * يعيد النص الخام (يُفسَّر لاحقاً في importer.parseDate) أو null.
+ */
+export function extractChapterDateText($a: Cheerio<any>): string | null {
+  const clean = (s?: string | null) => {
+    const t = (s ?? "").trim().replace(/\s+/g, " ");
+    return t || null;
+  };
+  const timeEl = $a.find("time[datetime]").first().attr("datetime");
+  if (clean(timeEl)) return clean(timeEl);
+  const container = $a.closest("li, tr, .wp-manga-chapter, .chapter-item, div");
+  const dt = container.find("time[datetime]").first().attr("datetime");
+  if (clean(dt)) return clean(dt);
+  const sel = [
+    ".chapter-release-date i",
+    ".chapter-release-date",
+    "span.chapter-release-date i",
+    ".chapterdate",
+    ".chapter-date",
+    ".post-on",
+  ];
+  for (const s of sel) {
+    const t = clean(container.find(s).first().text());
+    if (t) return t;
+  }
+  // fallback: <i> أو <small> داخل الرابط نفسه أو شقيق لاحق له
+  const inline =
+    clean($a.find("i, small").first().text()) || clean($a.next("i, small, span").first().text());
+  return inline;
+}
 
 /* ====== الواجهة الموحدة للأنواع ====== */
 

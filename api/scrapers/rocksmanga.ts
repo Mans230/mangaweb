@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { BaseScraper } from "./base";
+import { BaseScraper, extractChapterDateText } from "./base";
 import type { LatestItem, SearchItem, SeriesInfo } from "./base";
 
 /**
@@ -79,7 +79,7 @@ export class RocksMangaScraper extends BaseScraper {
         number: m ? Number(m[1]) : chapters.length + 1,
         title: $(a).text().trim().replace(/\s+/g, " ").slice(0, 120),
         url: href,
-        date: null,
+        date: extractChapterDateText($(a)),
       });
     });
     // fallback لأي روابط فصول
@@ -93,7 +93,7 @@ export class RocksMangaScraper extends BaseScraper {
           number: Number(m[1]),
           title: $(a).text().trim().slice(0, 120),
           url: href,
-          date: null,
+          date: extractChapterDateText($(a)),
         });
       });
     }

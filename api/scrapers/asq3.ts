@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { CheerioAPI } from "cheerio";
-import { BaseScraper } from "./base";
+import { BaseScraper, extractChapterDateText } from "./base";
 import type { ChapterInfo, LatestItem, SearchItem, SeriesInfo } from "./base";
 
 /**
@@ -86,7 +86,7 @@ export class Asq3Scraper extends BaseScraper {
             number: numM ? Number(numM[1]) : chapters.length + 1,
             title: $(a).text().trim().replace(/\s+/g, " ").slice(0, 120),
             url: href,
-            date: null,
+            date: extractChapterDateText($(a)),
           });
         },
       );

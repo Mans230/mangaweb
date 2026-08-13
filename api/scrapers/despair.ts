@@ -132,7 +132,17 @@ export class DespairScraper extends BaseScraper {
   }
 
   async getLatest(page = 1): Promise<LatestItem[]> {
-    const html = await this.getHtml(page > 1 ? `/page/${page}/` : "/");
+    let html: string;
+    if (page > 1) {
+      // /page/N/ تعطي 404 في هذا القالب — ترقيم WordPress الافتراضي ?paged=N
+      try {
+        html = await this.getHtml("/", { params: { paged: page } });
+      } catch {
+        return []; // لا ترقيم أبعد من الصفحة الأولى — أبلغ المستورِد بالتوقف
+      }
+    } else {
+      html = await this.getHtml("/");
+    }
     const $ = cheerio.load(String(html));
     const items: LatestItem[] = [];
     const seen = new Set<string>();
