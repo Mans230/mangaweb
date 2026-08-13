@@ -1,31 +1,51 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, KeyRound, Link2, Loader2, Mail, RefreshCw, Send, Unlink } from "lucide-react";
+import { BadgeCheck, KeyRound, Link2, Loader2, Mail, RefreshCw, Send, Unlink, Zap } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/library/toast";
 import GlassModal from "@/components/library/GlassModal";
 import { trpc } from "@/providers/trpc";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const TG_KEY = "zeko-telegram-linked";
 const TG_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "zeko_manga_bot";
+const TG_WIDGET_ENABLED = Boolean(import.meta.env.VITE_TELEGRAM_BOT_USERNAME);
+
+type TelegramAuthPayload = {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+};
+
+declare global {
+  interface Window {
+    onTelegramLinkAuth?: (user: TelegramAuthPayload) => void;
+  }
+}
 
 interface LinkedAccountsProps {
   email: string | null;
   telegramLinked: boolean;
-  onTelegramChange: (linked: boolean) => void;
+  telegramUsername?: string | null;
 }
 
-export default function LinkedAccounts({ email, telegramLinked, onTelegramChange }: LinkedAccountsProps) {
+export default function LinkedAccounts({ email, telegramLinked, telegramUsername }: LinkedAccountsProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const utils = trpc.useUtils();
   const [tgModal, setTgModal] = useState(false);
 
-  const unlinkTelegram = () => {
-    window.localStorage.removeItem(TG_KEY);
-    onTelegramChange(false);
-    toast(t("أُلغي ربط تليجرام", "Telegram unlinked"));
-  };
+  const unlinkMutation = trpc.auth.unlinkTelegram.useMutation({
+    onSuccess: () => {
+      void utils.auth.me.invalidate();
+      toast(t("أُلغي ربط تليجرام", "Telegram unlinked"));
+    },
+    onError: (e) =>
+      toast(e.message || t("تعذر إلغاء الربط — حاول مجدداً", "Could not unlink — try again"), { kind: "info" }),
+  });
 
   return (
     <motion.section
@@ -62,12 +82,18 @@ export default function LinkedAccounts({ email, telegramLinked, onTelegramChange
               )}
             </div>
             <p className="mt-0.5 text-[11.5px] text-app-3">
-              {t("الربط يفعّل إشعارات الفصول الجديدة والتحميل الكامل.", "Linking enables new-chapter notifications and full downloads.")}
+              {telegramLinked && telegramUsername
+                ? <span dir="ltr">@{telegramUsername}</span>
+                : t("الربط يفعّل إشعارات الفصول الجديدة والتحميل الكامل.", "Linking enables new-chapter notifications and full downloads.")}
             </p>
           </div>
           {telegramLinked ? (
-            <button onClick={unlinkTelegram} className="btn-glass !px-4 !py-2 text-xs !text-danger !border-danger/40">
-              <Unlink size={13} />
+            <button
+              onClick={() => unlinkMutation.mutate()}
+              disabled={unlinkMutation.isPending}
+              className="btn-glass !px-4 !py-2 text-xs !text-danger !border-danger/40 disabled:opacity-60"
+            >
+              {unlinkMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Unlink size={13} />}
               {t("إلغاء الربط", "Unlink")}
             </button>
           ) : (
@@ -133,34 +159,19 @@ export default function LinkedAccounts({ email, telegramLinked, onTelegramChange
         </motion.div>
       </div>
 
-      <TelegramModal
-        open={tgModal}
-        onClose={() => setTgModal(false)}
-        onLinked={() => {
-          window.localStorage.setItem(TG_KEY, "1");
-          onTelegramChange(true);
-          setTgModal(false);
-        }}
-      />
+      <TelegramModal open={tgModal} onClose={() => setTgModal(false)} />
     </motion.section>
   );
 }
 
-/** مودال ربط تليجرام: رمز ربط حقيقي من الخادم يُرسله المستخدم للبوت، ثم يتحقق من حالة الربط. */
-function TelegramModal({
-  open,
-  onClose,
-  onLinked,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onLinked: () => void;
-}) {
+/** مودال ربط تليجرام: ربط فوري عبر Telegram Login Widget أو رمز ربط يُرسله المستخدم للبوت. */
+function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [code, setCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [widgetError, setWidgetError] = useState<string | null>(null);
 
   const linkCodeMutation = trpc.auth.createLinkCode.useMutation({
     onSuccess: (data) => setCode(data.code),
@@ -168,21 +179,59 @@ function TelegramModal({
       toast(t("تعذر توليد رمز الربط — حاول مجدداً", "Could not generate a link code — try again"), { kind: "info" }),
   });
 
+  const linkWidgetMutation = trpc.auth.linkTelegramViaWidget.useMutation({
+    onSuccess: () => {
+      setWidgetError(null);
+      void utils.auth.me.invalidate();
+      toast(t("تم ربط تليجرام بنجاح", "Telegram linked successfully"));
+      onClose();
+    },
+    // أخطاء 409 تصل برسالة عربية من الخادم — تُعرض كما هي
+    onError: (e) => setWidgetError(e.message),
+  });
+
   useEffect(() => {
-    if (open && !code && !linkCodeMutation.isPending) {
-      linkCodeMutation.mutate();
+    if (open) {
+      setWidgetError(null);
+      if (!code && !linkCodeMutation.isPending) {
+        linkCodeMutation.mutate();
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Telegram Login Widget — ربط فوري بالحساب الحالي
+  const widgetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open || !TG_WIDGET_ENABLED || !widgetRef.current) return;
+    window.onTelegramLinkAuth = (user) => {
+      setWidgetError(null);
+      linkWidgetMutation.mutate(user);
+    };
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.async = true;
+    script.setAttribute("data-telegram-login", TG_BOT);
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-radius", "14");
+    script.setAttribute("data-onauth", "onTelegramLinkAuth(user)");
+    widgetRef.current.innerHTML = "";
+    widgetRef.current.appendChild(script);
+    return () => {
+      delete window.onTelegramLinkAuth;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const checkLinked = async () => {
     setChecking(true);
     try {
-      const me = await utils.auth.me.fetch();
+      // تجاوز كاش auth.me (staleTime 5 دقائق) بقراءة مباشرة من الخادم
+      await utils.auth.me.invalidate();
+      const me = await utils.client.auth.me.query();
       if (me?.telegramId) {
-        window.localStorage.setItem(TG_KEY, "1");
-        onLinked();
         toast(t("تم ربط تليجرام بنجاح", "Telegram linked successfully"));
+        onClose();
       } else {
         toast(t("لم يكتمل الربط بعد — أرسل الرمز للبوت ثم أعد التحقق", "Not linked yet — send the code to the bot, then re-check"), { kind: "info" });
       }
@@ -193,6 +242,38 @@ function TelegramModal({
 
   return (
     <GlassModal open={open} onClose={onClose} title={t("ربط حساب تليجرام", "Link Telegram account")}>
+      {/* الطريقة الأولى: ربط فوري عبر ودجت تليجرام */}
+      {TG_WIDGET_ENABLED && (
+        <div className="mb-5">
+          <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-app">
+            <Zap size={14} className="text-accent" />
+            {t("ربط فوري بحساب تليجرام", "Instant link with your Telegram account")}
+          </p>
+          <div className="flex justify-center">
+            {linkWidgetMutation.isPending ? (
+              <Loader2 size={24} className="animate-spin text-app-3" />
+            ) : (
+              <div ref={widgetRef} className="flex justify-center" />
+            )}
+          </div>
+          {widgetError && (
+            <motion.p
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-medium text-danger"
+            >
+              {widgetError}
+            </motion.p>
+          )}
+          <div className="mt-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-[var(--border)]" />
+            <span className="text-xs text-app-3">{t("أو عبر رمز الربط", "or via link code")}</span>
+            <span className="h-px flex-1 bg-[var(--border)]" />
+          </div>
+        </div>
+      )}
+
+      {/* الطريقة الثانية: رمز الربط عبر البوت */}
       <ol className="flex list-none flex-col gap-3 text-sm text-app-2">
         <li className="flex gap-2.5">
           <span className="gradient-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white">1</span>

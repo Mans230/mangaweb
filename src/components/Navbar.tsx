@@ -54,6 +54,9 @@ export default function Navbar() {
     { to: "/browse", ar: "بحث", en: "Search", icon: Search },
     { to: "/library", ar: "مكتبتي", en: "Library", icon: Library },
     { to: "/request", ar: "الطلبات", en: "Requests", icon: Send },
+    ...(user?.role === "admin"
+      ? [{ to: "/admin", ar: "الإدارة", en: "Admin", icon: LayoutDashboard }]
+      : []),
     { to: accountPath, ar: "حسابي", en: "Account", icon: User },
   ];
 
@@ -113,7 +116,7 @@ export default function Navbar() {
           </nav>
 
           {/* Actions */}
-          <div className="ms-auto flex items-center gap-2 lg:ms-0">
+          <div className="ms-auto flex items-center gap-2 md:ms-0">
             <button
               className="btn-icon"
               aria-label={t("بحث", "Search")}
