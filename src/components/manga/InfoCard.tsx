@@ -11,12 +11,16 @@ import {
   Eye,
   Heart,
   Layers,
+  ListPlus,
   Lock,
   Play,
   Share2,
+  Users,
 } from "lucide-react";
 import StarRating from "@/components/StarRating";
+import ReportDialog from "@/components/ReportDialog";
 import { useLanguage } from "@/components/LanguageProvider";
+import AddToListModal from "./AddToListModal";
 import ProgressRing from "./ProgressRing";
 import type { DetailVM } from "./types";
 import { fmtChapter } from "./types";
@@ -99,6 +103,7 @@ export default function InfoCard({
   const [ratingOpen, setRatingOpen] = useState(false);
   const [shareToast, setShareToast] = useState(false);
   const [burst, setBurst] = useState(0);
+  const [listModalOpen, setListModalOpen] = useState(false);
   const ratingRef = useRef<HTMLDivElement>(null);
 
   // إغلاق نافذة التقييم عند النقر خارجها
@@ -391,6 +396,33 @@ export default function InfoCard({
               <Share2 size={18} />
             </button>
 
+            {/* أضف إلى قائمة */}
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.9 }}
+              onClick={() => (isAuthenticated ? setListModalOpen(true) : onAuthRequired())}
+              aria-label={t("أضف إلى قائمة", "Add to list")}
+              title={t("أضف إلى قائمة", "Add to list")}
+              className="btn-icon"
+            >
+              <ListPlus size={18} />
+            </motion.button>
+
+            {/* رابط مجتمع العمل */}
+            <Link
+              to={`/manga/${vm.slug}/community`}
+              aria-label={t("المجتمع", "Community")}
+              title={t("المجتمع", "Community")}
+              className="btn-icon"
+            >
+              <Users size={18} />
+            </Link>
+
+            <ReportDialog
+              mangaId={vm.id}
+              label={t("تبليغ عن المانهوا", "Report manga")}
+            />
+
             {/* توست نسخ الرابط */}
             <AnimatePresence>
               {shareToast && (
@@ -427,6 +459,14 @@ export default function InfoCard({
           </motion.div>
         </motion.div>
       </div>
+
+      {/* مودال الإضافة لقائمة */}
+      <AddToListModal
+        open={listModalOpen}
+        onClose={() => setListModalOpen(false)}
+        mangaId={vm.id}
+        mangaTitle={vm.title}
+      />
     </motion.section>
   );
 }

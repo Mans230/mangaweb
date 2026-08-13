@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, FileArchive, FileText, Send, X } from "lucide-react";
+import { Archive, Check, Download, FileArchive, FileText, Send, X } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
+import { chapterDownloadUrl, recordDownloadSafe } from "@/components/reader/DownloadModal";
 
 /** اسم بوت التحميل على تليجرام */
 const TELEGRAM_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "egmangabot";
 const PART_SIZE = 50;
+/** حتى هذا العدد من الفصول المحددة يُحمَّل مباشرة من الموقع، وما زاد يبقى عبر البوت */
+const DIRECT_MAX = 10;
 
 interface DownloadModalProps {
   open: boolean;
@@ -28,31 +31,63 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
   const [to, setTo] = useState("");
   const [list, setList] = useState("");
 
-  // بناء مقطع الفصول c… من المدخلات (نطاق أو قائمة)
-  const chapterSpec = (() => {
+  // بناء قائمة أرقام الفصول من المدخلات (نطاق أو قائمة مفصولة بفواصل)
+  const customChapters = (() => {
     if (list.trim()) {
       const nums = list
         .split(/[,،\s]+/)
         .map((s) => Number(s))
         .filter((n) => Number.isInteger(n) && n > 0 && n <= chapterTotal);
-      const uniq = [...new Set(nums)].sort((a, b) => a - b);
-      return uniq.length ? `c${uniq.join(",")}` : null;
+      return [...new Set(nums)].sort((a, b) => a - b);
     }
     const a = Number(from);
     const b = Number(to);
     if (Number.isInteger(a) && a > 0 && Number.isInteger(b) && b >= a) {
-      return a === b ? `c${a}` : `c${a}-${Math.min(b, chapterTotal)}`;
+      const hi = Math.min(b, chapterTotal);
+      return Array.from({ length: hi - a + 1 }, (_, i) => a + i);
     }
-    if (Number.isInteger(a) && a > 0 && !to.trim()) return `c${a}`;
-    return null;
+    if (Number.isInteger(a) && a > 0 && !to.trim()) return [a];
+    return [] as number[];
   })();
+
+  // مقطع c… لرابط البوت (للنطاقات الكبيرة) — نطاق متصل يُكتب c1-50 وإلا قائمة c1,2,3
+  const chapterSpec = (() => {
+    if (!customChapters.length) return null;
+    if (customChapters.length === 1) return `c${customChapters[0]}`;
+    const first = customChapters[0];
+    const last = customChapters[customChapters.length - 1];
+    const contiguous = last - first + 1 === customChapters.length;
+    return contiguous ? `c${first}-${last}` : `c${customChapters.join(",")}`;
+  })();
+
+  // فصول قليلة → تحميل مباشر من الموقع؛ نطاقات كبيرة → البوت
+  const directChapters =
+    mode === "custom" && customChapters.length > 0 && customChapters.length <= DIRECT_MAX
+      ? customChapters
+      : null;
 
   const botLink =
     mode === "parts"
       ? `https://t.me/${TELEGRAM_BOT}?start=dl_${slug}_p${part}_${format}`
-      : chapterSpec
+      : !directChapters && chapterSpec
         ? `https://t.me/${TELEGRAM_BOT}?start=dl_${slug}_${chapterSpec}_${format}`
         : null;
+
+  /** تحميل كل الفصول المحددة تباعاً (CBZ) */
+  const downloadAll = () => {
+    directChapters?.forEach((ch, i) => {
+      window.setTimeout(() => {
+        const a = document.createElement("a");
+        a.href = chapterDownloadUrl(slug, ch, "cbz");
+        a.download = "";
+        a.rel = "noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        void recordDownloadSafe({ slug, chapter: ch, format: "cbz" });
+      }, i * 600);
+    });
+  };
 
   return (
     <AnimatePresence>
@@ -180,11 +215,57 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
                     className="input-glass mt-2 w-full !py-2.5 text-left text-sm"
                   />
                 </div>
-                {chapterSpec && (
-                  <span className="glass-chip !px-3 !py-1 !text-[11px] text-success" dir="ltr">
-                    <Check size={12} /> dl_{slug}_{chapterSpec}_{format}
-                  </span>
-                )}
+                {directChapters ? (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-app-3">
+                      {t("تحميل مباشر من الموقع", "Direct download from the site")}
+                    </span>
+                    <ul className="max-h-44 space-y-1.5 overflow-y-auto pe-1">
+                      {directChapters.map((ch) => (
+                        <li
+                          key={ch}
+                          className="glass flex items-center gap-2 !rounded-xl px-3 py-2 text-xs"
+                        >
+                          <span className="flex-1 font-bold text-app">
+                            {t("فصل", "Ch.")} {ch}
+                          </span>
+                          {(["cbz", "zip"] as const).map((f) => (
+                            <a
+                              key={f}
+                              href={chapterDownloadUrl(slug, ch, f)}
+                              download
+                              onClick={() => void recordDownloadSafe({ slug, chapter: ch, format: f })}
+                              className="glass-chip !px-2.5 !py-1 !text-[10.5px] font-bold uppercase text-primary"
+                            >
+                              <Download size={11} />
+                              {f}
+                            </a>
+                          ))}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={downloadAll}
+                      className="btn-primary w-full !py-2.5 text-xs"
+                    >
+                      <Archive size={14} />
+                      {t(`تحميل الكل (${directChapters.length} فصول CBZ)`, `Download all (${directChapters.length} ch CBZ)`)}
+                    </button>
+                  </div>
+                ) : chapterSpec ? (
+                  <div className="space-y-2">
+                    <span className="glass-chip !px-3 !py-1 !text-[11px] text-success" dir="ltr">
+                      <Check size={12} /> dl_{slug}_{chapterSpec}_{format}
+                    </span>
+                    <p className="text-[11px] leading-relaxed text-app-3">
+                      {t(
+                        `النطاقات الأكبر من ${DIRECT_MAX} فصول تُرسَل للبوت.`,
+                        `Ranges larger than ${DIRECT_MAX} chapters are sent to the bot.`,
+                      )}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -217,23 +298,27 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
             </div>
             )}
 
-            <a
-              href={botLink ?? undefined}
-              target="_blank"
-              rel="noreferrer"
-              aria-disabled={!botLink}
-              onClick={(e) => !botLink && e.preventDefault()}
-              className={`btn-primary mt-6 w-full !py-3.5 text-sm ${!botLink ? "pointer-events-none opacity-50" : ""}`}
-            >
-              <Send size={16} className="rtl:-scale-x-100" />
-              {t("إرسال للبوت", "Send to bot")}
-            </a>
-            <p className="mt-3 text-center text-[11px] text-app-3">
-              {t("يتطلب ربط الحساب بتليجرام —", "Requires linking your Telegram account —")}{" "}
-              <Link to="/profile" className="font-bold text-primary hover:underline" onClick={onClose}>
-                {t("الملف الشخصي", "Profile")}
-              </Link>
-            </p>
+            {!directChapters && (
+              <>
+                <a
+                  href={botLink ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={!botLink}
+                  onClick={(e) => !botLink && e.preventDefault()}
+                  className={`btn-primary mt-6 w-full !py-3.5 text-sm ${!botLink ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  <Send size={16} className="rtl:-scale-x-100" />
+                  {t("إرسال للبوت", "Send to bot")}
+                </a>
+                <p className="mt-3 text-center text-[11px] text-app-3">
+                  {t("يتطلب ربط الحساب بتليجرام —", "Requires linking your Telegram account —")}{" "}
+                  <Link to="/profile" className="font-bold text-primary hover:underline" onClick={onClose}>
+                    {t("الملف الشخصي", "Profile")}
+                  </Link>
+                </p>
+              </>
+            )}
           </motion.div>
         </motion.div>
       )}
