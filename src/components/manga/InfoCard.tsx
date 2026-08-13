@@ -233,12 +233,18 @@ export default function InfoCard({
             )}
           </motion.div>
 
-          {/* التقييم */}
+          {/* التقييم — المتوسط + عدد المقيمين بشكل بارز (التوزيع غير متاح من getRating) */}
           <motion.div variants={item} className="relative mt-3 flex flex-wrap items-center gap-2.5" ref={ratingRef}>
-            <StarRating value={vm.rating} size={20} />
-            <span className="font-display text-lg font-bold text-app">{vm.rating.toFixed(1)}</span>
-            <span className="text-xs text-app-3">
-              ({vm.ratingCount.toLocaleString("en-US")} {t("تقييم", "ratings")})
+            <span className="glass-chip !gap-2.5 !px-4 !py-2">
+              <span className="font-display text-2xl font-extrabold leading-none text-app" dir="ltr">
+                {vm.rating.toFixed(1)}
+              </span>
+              <span className="flex flex-col items-start gap-1">
+                <StarRating value={vm.rating} size={16} />
+                <span className="text-[10.5px] text-app-3">
+                  {vm.ratingCount.toLocaleString("en-US")} {t("مقيّم", "raters")}
+                </span>
+              </span>
             </span>
             <button
               type="button"
@@ -247,6 +253,11 @@ export default function InfoCard({
             >
               {userStars ? t(`تقييمك: ${userStars}/5`, `Your rating: ${userStars}/5`) : t("قيّم", "Rate")}
             </button>
+            {!userStars && (
+              <span className="w-full text-[11px] text-app-3">
+                {t("قيّم لتساعد الآخرين على اكتشاف هذا العمل", "Rate to help others discover this title")}
+              </span>
+            )}
 
             <AnimatePresence>
               {ratingOpen && (

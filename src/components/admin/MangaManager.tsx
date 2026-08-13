@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   EyeOff,
+  Flame,
   Pencil,
   Search,
   ShieldAlert,
@@ -50,6 +51,8 @@ function mapApiManga(m: ApiMangaItem): AdminMangaRow {
     rating: m.rating,
     source: m.source.name,
     isAdult: m.isAdult,
+    isTrending: m.isTrending ?? false,
+    statusRaw: m.status,
     lastScan: timeAgo(m.updatedAt),
     genres: m.genres ?? [],
     description: m.description ?? "",
@@ -69,9 +72,7 @@ export default function MangaManager() {
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
-  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
   const [adultOverrides, setAdultOverrides] = useState<Record<number, boolean>>({});
-  const [edits, setEdits] = useState<Record<number, Partial<AdminMangaRow>>>({});
   const [editing, setEditing] = useState<AdminMangaRow | null>(null);
   const [draft, setDraft] = useState<AdminMangaRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<number[] | null>(null);
@@ -99,14 +100,11 @@ export default function MangaManager() {
 
   const visible = useMemo(
     () =>
-      rows
-        .filter((m) => !deletedIds.has(m.id))
-        .map((m) => ({
-          ...m,
-          ...edits[m.id],
-          isAdult: adultOverrides[m.id] ?? edits[m.id]?.isAdult ?? m.isAdult,
-        })),
-    [rows, deletedIds, edits, adultOverrides],
+      rows.map((m) => ({
+        ...m,
+        isAdult: adultOverrides[m.id] ?? m.isAdult,
+      })),
+    [rows, adultOverrides],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / perPage));
@@ -137,13 +135,24 @@ export default function MangaManager() {
     toast(t("تم التمييز كـ +18", "Marked as +18"));
   };
 
+  const deleteMutation = trpc.admin.deleteManga.useMutation();
+  const updateMutation = trpc.admin.updateManga.useMutation();
+
   const confirmDelete = () => {
     if (!deleteTarget) return;
-    // TODO: ربط بـ API حذف السلسلة عند توفره
-    setDeletedIds((prev) => new Set([...prev, ...deleteTarget]));
-    setSelected(new Set());
-    setDeleteTarget(null);
-    toast(t("تم حذف السلسلة", "Series deleted"), "danger");
+    const ids = deleteTarget;
+    // حذف حقيقي عبر الـ API لكل سلسلة محددة
+    Promise.allSettled(ids.map((id) => deleteMutation.mutateAsync({ id }))).then((results) => {
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setSelected(new Set());
+      setDeleteTarget(null);
+      query.refetch();
+      if (failed > 0) {
+        toast(t(`تعذّر حذف ${failed} سلسلة`, `Failed to delete ${failed} series`), "danger");
+      } else {
+        toast(t("تم حذف السلسلة نهائياً", "Series deleted permanently"), "danger");
+      }
+    });
   };
 
   const openEdit = (m: AdminMangaRow) => {
@@ -153,13 +162,30 @@ export default function MangaManager() {
 
   const saveEdit = () => {
     if (!draft) return;
-    // TODO: ربط بـ API تحديث بيانات المانجا عند توفره
-    setEdits((prev) => ({ ...prev, [draft.id]: draft }));
-    if (draft.isAdult !== editing?.isAdult) {
-      setAdultOverrides((prev) => ({ ...prev, [draft.id]: draft.isAdult }));
-    }
-    setEditing(null);
-    toast(t("تم حفظ التعديلات", "Changes saved"));
+    // تحديث حقيقي عبر admin.updateManga — فقط الحقول المدعومة في العقد
+    const status: "ongoing" | "completed" =
+      draft.status === "مكتمل" || draft.statusRaw === "completed" ? "completed" : "ongoing";
+    updateMutation.mutate(
+      {
+        id: draft.id,
+        title: draft.title,
+        coverUrl: draft.cover,
+        description: draft.description,
+        status,
+        isTrending: draft.isTrending,
+      },
+      {
+        onSuccess: () => {
+          if (draft.isAdult !== editing?.isAdult) {
+            setAdultOverrides((prev) => ({ ...prev, [draft.id]: draft.isAdult }));
+          }
+          setEditing(null);
+          query.refetch();
+          toast(t("تم حفظ التعديلات", "Changes saved"));
+        },
+        onError: () => toast(t("تعذّر حفظ التعديلات", "Couldn't save changes"), "danger"),
+      },
+    );
   };
 
   const dirty = draft && editing && JSON.stringify(draft) !== JSON.stringify(editing);
@@ -295,6 +321,11 @@ export default function MangaManager() {
                             {m.isAdult && (
                               <span className="rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">+18</span>
                             )}
+                            {m.isTrending && (
+                              <span className="flex items-center gap-0.5 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning">
+                                <Flame size={10} /> {t("شائع", "Trending")}
+                              </span>
+                            )}
                           </div>
                           {m.altTitle && <div className="max-w-52 truncate text-xs text-app-3" dir="ltr">{m.altTitle}</div>}
                         </div>
@@ -360,6 +391,11 @@ export default function MangaManager() {
                     <span className="truncate text-sm font-semibold text-app">{m.title}</span>
                     {m.isAdult && (
                       <span className="rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">+18</span>
+                    )}
+                    {m.isTrending && (
+                      <span className="flex items-center gap-0.5 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning">
+                        <Flame size={10} /> {t("شائع", "Trending")}
+                      </span>
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-app-3">
@@ -445,6 +481,10 @@ export default function MangaManager() {
                   <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className="input-glass w-full text-sm" />
                 </div>
                 <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-2">{t("رابط الغلاف", "Cover URL")}</label>
+                  <input dir="ltr" value={draft.cover} onChange={(e) => setDraft({ ...draft, cover: e.target.value })} className="input-glass w-full text-left text-sm" />
+                </div>
+                <div>
                   <label className="mb-1.5 block text-xs font-semibold text-app-2">{t("العنوان البديل", "Alt title")}</label>
                   <input dir="ltr" value={draft.altTitle ?? ""} onChange={(e) => setDraft({ ...draft, altTitle: e.target.value })} className="input-glass w-full text-left text-sm" />
                 </div>
@@ -496,13 +536,20 @@ export default function MangaManager() {
                   </span>
                   <Switch checked={draft.isAdult} onCheckedChange={(v) => setDraft({ ...draft, isAdult: v })} />
                 </div>
+                <div className="glass flex items-center justify-between !rounded-2xl p-3.5">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-app">
+                    <Flame size={16} className="text-warning" />
+                    {t("شائع (ترند)", "Trending")}
+                  </span>
+                  <Switch checked={draft.isTrending} onCheckedChange={(v) => setDraft({ ...draft, isTrending: v })} />
+                </div>
               </div>
               <div className="glass-strong absolute inset-x-0 bottom-0 flex gap-2 border-t border-app p-4">
                 <button onClick={() => setEditing(null)} className="btn-glass flex-1 !py-2.5 text-sm">
                   {t("إلغاء", "Cancel")}
                 </button>
-                <button onClick={saveEdit} className="btn-primary flex-1 !py-2.5 text-sm">
-                  {t("حفظ التعديلات", "Save changes")}
+                <button onClick={saveEdit} disabled={updateMutation.isPending} className="btn-primary flex-1 !py-2.5 text-sm disabled:opacity-50">
+                  {updateMutation.isPending ? t("جارٍ الحفظ…", "Saving…") : t("حفظ التعديلات", "Save changes")}
                 </button>
               </div>
             </>
@@ -526,7 +573,8 @@ export default function MangaManager() {
             </button>
             <button
               onClick={confirmDelete}
-              className="btn-primary !border-none !bg-none !px-5 !py-2.5 text-sm"
+              disabled={deleteMutation.isPending}
+              className="btn-primary !border-none !bg-none !px-5 !py-2.5 text-sm disabled:opacity-50"
               style={{ background: "linear-gradient(135deg,#FB7185,#F43F5E)" }}
             >
               <Trash2 size={15} /> {t("حذف نهائي", "Delete permanently")}

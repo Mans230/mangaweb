@@ -5,7 +5,7 @@ import { Check, FileArchive, FileText, Send, X } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
 /** اسم بوت التحميل على تليجرام */
-const TELEGRAM_BOT = "zeko_manga_bot";
+const TELEGRAM_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "egmangabot";
 const PART_SIZE = 50;
 
 interface DownloadModalProps {
@@ -22,7 +22,37 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
   const parts = Math.max(1, Math.ceil(chapterTotal / PART_SIZE));
   const [part, setPart] = useState(1);
 
-  const botLink = `https://t.me/${TELEGRAM_BOT}?start=dl_${slug}_p${part}_${format}`;
+  // وضع الفصول المحددة: نطاق from/to أو قائمة مفصولة بفواصل
+  const [mode, setMode] = useState<"parts" | "custom">("parts");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [list, setList] = useState("");
+
+  // بناء مقطع الفصول c… من المدخلات (نطاق أو قائمة)
+  const chapterSpec = (() => {
+    if (list.trim()) {
+      const nums = list
+        .split(/[,،\s]+/)
+        .map((s) => Number(s))
+        .filter((n) => Number.isInteger(n) && n > 0 && n <= chapterTotal);
+      const uniq = [...new Set(nums)].sort((a, b) => a - b);
+      return uniq.length ? `c${uniq.join(",")}` : null;
+    }
+    const a = Number(from);
+    const b = Number(to);
+    if (Number.isInteger(a) && a > 0 && Number.isInteger(b) && b >= a) {
+      return a === b ? `c${a}` : `c${a}-${Math.min(b, chapterTotal)}`;
+    }
+    if (Number.isInteger(a) && a > 0 && !to.trim()) return `c${a}`;
+    return null;
+  })();
+
+  const botLink =
+    mode === "parts"
+      ? `https://t.me/${TELEGRAM_BOT}?start=dl_${slug}_p${part}_${format}`
+      : chapterSpec
+        ? `https://t.me/${TELEGRAM_BOT}?start=dl_${slug}_${chapterSpec}_${format}`
+        : null;
 
   return (
     <AnimatePresence>
@@ -91,7 +121,75 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
               ))}
             </div>
 
+            {/* وضع التحميل: أجزاء / فصول محددة */}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: "parts", label: t("أجزاء (50 فصل)", "Parts (50 ch)") },
+                  { id: "custom", label: t("فصول محددة", "Specific chapters") },
+                ] as const
+              ).map((mo) => (
+                <button
+                  key={mo.id}
+                  type="button"
+                  onClick={() => setMode(mo.id)}
+                  className={`glass-chip justify-center !rounded-2xl !py-2.5 text-xs font-bold ${
+                    mode === mo.id ? "!border-[var(--border-glow)] text-primary" : ""
+                  }`}
+                >
+                  {mo.label}
+                  {mode === mo.id && <Check size={13} className="text-success" />}
+                </button>
+              ))}
+            </div>
+
+            {mode === "custom" && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <span className="text-xs font-semibold text-app-3">
+                    {t("نطاق الفصول (من – إلى)", "Chapter range (from – to)")}
+                  </span>
+                  <div className="mt-2 flex items-center gap-2" dir="ltr">
+                    <input
+                      inputMode="numeric"
+                      value={from}
+                      onChange={(e) => { setFrom(e.target.value.replace(/\D/g, "")); setList(""); }}
+                      placeholder="1"
+                      className="input-glass w-full !py-2.5 text-center text-sm"
+                    />
+                    <span className="text-app-3">—</span>
+                    <input
+                      inputMode="numeric"
+                      value={to}
+                      onChange={(e) => { setTo(e.target.value.replace(/\D/g, "")); setList(""); }}
+                      placeholder={String(chapterTotal)}
+                      className="input-glass w-full !py-2.5 text-center text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-app-3">
+                    {t("أو قائمة مفصولة بفواصل", "Or a comma-separated list")}
+                  </span>
+                  <input
+                    dir="ltr"
+                    inputMode="numeric"
+                    value={list}
+                    onChange={(e) => { setList(e.target.value); setFrom(""); setTo(""); }}
+                    placeholder="1,2,3"
+                    className="input-glass mt-2 w-full !py-2.5 text-left text-sm"
+                  />
+                </div>
+                {chapterSpec && (
+                  <span className="glass-chip !px-3 !py-1 !text-[11px] text-success" dir="ltr">
+                    <Check size={12} /> dl_{slug}_{chapterSpec}_{format}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* اختيار الجزء */}
+            {mode === "parts" && (
             <div className="mt-4">
               <span className="text-xs font-semibold text-app-3">
                 {t(`الأجزاء (1–${parts}) — كل جزء ${PART_SIZE} فصلاً`, `Parts (1–${parts}) — ${PART_SIZE} chapters each`)}
@@ -117,12 +215,15 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
                 )}
               </span>
             </div>
+            )}
 
             <a
-              href={botLink}
+              href={botLink ?? undefined}
               target="_blank"
               rel="noreferrer"
-              className="btn-primary mt-6 w-full !py-3.5 text-sm"
+              aria-disabled={!botLink}
+              onClick={(e) => !botLink && e.preventDefault()}
+              className={`btn-primary mt-6 w-full !py-3.5 text-sm ${!botLink ? "pointer-events-none opacity-50" : ""}`}
             >
               <Send size={16} className="rtl:-scale-x-100" />
               {t("إرسال للبوت", "Send to bot")}
