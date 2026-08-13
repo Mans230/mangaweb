@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   EyeOff,
   Flame,
+  ImageOff,
   Pencil,
   Search,
   ShieldAlert,
@@ -137,6 +138,27 @@ export default function MangaManager() {
 
   const deleteMutation = trpc.admin.deleteManga.useMutation();
   const updateMutation = trpc.admin.updateManga.useMutation();
+  const fixCoversMutation = trpc.admin.fixMissingCovers.useMutation();
+
+  /** إصلاح الأغلفة الناقصة — دفعة من 50 سلسلة */
+  const fixCovers = () => {
+    fixCoversMutation.mutate(
+      { limit: 50 },
+      {
+        onSuccess: (res) => {
+          query.refetch();
+          toast(
+            t(
+              `فُحصت ${res.scanned} سلسلة — أُصلح ${res.fixed} غلاف — فشل ${res.failed}`,
+              `Scanned ${res.scanned} — fixed ${res.fixed} covers — ${res.failed} failed`,
+            ),
+            res.failed > 0 ? "info" : "success",
+          );
+        },
+        onError: () => toast(t("تعذّر إصلاح الأغلفة", "Couldn't fix covers"), "danger"),
+      },
+    );
+  };
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -228,6 +250,15 @@ export default function MangaManager() {
             <option key={s} value={s}>{s === "الكل" ? t("كل الأنواع", "All types") : s}</option>
           ))}
         </select>
+        <button
+          onClick={fixCovers}
+          disabled={fixCoversMutation.isPending}
+          className="btn-glass !px-4 !py-2.5 text-xs disabled:opacity-50"
+          title={t("إعادة جلب الأغلفة الناقصة من المصدر (دفعة 50)", "Re-fetch missing covers from sources (batch of 50)")}
+        >
+          <ImageOff size={14} />
+          {fixCoversMutation.isPending ? t("جارٍ الإصلاح…", "Fixing…") : t("إصلاح الأغلفة", "Fix covers")}
+        </button>
       </div>
 
       {/* شريط الإجراءات الجماعية */}
