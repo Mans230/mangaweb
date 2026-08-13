@@ -1,4 +1,4 @@
-import { and, asc, count, eq, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNull, or } from "drizzle-orm";
 import { chapters, manga, sources } from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getScraper } from "../scrapers";
@@ -261,6 +261,27 @@ export async function importSeries(
     created = true;
   }
 
+  // غلاف مؤقت: لو المصدر لم يعطِ غلافاً، استخدم أول صورة من أول فصل
+  if (!mangaRow.coverUrl && info.chapters.length) {
+    try {
+      const first = info.chapters.reduce((a, b) => (a.number <= b.number ? a : b));
+      if (first.url) {
+        const pages = await scraper.getPages(first.url, first.sourceRef);
+        if (pages.length) {
+          await db
+            .update(manga)
+            .set({ coverUrl: pages[0] })
+            .where(eq(manga.id, mangaRow.id));
+          mangaRow = { ...mangaRow, coverUrl: pages[0] };
+        }
+      }
+    } catch (e) {
+      console.warn(
+        `[importer] تعذّر جلب غلاف مؤقت لـ "${info.title}": ${(e as Error).message}`,
+      );
+    }
+  }
+
   const chaptersAdded = await upsertChapters(mangaRow.id, info.chapters);
   const [[{ total }]] = await Promise.all([
     db.select({ total: count() }).from(chapters).where(eq(chapters.mangaId, mangaRow.id)),
@@ -434,6 +455,58 @@ export async function refreshChapters(mangaId: number): Promise<{ chaptersAdded:
     })
     .where(eq(manga.id, m.id));
   return { chaptersAdded };
+}
+
+/**
+ * إصلاح الأغلفة المفقودة: دفعة صغيرة من المانجا بلا coverUrl،
+ * يعيد جلب بياناتها من المصدر (getSeries + تحديث الفصول)،
+ * ولو لم يجد غلافاً يستخدم أول صورة من أول فصل كغلاف مؤقت.
+ */
+export async function fixMissingCovers(
+  limit = 20,
+): Promise<{ scanned: number; fixed: number; failed: number }> {
+  const db = getDb();
+  const rows = await db
+    .select({ manga: manga, source: sources })
+    .from(manga)
+    .innerJoin(sources, eq(manga.sourceId, sources.id))
+    .where(or(isNull(manga.coverUrl), eq(manga.coverUrl, "")))
+    .orderBy(asc(manga.id))
+    .limit(Math.max(1, Math.min(limit, 100)));
+
+  let fixed = 0;
+  let failed = 0;
+  for (const { manga: m, source } of rows) {
+    try {
+      const scraper = getScraper(source.name);
+      if (!scraper || !scraper.enabled || !m.sourceUrl) continue;
+      const info = await scraper.getSeries(m.sourceUrl);
+      await upsertChapters(m.id, info.chapters);
+
+      let cover = info.cover || null;
+      if (!cover && info.chapters.length) {
+        const first = info.chapters.reduce((a, b) =>
+          a.number <= b.number ? a : b,
+        );
+        if (first.url) {
+          try {
+            const pages = await scraper.getPages(first.url, first.sourceRef);
+            cover = pages[0] ?? null;
+          } catch {
+            /* اتركه null */
+          }
+        }
+      }
+      if (cover) {
+        await db.update(manga).set({ coverUrl: cover }).where(eq(manga.id, m.id));
+        fixed += 1;
+      }
+    } catch (e) {
+      failed += 1;
+      console.warn(`[importer] fixMissingCovers(${m.id}) فشل: ${(e as Error).message}`);
+    }
+  }
+  return { scanned: rows.length, fixed, failed };
 }
 
 /** تحديث كل المانجا — أخطاء كل عنصر تُلتقط بلا إيقاف */
