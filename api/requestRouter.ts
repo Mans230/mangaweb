@@ -2,10 +2,10 @@ import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { requests } from "@db/schema";
 import { getDb } from "./queries/connection";
-import { createRouter, authedQuery, publicQuery } from "./middleware";
+import { createRouter, authedQuery } from "./middleware";
 
 export const requestRouter = createRouter({
-  create: publicQuery
+  create: authedQuery
     .input(
       z.object({
         title: z.string().trim().min(1).max(500),
@@ -18,7 +18,7 @@ export const requestRouter = createRouter({
       const [{ id }] = await db
         .insert(requests)
         .values({
-          userId: ctx.user?.id ?? null,
+          userId: ctx.user.id,
           title: input.title,
           sourceUrl: input.sourceUrl ?? null,
           note: input.note ?? null,

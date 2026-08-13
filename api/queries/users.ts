@@ -95,3 +95,20 @@ export async function linkTelegramToUser(
     })
     .where(eq(schema.users.id, userId));
 }
+
+export async function unlinkTelegramFromUser(userId: number) {
+  await getDb()
+    .update(schema.users)
+    .set({
+      telegramId: null,
+      telegramUsername: null,
+    })
+    .where(eq(schema.users.id, userId));
+}
+
+export async function setUserRole(id: number, role: "user" | "admin") {
+  await getDb()
+    .update(schema.users)
+    .set({ role })
+    .where(eq(schema.users.id, id));
+}

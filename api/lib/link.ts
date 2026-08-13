@@ -1,13 +1,26 @@
 import type { Context } from "hono";
 import { z } from "zod";
 import { consumeLinkCode } from "./linkCodes";
-import { findUserByTelegramId, linkTelegramToUser } from "../queries/users";
+import {
+  findUserById,
+  findUserByTelegramId,
+  linkTelegramToUser,
+} from "../queries/users";
 
 const bodySchema = z.object({
   code: z.string().regex(/^\d{6}$/),
   telegramId: z.union([z.string(), z.number()]).transform(String),
   username: z.string().optional(),
 });
+
+function isDuplicateEntry(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === "ER_DUP_ENTRY"
+  );
+}
 
 /**
  * POST /api/link/verify
@@ -34,11 +47,25 @@ export function linkVerifyHandler() {
     }
 
     const { code, telegramId, username } = parsed.data;
-    const userId = consumeLinkCode(code);
+    const userId = await consumeLinkCode(code);
     if (!userId) {
       return c.json({ error: "Invalid or expired code" }, 400);
     }
 
+    const user = await findUserById(userId);
+    if (!user) {
+      return c.json({ error: "User not found" }, 400);
+    }
+
+    // One-link rule: user already linked to a *different* Telegram account
+    if (user.telegramId && user.telegramId !== telegramId) {
+      return c.json(
+        { error: "This account is already linked to another Telegram account. Unlink it first." },
+        409,
+      );
+    }
+
+    // One-link rule: this Telegram account belongs to a different user
     const existing = await findUserByTelegramId(telegramId);
     if (existing && Number(existing.id) !== userId) {
       return c.json(
@@ -47,7 +74,17 @@ export function linkVerifyHandler() {
       );
     }
 
-    await linkTelegramToUser(userId, telegramId, username);
+    try {
+      await linkTelegramToUser(userId, telegramId, username);
+    } catch (err) {
+      if (isDuplicateEntry(err)) {
+        return c.json(
+          { error: "This Telegram account is already linked to another user" },
+          409,
+        );
+      }
+      throw err;
+    }
     return c.json({ success: true, userId });
   };
 }

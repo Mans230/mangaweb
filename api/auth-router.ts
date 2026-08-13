@@ -12,7 +12,10 @@ import {
   createUser,
   findUserByEmail,
   findUserByTelegramId,
+  linkTelegramToUser,
+  setUserRole,
   touchLastSignIn,
+  unlinkTelegramFromUser,
 } from "./queries/users";
 import { checkRateLimit, clientIp } from "./lib/rateLimit";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
@@ -42,7 +45,7 @@ const registerSchema = credentialsSchema.extend({
 
 const telegramAuthSchema = z.object({
   id: z.number(),
-  first_name: z.string(),
+  first_name: z.string().optional(),
   last_name: z.string().optional(),
   username: z.string().optional(),
   photo_url: z.string().optional(),
@@ -120,6 +123,15 @@ export const authRouter = createRouter({
       if (!ok) {
         throw invalid();
       }
+      // Upgrade existing accounts whose email is in ADMIN_EMAILS on every login
+      if (
+        user.role !== "admin" &&
+        user.email &&
+        env.adminEmails.includes(user.email.toLowerCase())
+      ) {
+        await setUserRole(Number(user.id), "admin");
+        user.role = "admin";
+      }
       await touchLastSignIn(Number(user.id));
       appendSessionCookie(ctx.resHeaders, ctx.req.headers, Number(user.id));
       return { success: true, user: { ...user, passwordHash: null } };
@@ -166,6 +178,15 @@ export const authRouter = createRouter({
         await touchLastSignIn(Number(user.id));
       }
 
+      // Grant admin role on every login when the Telegram id is allow-listed
+      if (
+        user.role !== "admin" &&
+        env.adminTelegramIds.includes(String(input.id))
+      ) {
+        await setUserRole(Number(user.id), "admin");
+        user = { ...user, role: "admin" };
+      }
+
       appendSessionCookie(ctx.resHeaders, ctx.req.headers, Number(user.id));
       return { success: true, user: { ...user, passwordHash: null } };
     }),
@@ -176,7 +197,63 @@ export const authRouter = createRouter({
   })),
 
   createLinkCode: authedQuery.mutation(async ({ ctx }) => {
-    const { code, expiresAt } = createLinkCode(Number(ctx.user.id));
+    const { code, expiresAt } = await createLinkCode(Number(ctx.user.id));
     return { code, expiresAt };
   }),
+
+  unlinkTelegram: authedQuery.mutation(async ({ ctx }) => {
+    await unlinkTelegramFromUser(Number(ctx.user.id));
+    return { success: true };
+  }),
+
+  linkTelegramViaWidget: authedQuery
+    .input(telegramAuthSchema)
+    .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("linkTelegramViaWidget", ctx.req);
+      if (!env.telegramBotToken) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "ربط تيليجرام غير مفعّل على هذا الخادم",
+        });
+      }
+      if (!verifyTelegramAuth(input, env.telegramBotToken)) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "بيانات تيليجرام غير صالحة",
+        });
+      }
+
+      const userId = Number(ctx.user.id);
+      const telegramId = String(input.id);
+
+      // One-link rule: current account already linked to a different Telegram account
+      if (ctx.user.telegramId && ctx.user.telegramId !== telegramId) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "هذا الحساب مربوط بحساب تيليجرام آخر، ألغِ الربط الحالي أولاً",
+        });
+      }
+
+      // One-link rule: this Telegram account belongs to a different user
+      const existing = await findUserByTelegramId(telegramId);
+      if (existing && Number(existing.id) !== userId) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "حساب تيليجرام هذا مربوط بحساب آخر",
+        });
+      }
+
+      try {
+        await linkTelegramToUser(userId, telegramId, input.username);
+      } catch (err) {
+        if (isDuplicateEntry(err)) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "حساب تيليجرام هذا مربوط بحساب آخر",
+          });
+        }
+        throw err;
+      }
+      return { success: true };
+    }),
 });

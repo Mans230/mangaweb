@@ -18,6 +18,10 @@ export const env = {
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean),
+  adminTelegramIds: (process.env.ADMIN_TELEGRAM_IDS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean),
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   siteUrl: (process.env.SITE_URL ?? "").replace(/\/$/, ""),
