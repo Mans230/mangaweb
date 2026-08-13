@@ -369,6 +369,10 @@ export const reports = mysqlTable(
       mode: "number",
       unsigned: true,
     }).references(() => chapters.id),
+    communityMessageId: bigint("communityMessageId", {
+      mode: "number",
+      unsigned: true,
+    }).references(() => communityChatMessages.id, { onDelete: "set null" }),
     reason: mysqlEnum("reason", [
       "porn",
       "broken",
@@ -413,3 +417,246 @@ export const communityMessages = mysqlTable(
 );
 
 export type CommunityMessage = typeof communityMessages.$inferSelect;
+
+// ================= مجتمعات المستخدمين =================
+
+export const siteSettings = mysqlTable("site_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value"),
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
+
+export const communities = mysqlTable(
+  "communities",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    slug: varchar("slug", { length: 150 }).notNull().unique(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    imageUrl: text("imageUrl"),
+    color: varchar("color", { length: 7 }),
+    isPrivate: boolean("isPrivate").default(false).notNull(),
+    ownerId: bigint("ownerId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true }).references(
+      () => manga.id,
+    ),
+    slowModeSeconds: int("slowModeSeconds").default(0).notNull(),
+    archivedAt: timestamp("archivedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    ownerIdx: index("communities_owner_idx").on(table.ownerId),
+  }),
+);
+
+export type Community = typeof communities.$inferSelect;
+export type InsertCommunity = typeof communities.$inferInsert;
+
+export const communityRoles = mysqlTable(
+  "community_roles",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    communityId: bigint("communityId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 60 }).notNull(),
+    canModerate: boolean("canModerate").default(false).notNull(),
+  },
+  (table) => ({
+    communityNameUnique: uniqueIndex("community_roles_community_name_unique").on(
+      table.communityId,
+      table.name,
+    ),
+  }),
+);
+
+export type CommunityRole = typeof communityRoles.$inferSelect;
+export type InsertCommunityRole = typeof communityRoles.$inferInsert;
+
+export const communityMembers = mysqlTable(
+  "community_members",
+  {
+    communityId: bigint("communityId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleId: bigint("roleId", { mode: "number", unsigned: true }).references(
+      () => communityRoles.id,
+      { onDelete: "set null" },
+    ),
+    mutedUntil: timestamp("mutedUntil"),
+    lastMessageAt: timestamp("lastMessageAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.communityId, table.userId] }),
+    userIdx: index("community_members_user_idx").on(table.userId),
+  }),
+);
+
+export type CommunityMember = typeof communityMembers.$inferSelect;
+export type InsertCommunityMember = typeof communityMembers.$inferInsert;
+
+export const communityJoinRequests = mysqlTable(
+  "community_join_requests",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    communityId: bigint("communityId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"])
+      .default("pending")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    communityUserIdx: index("community_join_requests_community_user_idx").on(
+      table.communityId,
+      table.userId,
+    ),
+    statusIdx: index("community_join_requests_status_idx").on(table.status),
+  }),
+);
+
+export type CommunityJoinRequest = typeof communityJoinRequests.$inferSelect;
+
+export const communityBans = mysqlTable(
+  "community_bans",
+  {
+    communityId: bigint("communityId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.communityId, table.userId] }),
+  }),
+);
+
+export type CommunityBan = typeof communityBans.$inferSelect;
+
+export type CommunityCreatePayload = {
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  color?: string | null;
+  isPrivate: boolean;
+  mangaId?: number | null;
+};
+
+export const communityCreateRequests = mysqlTable(
+  "community_create_requests",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    payload: json("payload").$type<CommunityCreatePayload>().notNull(),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"])
+      .default("pending")
+      .notNull(),
+    rejectReason: text("rejectReason"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("community_create_requests_status_idx").on(table.status),
+    userIdx: index("community_create_requests_user_idx").on(table.userId),
+  }),
+);
+
+export type CommunityCreateRequest =
+  typeof communityCreateRequests.$inferSelect;
+
+export const communityInvites = mysqlTable("community_invites", {
+  communityId: bigint("communityId", { mode: "number", unsigned: true })
+    .primaryKey()
+    .references(() => communities.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type CommunityInvite = typeof communityInvites.$inferSelect;
+
+export const communityChatMessages = mysqlTable(
+  "community_chat_messages",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    communityId: bigint("communityId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: varchar("content", { length: 500 }).notNull(),
+    imageUrl: text("imageUrl"),
+    pinnedAt: timestamp("pinnedAt"),
+    deletedAt: timestamp("deletedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    communityIdIdx: index("community_chat_messages_community_id_idx").on(
+      table.communityId,
+      table.id,
+    ),
+  }),
+);
+
+export type CommunityChatMessage = typeof communityChatMessages.$inferSelect;
+
+export type NotificationPayload = {
+  communityId?: number;
+  communitySlug?: string;
+  communityName?: string;
+  messageId?: number;
+  fromUsername?: string;
+  excerpt?: string;
+};
+
+export const notifications = mysqlTable(
+  "notifications",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 32 }).notNull(),
+    payload: json("payload").$type<NotificationPayload>(),
+    readAt: timestamp("readAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    userReadIdx: index("notifications_user_read_idx").on(
+      table.userId,
+      table.readAt,
+    ),
+  }),
+);
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
