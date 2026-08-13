@@ -5,6 +5,11 @@ import {
   bannedIps,
   chapters,
   comments,
+  communities,
+  communityCreateRequests,
+  communityInvites,
+  communityMembers,
+  communityRoles,
   favorites,
   follows,
   manga,
@@ -16,6 +21,13 @@ import {
 } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, adminQuery } from "./middleware";
+import {
+  getSetting,
+  setSetting,
+  SETTING_COMMUNITY_MANGA_ENABLED,
+  SETTING_COMMUNITY_USER_ENABLED,
+} from "./lib/siteSettings";
+import { generateInviteCode, uniqueSlug } from "./communitiesRouter";
 import { enabledScrapers } from "./scrapers";
 import {
   fixMissingCovers,
@@ -526,5 +538,202 @@ export const adminRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       return fixMissingCovers(input.limit);
+    }),
+
+  // ================= مجتمعات المستخدمين (إدارة الموقع) =================
+
+  /** طلبات إنشاء المجتمعات مع بيانات مقدم الطلب */
+  listCommunityCreateRequests: adminQuery
+    .input(
+      z.object({
+        status: z.enum(["pending", "approved", "rejected"]).default("pending"),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const where = eq(communityCreateRequests.status, input.status);
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            request: communityCreateRequests,
+            user: {
+              id: users.id,
+              name: users.name,
+              username: users.username,
+              avatarUrl: users.avatarUrl,
+            },
+          })
+          .from(communityCreateRequests)
+          .innerJoin(users, eq(communityCreateRequests.userId, users.id))
+          .where(where)
+          .orderBy(desc(communityCreateRequests.createdAt))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(communityCreateRequests).where(where),
+      ]);
+      return {
+        items: rows.map((r) => ({ ...r.request, user: r.user })),
+        total,
+        page: input.page,
+        limit: input.limit,
+      };
+    }),
+
+  /**
+   * الموافقة على طلب إنشاء مجتمع: ينشئ المجتمع + عضوية المالك
+   * + دور "مشرف" الافتراضي + رابط الدعوة الأول.
+   */
+  approveCreateRequest: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const request = await db.query.communityCreateRequests.findFirst({
+        where: eq(communityCreateRequests.id, input.id),
+      });
+      if (!request || request.status !== "pending") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "الطلب غير موجود أو تمت معالجته مسبقاً",
+        });
+      }
+      const [{ owned }] = await db
+        .select({ owned: count() })
+        .from(communities)
+        .where(eq(communities.ownerId, request.userId));
+      if (owned >= 3) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "المستخدم وصل للحد الأقصى من المجتمعات المملوكة (3)",
+        });
+      }
+      const payload = request.payload;
+      const slug = await uniqueSlug(db, payload.name);
+      const [{ id: communityId }] = await db
+        .insert(communities)
+        .values({
+          slug,
+          name: payload.name,
+          description: payload.description ?? null,
+          imageUrl: payload.imageUrl ?? null,
+          color: payload.color ?? null,
+          isPrivate: payload.isPrivate,
+          ownerId: request.userId,
+          mangaId: payload.mangaId ?? null,
+        })
+        .$returningId();
+      // الدور الافتراضي "مشرف" بصلاحيات إشراف
+      await db.insert(communityRoles).values({
+        communityId,
+        name: "مشرف",
+        canModerate: true,
+      });
+      await db
+        .insert(communityMembers)
+        .values({ communityId, userId: request.userId });
+      await db
+        .insert(communityInvites)
+        .values({ communityId, code: generateInviteCode() });
+      await db
+        .update(communityCreateRequests)
+        .set({ status: "approved" })
+        .where(eq(communityCreateRequests.id, request.id));
+      return { success: true, communityId, slug };
+    }),
+
+  /** رفض طلب إنشاء مجتمع — السبب إلزامي ويظهر للمستخدم */
+  rejectCreateRequest: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        reason: z.string().trim().min(1, "سبب الرفض مطلوب").max(2000),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const request = await db.query.communityCreateRequests.findFirst({
+        where: eq(communityCreateRequests.id, input.id),
+      });
+      if (!request || request.status !== "pending") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "الطلب غير موجود أو تمت معالجته مسبقاً",
+        });
+      }
+      await db
+        .update(communityCreateRequests)
+        .set({ status: "rejected", rejectReason: input.reason })
+        .where(eq(communityCreateRequests.id, request.id));
+      return { success: true };
+    }),
+
+  /** مفاتيح تفعيل/تعطيل مجتمعات المستخدمين ومجتمعات المانجا */
+  setCommunityToggles: adminQuery
+    .input(
+      z.object({
+        user: z.boolean().optional(),
+        manga: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      if (input.user !== undefined) {
+        await setSetting(SETTING_COMMUNITY_USER_ENABLED, input.user ? "1" : "0");
+      }
+      if (input.manga !== undefined) {
+        await setSetting(
+          SETTING_COMMUNITY_MANGA_ENABLED,
+          input.manga ? "1" : "0",
+        );
+      }
+      return { success: true };
+    }),
+
+  getCommunityToggles: adminQuery.query(async () => {
+    const [user, mangaEnabled] = await Promise.all([
+      getSetting(SETTING_COMMUNITY_USER_ENABLED, "1"),
+      getSetting(SETTING_COMMUNITY_MANGA_ENABLED, "1"),
+    ]);
+    return { user: user === "1", manga: mangaEnabled === "1" };
+  }),
+
+  /** أرشفة/إلغاء أرشفة مجتمع — الأرشفة تجعله للقراءة فقط */
+  setCommunityArchived: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        archived: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const community = await db.query.communities.findFirst({
+        where: eq(communities.id, input.id),
+        columns: { id: true },
+      });
+      if (!community) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المجتمع غير موجود" });
+      }
+      await db
+        .update(communities)
+        .set({ archivedAt: input.archived ? new Date() : null })
+        .where(eq(communities.id, community.id));
+      return { success: true };
+    }),
+
+  /** حذف مجتمع نهائياً — أدمن الموقع فقط (لا يوجد نقل ملكية) */
+  deleteCommunity: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const community = await db.query.communities.findFirst({
+        where: eq(communities.id, input.id),
+        columns: { id: true },
+      });
+      if (!community) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المجتمع غير موجود" });
+      }
+      await db.delete(communities).where(eq(communities.id, community.id));
+      return { success: true };
     }),
 });

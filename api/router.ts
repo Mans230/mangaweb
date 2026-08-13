@@ -1,6 +1,7 @@
 import { authRouter } from "./auth-router";
 import { adminRouter } from "./adminRouter";
 import { communityRouter } from "./communityRouter";
+import { communitiesRouter } from "./communitiesRouter";
 import { engagementRouter } from "./engagementRouter";
 import { libraryRouter } from "./libraryRouter";
 import { listsRouter } from "./listsRouter";
@@ -22,6 +23,7 @@ export const appRouter = createRouter({
   lists: listsRouter,
   reports: reportsRouter,
   community: communityRouter,
+  communities: communitiesRouter,
 });
 
 export type AppRouter = typeof appRouter;

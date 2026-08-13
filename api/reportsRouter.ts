@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { chapters, manga, reports, users } from "@db/schema";
+import { chapters, communityChatMessages, manga, reports, users } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 
@@ -15,7 +15,7 @@ const reportReasonEnum = z.enum([
 export const reportsRouter = createRouter({
   /**
    * إنشاء تقرير — منع السبام: تقرير pending واحد فقط لكل (user, target).
-   * الهدف: mangaId و/أو chapterId (واحد منهما على الأقل).
+   * الهدف: mangaId و/أو chapterId و/أو communityMessageId (واحد منها على الأقل).
    */
   create: authedQuery
     .input(
@@ -23,18 +23,32 @@ export const reportsRouter = createRouter({
         .object({
           mangaId: z.number().int().positive().optional(),
           chapterId: z.number().int().positive().optional(),
+          communityMessageId: z.number().int().positive().optional(),
           reason: reportReasonEnum,
           details: z.string().trim().max(2000).optional(),
         })
-        .refine((v) => v.mangaId !== undefined || v.chapterId !== undefined, {
-          message: "يجب تحديد مانجا أو فصل",
-        }),
+        .refine(
+          (v) =>
+            v.mangaId !== undefined ||
+            v.chapterId !== undefined ||
+            v.communityMessageId !== undefined,
+          { message: "يجب تحديد مانجا أو فصل أو رسالة مجتمع" },
+        ),
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
 
       // تحقق من وجود الهدف، واستنتج mangaId من الفصل إن لم يُمرَّر
       let mangaId = input.mangaId ?? null;
+      if (input.communityMessageId !== undefined) {
+        const msg = await db.query.communityChatMessages.findFirst({
+          where: eq(communityChatMessages.id, input.communityMessageId),
+          columns: { id: true },
+        });
+        if (!msg) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "الرسالة غير موجودة" });
+        }
+      }
       if (input.chapterId !== undefined) {
         const chapter = await db.query.chapters.findFirst({
           where: eq(chapters.id, input.chapterId),
@@ -54,7 +68,7 @@ export const reportsRouter = createRouter({
         }
       }
 
-      // منع السبام: تقرير pending واحد لكل (user, manga, chapter)
+      // منع السبام: تقرير pending واحد لكل (user, manga, chapter, message)
       const targetConditions = [eq(reports.userId, ctx.user.id), eq(reports.status, "pending")];
       targetConditions.push(
         mangaId !== null ? eq(reports.mangaId, mangaId) : isNull(reports.mangaId),
@@ -63,6 +77,11 @@ export const reportsRouter = createRouter({
         input.chapterId !== undefined
           ? eq(reports.chapterId, input.chapterId)
           : isNull(reports.chapterId),
+      );
+      targetConditions.push(
+        input.communityMessageId !== undefined
+          ? eq(reports.communityMessageId, input.communityMessageId)
+          : isNull(reports.communityMessageId),
       );
       const existing = await db.query.reports.findFirst({
         where: and(...targetConditions),
@@ -81,6 +100,7 @@ export const reportsRouter = createRouter({
           userId: ctx.user.id,
           mangaId,
           chapterId: input.chapterId ?? null,
+          communityMessageId: input.communityMessageId ?? null,
           reason: input.reason,
           details: input.details ?? null,
         })

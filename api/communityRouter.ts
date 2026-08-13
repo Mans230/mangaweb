@@ -4,7 +4,18 @@ import { TRPCError } from "@trpc/server";
 import { communityMessages, manga, users } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { checkRateLimit, clientIp } from "./lib/rateLimit";
+import { isMangaCommunitiesEnabled } from "./lib/siteSettings";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
+
+/** عند تعطيل مجتمعات المانجا تصبح أرشيفاً للقراءة فقط — تُحظر كل الكتابات */
+async function assertMangaCommunityWritable(): Promise<void> {
+  if (!(await isMangaCommunitiesEnabled())) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "مجتمعات المانجا معطّلة حالياً — القراءة فقط",
+    });
+  }
+}
 
 const userCard = {
   id: users.id,
@@ -23,6 +34,7 @@ export const communityRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertMangaCommunityWritable();
       if (!checkRateLimit(`community:${clientIp(ctx.req)}`, 10, 60 * 1000)) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
@@ -91,6 +103,7 @@ export const communityRouter = createRouter({
   deleteMessage: authedQuery
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      await assertMangaCommunityWritable();
       const db = getDb();
       const message = await db.query.communityMessages.findFirst({
         where: eq(communityMessages.id, input.id),
