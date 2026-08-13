@@ -2,16 +2,19 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AtSign,
   Bell,
   Home,
   LayoutDashboard,
   Library,
   LogOut,
+  Menu,
   Moon,
   Search,
   Send,
   Sun,
   User,
+  UsersRound,
   X,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
@@ -19,7 +22,7 @@ import { useLanguage } from "./LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
 import { trpc } from "@/providers/trpc";
-import { adaptLatestChapter } from "@/lib/manga";
+import { adaptLatestChapter, timeAgo } from "@/lib/manga";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -32,34 +35,61 @@ import {
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-/* ===== جرس الإشعارات — آخر الفصول المضافة (لا يوجد endpoint إشعارات متابعة بعد) ===== */
+/* ===== جرس الإشعارات — منشن المجتمعات + آخر الفصول المضافة ===== */
 function NotificationsBell() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const query = trpc.manga.latest.useQuery(
     { limit: 10 },
     { retry: false, enabled: isAuthenticated },
   );
   const items = (query.data ?? []).map((c) => adaptLatestChapter(c));
 
+  // إشعارات المجتمعات (المنشن)
+  const unreadQ = trpc.communities.unreadNotificationsCount.useQuery(undefined, {
+    retry: false,
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
+  const mentionsQ = trpc.communities.myNotifications.useQuery(
+    { limit: 10 },
+    { retry: false, enabled: isAuthenticated && open },
+  );
+  const markReadMut = trpc.communities.markNotificationsRead.useMutation({
+    onSuccess: () => void unreadQ.refetch(),
+  });
+  const unread = unreadQ.data?.count ?? 0;
+  const mentions = mentionsQ.data ?? [];
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next && unread > 0) markReadMut.mutate({});
+  };
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
         className="btn-icon relative hidden sm:inline-flex"
         aria-label={t("الإشعارات", "Notifications")}
       >
         <Bell size={18} />
-        {isAuthenticated && items.length > 0 && (
-          <span className="absolute end-2 top-2 h-2 w-2 rounded-full bg-danger" />
+        {isAuthenticated && unread > 0 ? (
+          <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white tabular-nums">
+            {unread > 99 ? "99+" : unread}
+          </span>
+        ) : (
+          isAuthenticated &&
+          items.length > 0 && (
+            <span className="absolute end-2 top-2 h-2 w-2 rounded-full bg-danger" />
+          )
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-[21rem] max-w-[calc(100vw-2rem)] backdrop-blur-xl saturate-150"
+        className="max-h-[70vh] w-[21rem] max-w-[calc(100vw-2rem)] overflow-y-auto backdrop-blur-xl saturate-150"
       >
-        <DropdownMenuLabel>{t("آخر الفصول", "Latest chapters")}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
         {!isAuthenticated ? (
           <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
             <Bell size={22} className="text-app-3" />
@@ -70,7 +100,64 @@ function NotificationsBell() {
               {t("دخول", "Sign in")}
             </Link>
           </div>
-        ) : query.isLoading ? (
+        ) : (
+          <>
+            {/* قسم المنشن */}
+            <DropdownMenuLabel className="flex items-center gap-1.5">
+              <AtSign size={13} className="text-primary" />
+              {t("منشن", "Mentions")}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {mentionsQ.isLoading ? (
+              <div className="flex flex-col gap-2 p-2">
+                {[1, 2].map((i) => (
+                  <div key={i} className="skeleton h-12 !rounded-xl" />
+                ))}
+              </div>
+            ) : mentions.length === 0 ? (
+              <p className="px-4 py-4 text-center text-xs text-app-3">
+                {t("لا منشنات بعد — سيظهر هنا ذكرك في المجتمعات.", "No mentions yet — community mentions appear here.")}
+              </p>
+            ) : (
+              mentions.map((n) => (
+                <DropdownMenuItem
+                  key={n.id}
+                  onClick={() =>
+                    n.payload?.communitySlug && navigate(`/c/${n.payload.communitySlug}`)
+                  }
+                  className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(167,139,250,0.16)]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                    <AtSign size={15} />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="line-clamp-1 text-xs font-semibold">
+                      {n.payload?.fromUsername ? (
+                        <>
+                          <span dir="ltr">@{n.payload.fromUsername}</span>{" "}
+                          {t("ذكرك في", "mentioned you in")} {n.payload?.communityName ?? ""}
+                        </>
+                      ) : (
+                        (n.payload?.communityName ?? t("إشعار مجتمع", "Community notification"))
+                      )}
+                    </span>
+                    {n.payload?.excerpt && (
+                      <span className="line-clamp-1 text-[11px] text-app-3">{n.payload.excerpt}</span>
+                    )}
+                    <span className="text-[10px] text-app-3">{timeAgo(n.createdAt, lang)}</span>
+                  </span>
+                  {!n.readAt && (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-accent-2" aria-hidden />
+                  )}
+                </DropdownMenuItem>
+              ))
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{t("آخر الفصول", "Latest chapters")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {isAuthenticated && (query.isLoading ? (
           <div className="flex flex-col gap-2 p-2">
             {[1, 2, 3].map((i) => (
               <div key={i} className="skeleton h-14 !rounded-xl" />
@@ -114,7 +201,7 @@ function NotificationsBell() {
               {t("عرض الكل", "View all")}
             </DropdownMenuItem>
           </>
-        )}
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -132,11 +219,15 @@ export default function Navbar() {
   const { t, toggleLanguage } = useLanguage();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => setSearchOpen(false), [location.pathname]);
+  useEffect(() => {
+    setSearchOpen(false);
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const accountPath = isAuthenticated ? "/profile" : LOGIN_PATH;
   const bottomNav = [
@@ -207,6 +298,15 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="ms-auto flex items-center gap-2 md:ms-0">
+            {/* قائمة الموبايل (الشريط السفلي يبقى كما هو) */}
+            <button
+              className="btn-icon lg:hidden"
+              aria-label={t("القائمة", "Menu")}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              {menuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+
             <button
               className="btn-icon"
               aria-label={t("بحث", "Search")}
@@ -320,6 +420,42 @@ export default function Navbar() {
                 </button>
               </form>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile menu sheet — روابط التنقل كاملة بما فيها المجتمعات */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.nav
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: EASE }}
+              className="overflow-hidden border-t border-app lg:hidden"
+              aria-label={t("قائمة التنقل", "Navigation menu")}
+            >
+              <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
+                {navLinks.map((l) => {
+                  const active =
+                    l.to === "/" ? location.pathname === "/" : location.pathname.startsWith(l.to);
+                  return (
+                    <Link
+                      key={l.to}
+                      to={l.to}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        active
+                          ? "bg-primary/15 text-primary"
+                          : "text-app-2 hover:bg-primary/10 hover:text-app"
+                      }`}
+                    >
+                      {l.to === "/communities" && <UsersRound size={16} />}
+                      {t(l.ar, l.en)}
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.nav>
           )}
         </AnimatePresence>
       </motion.header>
