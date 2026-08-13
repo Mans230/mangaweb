@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Loader2, LogIn, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn, Send, UserPlus } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/components/LanguageProvider";
+import PasswordResetHelp from "@/components/auth/PasswordResetHelp";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as
@@ -39,14 +41,33 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [widgetFailed, setWidgetFailed] = useState(false);
+  const [resetHelpOpen, setResetHelpOpen] = useState(false);
+  const { t } = useLanguage();
 
   const providersQ = trpc.auth.providers.useQuery(undefined, {
     staleTime: Infinity,
     retry: false,
   });
   const googleEnabled = providersQ.data?.google ?? false;
-  const telegramEnabled =
-    Boolean(TELEGRAM_BOT_USERNAME) && (providersQ.data?.telegram ?? true);
+  // عقد الباكند المتوازي يضيف telegramBotUsername/telegramBotId — نقرؤها بتساهل حتى تُنفَّذ
+  const providers = providersQ.data as
+    | {
+        telegramBotUsername?: string | null;
+        telegramBotId?: string | null;
+      }
+    | undefined;
+  const botUsername =
+    providers?.telegramBotUsername ?? TELEGRAM_BOT_USERNAME ?? null;
+  const botId = providers?.telegramBotId ?? null;
+  const telegramEnabled = providersQ.data?.telegram ?? true;
+  const telegramOAuthUrl = botId
+    ? `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(
+        window.location.origin,
+      )}&request_access=write&return_to=${encodeURIComponent(
+        window.location.origin + "/login",
+      )}`
+    : null;
 
   const onSuccess = async () => {
     setFormError(null);
@@ -84,28 +105,62 @@ export default function Login() {
     registerMutation.isPending ||
     telegramMutation.isPending;
 
-  // Telegram Login Widget
+  // Telegram Login Widget — مع كشف الفشل الصامت (سكربت telegram.org قد يكون محجوبًا)
   const telegramRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!telegramEnabled || !TELEGRAM_BOT_USERNAME || !telegramRef.current) {
+    if (!telegramEnabled || !botUsername || !telegramRef.current) {
       return;
     }
+    setWidgetFailed(false);
     window.onTelegramAuth = (user) => telegramMutation.mutate(user);
     const script = document.createElement("script");
     script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.async = true;
-    script.setAttribute("data-telegram-login", TELEGRAM_BOT_USERNAME);
+    script.setAttribute("data-telegram-login", botUsername);
     script.setAttribute("data-size", "large");
     script.setAttribute("data-radius", "14");
     script.setAttribute("data-onauth", "onTelegramAuth(user)");
     script.setAttribute("data-request-access", "write");
-    telegramRef.current.innerHTML = "";
-    telegramRef.current.appendChild(script);
+    script.onerror = () => setWidgetFailed(true);
+    const container = telegramRef.current;
+    container.innerHTML = "";
+    container.appendChild(script);
+    // بعد 5 ثوانٍ: إن لم يُنشأ iframe فالودجت فشل silently → اعرض الزر البديل
+    const timeout = window.setTimeout(() => {
+      if (!container.querySelector("iframe")) {
+        setWidgetFailed(true);
+      }
+    }, 5000);
     return () => {
+      window.clearTimeout(timeout);
       delete window.onTelegramAuth;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [telegramEnabled]);
+  }, [telegramEnabled, botUsername]);
+
+  // معالجة العودة من OAuth تليجرام (?id=...&hash=...&auth_date=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const hash = params.get("hash");
+    const authDate = params.get("auth_date");
+    if (!id || !hash || !authDate) return;
+    const payload: TelegramAuthPayload = {
+      id: Number(id),
+      first_name: params.get("first_name") ?? "",
+      auth_date: Number(authDate),
+      hash,
+    };
+    const lastName = params.get("last_name");
+    const username = params.get("username");
+    const photoUrl = params.get("photo_url");
+    if (lastName) payload.last_name = lastName;
+    if (username) payload.username = username;
+    if (photoUrl) payload.photo_url = photoUrl;
+    telegramMutation.mutate(payload);
+    window.history.replaceState(null, "", "/login");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Redirect if already signed in
   useEffect(() => {
@@ -258,6 +313,15 @@ export default function Login() {
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </div>
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => setResetHelpOpen(true)}
+                className="mt-1.5 text-xs font-medium text-app-3 transition-colors hover:text-accent"
+              >
+                {t("نسيت كلمة المرور؟", "Forgot your password?")}
+              </button>
+            )}
           </div>
 
           {formError && (
@@ -284,6 +348,14 @@ export default function Login() {
             )}
             {mode === "login" ? "تسجيل الدخول" : "إنشاء الحساب"}
           </button>
+          {mode === "register" && (
+            <p className="text-center text-[11.5px] leading-relaxed text-app-3">
+              {t(
+                "بعد التسجيل وثّق حسابك بربط تليجرام من صفحة «حسابي» لتفعيل الاستعادة والإشعارات.",
+                "After signing up, verify your account by linking Telegram from the “My Account” page to enable recovery and notifications.",
+              )}
+            </p>
+          )}
         </form>
 
         {(telegramEnabled || googleEnabled) && (
@@ -296,7 +368,32 @@ export default function Login() {
 
             <div className="flex flex-col items-center gap-3">
               {telegramEnabled && (
-                <div ref={telegramRef} className="flex justify-center" />
+                <div className="flex w-full flex-col items-center gap-2">
+                  {!widgetFailed && botUsername && (
+                    <div ref={telegramRef} className="flex justify-center" />
+                  )}
+                  {(widgetFailed || !botUsername) && telegramOAuthUrl && (
+                    <a
+                      href={telegramOAuthUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#229ED9] px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                    >
+                      <Send size={16} />
+                      الدخول عبر تليجرام
+                    </a>
+                  )}
+                  {telegramOAuthUrl && (
+                    <a
+                      href={telegramOAuthUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11.5px] font-medium text-app-3 underline-offset-2 transition-colors hover:text-accent hover:underline"
+                    >
+                      {t("لا يظهر زر تليجرام؟ اضغط هنا", "Telegram button not showing? Click here")}
+                    </a>
+                  )}
+                </div>
               )}
 
               {googleEnabled && (
@@ -311,6 +408,12 @@ export default function Login() {
           </>
         )}
       </motion.div>
+
+      <PasswordResetHelp
+        open={resetHelpOpen}
+        onClose={() => setResetHelpOpen(false)}
+        botUsername={botUsername}
+      />
     </div>
   );
 }

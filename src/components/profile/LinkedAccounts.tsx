@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, KeyRound, Link2, Loader2, Mail, RefreshCw, Send, Unlink, Zap } from "lucide-react";
+import { BadgeCheck, Check, Copy, KeyRound, Link2, Loader2, Mail, RefreshCw, Send, Unlink, Zap } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/library/toast";
 import GlassModal from "@/components/library/GlassModal";
+import PasswordResetHelp from "@/components/auth/PasswordResetHelp";
 import { trpc } from "@/providers/trpc";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const TG_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "zeko_manga_bot";
+const TG_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "egmangabot";
 const TG_WIDGET_ENABLED = Boolean(import.meta.env.VITE_TELEGRAM_BOT_USERNAME);
 
 type TelegramAuthPayload = {
@@ -37,6 +38,7 @@ export default function LinkedAccounts({ email, telegramLinked, telegramUsername
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [tgModal, setTgModal] = useState(false);
+  const [resetHelpOpen, setResetHelpOpen] = useState(false);
 
   const unlinkMutation = trpc.auth.unlinkTelegram.useMutation({
     onSuccess: () => {
@@ -140,10 +142,16 @@ export default function LinkedAccounts({ email, telegramLinked, telegramUsername
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-sm font-bold text-app">
               {t("البريد الإلكتروني", "Email")}
-              <span className="flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10.5px] font-bold text-success">
-                <BadgeCheck size={11} />
-                {t("موثّق", "Verified")}
-              </span>
+              {telegramLinked ? (
+                <span className="flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10.5px] font-bold text-success">
+                  <BadgeCheck size={11} />
+                  {t("موثّق عبر تليجرام", "Verified via Telegram")}
+                </span>
+              ) : (
+                <span className="glass-chip flex items-center gap-1 !py-0.5 text-[10.5px] font-bold text-app-3">
+                  {t("غير موثّق — اربط تليجرام", "Not verified — link Telegram")}
+                </span>
+              )}
             </div>
             <p className="mt-0.5 truncate text-[11.5px] text-app-3" dir="ltr">
               {email ?? "—"}
@@ -160,6 +168,11 @@ export default function LinkedAccounts({ email, telegramLinked, telegramUsername
       </div>
 
       <TelegramModal open={tgModal} onClose={() => setTgModal(false)} />
+      <PasswordResetHelp
+        open={resetHelpOpen}
+        onClose={() => setResetHelpOpen(false)}
+        botUsername={TG_BOT}
+      />
     </motion.section>
   );
 }
@@ -172,6 +185,19 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [code, setCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [widgetError, setWidgetError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyCode = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      toast(t("نُسخ الرمز", "Code copied"));
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast(t("تعذر النسخ — انسخ الرمز يدويًا", "Copy failed — copy the code manually"), { kind: "info" });
+    }
+  };
 
   const linkCodeMutation = trpc.auth.createLinkCode.useMutation({
     onSuccess: (data) => setCode(data.code),
@@ -290,9 +316,10 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
         </li>
       </ol>
 
-      <div className="my-4 flex justify-center">
+      <div className="my-4 flex flex-col items-center gap-2">
         {code ? (
-          <motion.span
+          <>
+            <motion.span
             key={code}
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -302,13 +329,22 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
           >
             {code}
           </motion.span>
+            <button
+              onClick={copyCode}
+              className="btn-glass !px-3 !py-1.5 text-xs"
+              aria-label={t("نسخ الرمز", "Copy code")}
+            >
+              {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+              {copied ? t("نُسخ!", "Copied!") : t("نسخ الرمز", "Copy code")}
+            </button>
+          </>
         ) : (
           <Loader2 size={24} className="animate-spin text-app-3" />
         )}
       </div>
 
       <a
-        href={`https://t.me/${TG_BOT}`}
+        href={code ? `https://t.me/${TG_BOT}?start=${code}` : `https://t.me/${TG_BOT}`}
         target="_blank"
         rel="noreferrer"
         className="btn-glass w-full !py-2.5 text-sm"
@@ -316,6 +352,13 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
         <Send size={15} />
         {t("فتح البوت في تليجرام", "Open bot in Telegram")}
       </a>
+
+      <p className="glass mt-3 !rounded-xl px-3 py-2 text-[11.5px] leading-relaxed text-app-3">
+        {t(
+          "الكود صالح 10 دقائق ويُستخدم مرة واحدة. إذا رد البوت «غير موجود»: ولّد كودًا جديدًا وأرسله فورًا.",
+          "The code is valid for 10 minutes and can be used once. If the bot replies “not found”: generate a new code and send it immediately.",
+        )}
+      </p>
 
       <p className="mt-4 text-center text-xs font-medium text-app-3">
         {t("بعد إرسال الرمز للبوت، اضغط زر التحقق:", "After sending the code to the bot, press verify:")}
@@ -325,6 +368,6 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
         {checking ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
         {t("تحقق من الربط", "Check linking status")}
       </button>
-    </GlassModal>
+        </GlassModal>
   );
 }
