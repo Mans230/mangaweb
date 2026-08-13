@@ -275,7 +275,7 @@ export const authRouter = createRouter({
         env.adminTelegramIds.includes(String(input.id))
       ) {
         await setUserRole(Number(user.id), "admin");
-        user.role = "admin";
+        user = { ...user, role: "admin" };
       }
 
       appendSessionCookie(ctx.resHeaders, ctx.req.headers, Number(user.id));
