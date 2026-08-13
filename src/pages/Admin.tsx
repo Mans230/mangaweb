@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Flag,
   GitMerge,
   Inbox,
   LayoutDashboard,
@@ -24,10 +25,11 @@ import AdminSources from "@/components/admin/Sources";
 import MergeDuplicates from "@/components/admin/MergeDuplicates";
 import UsersManager from "@/components/admin/UsersManager";
 import RequestsManager from "@/components/admin/RequestsManager";
+import ReportsManager from "@/components/admin/ReportsManager";
 import CommentsManager from "@/components/admin/CommentsManager";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "comments";
+type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "reports" | "comments";
 
 const shortcutKeys: Record<string, AdminView> = {
   d: "dashboard",
@@ -37,6 +39,7 @@ const shortcutKeys: Record<string, AdminView> = {
   g: "merge",
   u: "users",
   r: "requests",
+  p: "reports",
   c: "comments",
 };
 
@@ -57,6 +60,7 @@ function AdminShell() {
         { id: "merge", label: t("دمج المكرر", "Merge duplicates"), icon: GitMerge },
         { id: "users", label: t("المستخدمون", "Users"), icon: Users },
         { id: "requests", label: t("الطلبات", "Requests"), icon: Inbox, badge: pendingCount },
+        { id: "reports", label: t("التبليغات", "Reports"), icon: Flag },
         { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
     [t, pendingCount],
@@ -197,6 +201,7 @@ function AdminShell() {
             {view === "merge" && <MergeDuplicates />}
             {view === "users" && <UsersManager />}
             {view === "requests" && <RequestsManager />}
+            {view === "reports" && <ReportsManager />}
             {view === "comments" && <CommentsManager />}
           </motion.div>
         </AnimatePresence>

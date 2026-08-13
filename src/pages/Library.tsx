@@ -1,14 +1,17 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { motion } from "framer-motion";
-import { Bell, Heart, History } from "lucide-react";
+import { Bell, BookOpenCheck, Download, Heart, History, ListChecks } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
 import LibraryHeader from "@/components/library/LibraryHeader";
 import FavoritesTab from "@/components/library/FavoritesTab";
 import FollowingTab from "@/components/library/FollowingTab";
+import ReadingNowTab from "@/components/library/ReadingNowTab";
 import HistoryTab from "@/components/library/HistoryTab";
+import ListsTab from "@/components/library/ListsTab";
+import DownloadsTab from "@/components/library/DownloadsTab";
 import StatsCard from "@/components/library/StatsCard";
 import GuestGate from "@/components/library/GuestGate";
 import ErrorState from "@/components/ErrorState";
@@ -18,17 +21,25 @@ import type { LibraryData } from "@/components/library/data";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-type TabKey = "favorites" | "following" | "history";
+type TabKey = "favorites" | "following" | "reading" | "history" | "lists" | "downloads";
+const TAB_KEYS: TabKey[] = ["favorites", "following", "reading", "history", "lists", "downloads"];
+
+function parseTab(raw: string | null): TabKey {
+  return (TAB_KEYS as string[]).includes(raw ?? "") ? (raw as TabKey) : "favorites";
+}
 
 export default function Library() {
   const { t } = useLanguage();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [params, setParams] = useSearchParams();
-  const tabParam = params.get("tab");
-  const tab: TabKey =
-    tabParam === "following" || tabParam === "history" ? tabParam : "favorites";
+  const tab: TabKey = parseTab(params.get("tab"));
 
   const libraryQ = trpc.library.getLibrary.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const listsQ = trpc.lists.myLists.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
     staleTime: 30_000,
@@ -72,10 +83,13 @@ export default function Library() {
     setParams(key === "favorites" ? {} : { tab: key }, { replace: true });
   };
 
-  const tabs: { key: TabKey; label: string; icon: typeof Heart; count: number }[] = [
+  const tabs: { key: TabKey; label: string; icon: typeof Heart; count: number | null }[] = [
     { key: "favorites", label: t("المفضلة", "Favorites"), icon: Heart, count: data.favorites.length },
     { key: "following", label: t("المتابَعة", "Following"), icon: Bell, count: data.following.length },
-    { key: "history", label: t("سجل القراءة", "History"), icon: History, count: data.history.length },
+    { key: "reading", label: t("أقرأها الآن", "Reading now"), icon: BookOpenCheck, count: new Set(data.history.map((h) => h.manga.id)).size },
+    { key: "history", label: t("السجل", "History"), icon: History, count: data.history.length },
+    { key: "lists", label: t("قوائمي", "My lists"), icon: ListChecks, count: listsQ.data?.length ?? 0 },
+    { key: "downloads", label: t("التحميلات", "Downloads"), icon: Download, count: null },
   ];
 
   return (
@@ -101,8 +115,8 @@ export default function Library() {
           <GuestGate
             heading={t("مكتبتك بانتظارك", "Your library awaits")}
             copy={t(
-              "سجّل الدخول لتحفظ مفضلاتك وتتابع فصولك وتستكمل قراءتك من أي جهاز.",
-              "Sign in to save favorites, follow your series, and resume reading from any device.",
+              "سجّل الدخول لتحفظ مفضلاتك وتتابع فصولك وتنشئ قوائمك المخصصة وتستكمل قراءتك من أي جهاز.",
+              "Sign in to save favorites, follow your series, build custom lists, and resume reading from any device.",
             )}
           />
         </div>
@@ -118,12 +132,12 @@ export default function Library() {
             catchUpPct={catchUpPct}
           />
 
-          {/* tab bar */}
+          {/* tab bar — قابلة للتمرير أفقياً على الموبايل */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE, delay: 0.15 }}
-            className="glass flex !rounded-full p-1.5"
+            className="glass flex !rounded-full p-1.5 max-sm:overflow-x-auto max-sm:[-ms-overflow-style:none] max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
             role="tablist"
           >
             {tabs.map((item) => {
@@ -134,7 +148,7 @@ export default function Library() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setTab(item.key)}
-                  className={`relative flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold transition-colors sm:text-sm ${
+                  className={`relative flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 py-2.5 text-xs font-bold transition-colors sm:text-sm ${
                     active ? "text-white" : "text-app-3 hover:text-app-2"
                   }`}
                 >
@@ -147,20 +161,22 @@ export default function Library() {
                   )}
                   <item.icon size={15} className="relative z-10" />
                   <span className="relative z-10">{item.label}</span>
-                  <span
-                    className={`relative z-10 rounded-full px-1.5 text-[10.5px] ${
-                      active ? "bg-white/25" : "bg-black/5 dark:bg-white/10"
-                    }`}
-                  >
-                    {item.count.toLocaleString("ar")}
-                  </span>
+                  {item.count !== null && (
+                    <span
+                      className={`relative z-10 rounded-full px-1.5 text-[10.5px] ${
+                        active ? "bg-white/25" : "bg-black/5 dark:bg-white/10"
+                      }`}
+                    >
+                      {item.count.toLocaleString("ar")}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </motion.div>
 
           {/* tab content */}
-          {libraryQ.isError ? (
+          {libraryQ.isError && tab !== "lists" && tab !== "downloads" ? (
             <div className="glass">
               <ErrorState
                 onRetry={() => libraryQ.refetch()}
@@ -180,7 +196,10 @@ export default function Library() {
               {tab === "following" && (
                 <FollowingTab following={data.following} isLive={isLive} />
               )}
+              {tab === "reading" && <ReadingNowTab history={data.history} />}
               {tab === "history" && <HistoryTab history={data.history} />}
+              {tab === "lists" && <ListsTab />}
+              {tab === "downloads" && <DownloadsTab />}
             </motion.div>
           )}
 

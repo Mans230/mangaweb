@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     /* Light theme (default) — white/lavender */
     --bg: #f5f3ff;
     --bg-end: #fafaff;
@@ -29,6 +30,7 @@
   }
 
   [data-theme="dark"] {
+    color-scheme: dark;
     --bg: #0c0a18;
     --bg-end: #141026;
     --bg-2: #1b1533;
@@ -227,6 +229,26 @@
   .input-glass:focus {
     border-color: var(--border-glow);
     box-shadow: 0 0 0 2px var(--border-glow), 0 8px 24px rgba(124, 58, 237, 0.12);
+  }
+
+  /* ===== Native selects — قائمة منسدلة متوافقة مع الثيم بدل ألوان المتصفح ===== */
+  select.input-glass {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a78bfa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: left 0.9rem center; /* RTL: النهاية المرئية */
+    background-size: 1rem;
+    padding-inline-end: 2.5rem;
+    cursor: pointer;
+  }
+  [dir="ltr"] select.input-glass {
+    background-position: right 0.9rem center;
+  }
+  select.input-glass option,
+  select.input-glass optgroup {
+    background-color: var(--bg-2);
+    color: var(--text);
   }
 
   /* ===== Text / decorations ===== */

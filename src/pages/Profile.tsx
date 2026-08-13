@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
 import IdentityCard from "@/components/profile/IdentityCard";
+import CustomizeCard from "@/components/profile/CustomizeCard";
 import Achievements from "@/components/profile/Achievements";
 import LinkedAccounts from "@/components/profile/LinkedAccounts";
 import Preferences from "@/components/profile/Preferences";
@@ -78,10 +79,18 @@ export default function Profile() {
         <div className="relative flex flex-col gap-6 md:gap-8">
           <IdentityCard
             name={user?.name ?? t("قارئ", "Reader")}
+            username={user?.username ?? null}
             email={user?.email ?? null}
             avatar={user?.avatarUrl ?? null}
+            banner={user?.bannerUrl ?? null}
             role={user?.role ?? "user"}
             createdAt={user?.createdAt ?? null}
+          />
+          <CustomizeCard
+            username={user?.username ?? null}
+            avatarUrl={user?.avatarUrl ?? null}
+            bannerUrl={user?.bannerUrl ?? null}
+            telegramLinked={telegramLinked}
           />
           {user?.role === "admin" && (
             <Link

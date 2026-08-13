@@ -3,6 +3,7 @@ import Layout from "@/components/Layout";
 import Home from "@/pages/Home";
 import Browse from "@/pages/Browse";
 import MangaDetail from "@/pages/MangaDetail";
+import Community from "@/pages/Community";
 import Reader from "@/pages/Reader";
 import Library from "@/pages/Library";
 import Profile from "@/pages/Profile";
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="browse" element={<Browse />} />
         <Route path="search" element={<Browse />} />
         <Route path="manga/:slug" element={<MangaDetail />} />
+        <Route path="manga/:slug/community" element={<Community />} />
         <Route path="manga/:slug/chapter/:n" element={<Reader />} />
         <Route path="library" element={<Library />} />
         <Route path="profile" element={<Profile />} />
