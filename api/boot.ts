@@ -139,6 +139,7 @@ app.get(Paths.googleAuth, googleAuthStartHandler());
 app.get(Paths.googleCallback, googleCallbackHandler());
 app.post(Paths.linkVerify, linkVerifyHandler());
 app.post("/api/auth/telegram-reset", telegramResetHandler());
+app.get("/api/download/:slug/chapter/:num", downloadChapterHandler);
 app.get("/api/img", imageProxyHandler);
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
