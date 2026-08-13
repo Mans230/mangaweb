@@ -508,6 +508,7 @@ export default function Reader() {
       <DownloadModal
         open={downloadOpen}
         onClose={() => setDownloadOpen(false)}
+        slug={slug}
         chapterNumber={chapterNumber}
       />
       <CommentsSheet

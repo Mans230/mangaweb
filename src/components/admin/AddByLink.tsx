@@ -6,6 +6,7 @@ import {
   ClipboardPaste,
   Link2,
   RotateCcw,
+  Sparkles,
   XCircle,
 } from "lucide-react";
 import ErrorState from "@/components/ErrorState";
@@ -33,6 +34,93 @@ function slugCandidate(raw: string): string | null {
 
 function humanizeSlug(slug: string): string {
   return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** إضافة سلسلة بالاسم فقط عبر admin.addMangaByName — يبحث السكرابر ويستورد تلقائياً */
+function AddByName() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const [name, setName] = useState("");
+  const [result, setResult] = useState<{
+    imported: boolean;
+    title: string;
+    slug: string;
+    source: string;
+    duplicate?: boolean;
+  } | null>(null);
+
+  const mutation = trpc.admin.addMangaByName.useMutation({
+    onSuccess: (res) => {
+      setResult(res);
+      toast(
+        res.duplicate
+          ? t("السلسلة موجودة مسبقاً", "Series already exists")
+          : t("تم الاستيراد بالاسم بنجاح", "Imported by name"),
+        res.duplicate ? "info" : undefined,
+      );
+    },
+    onError: () => toast(t("تعذّرت الإضافة بالاسم", "Couldn't add by name"), "danger"),
+  });
+
+  const submit = () => {
+    const v = name.trim();
+    if (!v || mutation.isPending) return;
+    setResult(null);
+    mutation.mutate({ name: v });
+  };
+
+  return (
+    <div className="glass mb-8 !rounded-3xl p-6 md:p-7">
+      <h2 className="font-display flex items-center gap-2 text-lg font-bold text-app">
+        <Sparkles size={18} className="text-accent-2" />
+        {t("إضافة بالاسم", "Add by name")}
+      </h2>
+      <p className="mt-1 text-sm text-app-3">
+        {t("اكتب اسم السلسلة وسيبحث السكرابر عنها ويستوردها تلقائياً.", "Type the series name and the scraper will find and import it automatically.")}
+      </p>
+      <div className="mt-4 flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder={t("اسم السلسلة…", "Series name…")}
+          className="input-glass w-full !py-3 text-sm"
+        />
+        <button
+          onClick={submit}
+          disabled={!name.trim() || mutation.isPending}
+          className="btn-primary shrink-0 !px-5 !py-3 text-sm disabled:opacity-50"
+        >
+          {mutation.isPending ? t("جارٍ البحث…", "Searching…") : t("إضافة", "Add")}
+        </button>
+      </div>
+      <AnimatePresence>
+        {result && (
+          <motion.div
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 12, opacity: 0 }}
+            className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl border p-3.5 ${
+              result.duplicate ? "border-warning/40 bg-warning/10" : "border-success/40 bg-success/10"
+            }`}
+          >
+            {result.duplicate ? (
+              <XCircle size={18} className="shrink-0 text-warning" />
+            ) : (
+              <Check size={18} className="shrink-0 text-success" />
+            )}
+            <div className="flex-1 text-sm text-app-2">
+              {result.duplicate ? t("موجودة بالفعل:", "Already exists:") : t("تم الاستيراد:", "Imported:")}{" "}
+              <Link to={`/manga/${result.slug}`} className="font-semibold text-primary hover:underline">
+                {result.title} ←
+              </Link>
+            </div>
+            <span className="glass-chip !text-[11px]" dir="ltr">{result.source}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export default function AddByLink() {
@@ -136,6 +224,7 @@ export default function AddByLink() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <AddByName />
       {/* مؤشر الخطوات */}
       <div className="mb-8 flex items-center justify-center gap-0">
         {steps.map((label, i) => (
