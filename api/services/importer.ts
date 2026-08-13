@@ -1,8 +1,8 @@
-import { asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, isNull } from "drizzle-orm";
 import { chapters, manga, sources } from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getScraper } from "../scrapers";
-import type { SeriesInfo } from "../scrapers";
+import type { BaseScraper, SeriesInfo } from "../scrapers";
 
 /** تطبيع العنوان للمطابقة بين المصادر */
 export function normalizeTitle(title: string): string {
@@ -14,11 +14,39 @@ export function normalizeTitle(title: string): string {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
-/** تواريخ المصادر: ISO أو نص حر — نعيد Date صالحة أو null */
+/** تواريخ المصادر: ISO أو نص حر أو نسبي ("2 days ago" / "منذ 3 أيام") — نعيد Date صالحة أو null */
 function parseDate(d: string | null | undefined): Date | null {
   if (!d) return null;
-  const t = Date.parse(d);
-  return Number.isNaN(t) ? null : new Date(t);
+  const direct = Date.parse(d);
+  if (!Number.isNaN(direct)) return new Date(direct);
+
+  const t = d.trim().toLowerCase();
+  if (/^(أمس|yesterday)$/.test(t)) return new Date(Date.now() - 86400000);
+  if (/^(اليوم|today)$/.test(t)) return new Date();
+
+  const UNITS: [RegExp, number][] = [
+    [/ثانية|ثواني|seconds?/, 1000],
+    [/دقيقة|دقائق|minutes?/, 60000],
+    [/ساعة|ساعات|hours?/, 3600000],
+    [/يوم|أيام|ايام|days?/, 86400000],
+    [/أسبوع|اسبوع|أسابيع|اسابيع|weeks?/, 604800000],
+    [/شهر|أشهر|اشهر|months?/, 2592000000],
+    [/سنة|سنوات|years?/, 31536000000],
+  ];
+  const m = t.match(/(\d+(?:\.\d+)?)/);
+  if (m && /(ago|منذ|قبل)/.test(t)) {
+    const n = Number(m[1]);
+    for (const [re, ms] of UNITS) {
+      if (re.test(t)) return new Date(Date.now() - n * ms);
+    }
+  }
+  // صيغ مثل "منذ يومين" / "قبل ساعتين" بلا رقم
+  if (/(ago|منذ|قبل)/.test(t)) {
+    if (/يومين/.test(t)) return new Date(Date.now() - 2 * 86400000);
+    if (/ساعتين/.test(t)) return new Date(Date.now() - 2 * 3600000);
+    if (/أسبوعين|اسبوعين/.test(t)) return new Date(Date.now() - 2 * 604800000);
+  }
+  return null;
 }
 
 function mapStatus(s?: string): "ongoing" | "completed" {
@@ -99,7 +127,7 @@ async function upsertChapters(
   if (!list.length) return 0;
   const db = getDb();
   const existing = await db
-    .select({ number: chapters.number })
+    .select({ number: chapters.number, publishedAt: chapters.publishedAt })
     .from(chapters)
     .where(eq(chapters.mangaId, mangaId));
   const existingNums = new Set(existing.map((r) => Number(r.number)));
@@ -127,6 +155,26 @@ async function upsertChapters(
   const fresh = deduped.filter((r) => !existingNums.has(Number(r.number)));
   for (let i = 0; i < fresh.length; i += 200) {
     await db.insert(chapters).values(fresh.slice(i, i + 200));
+  }
+
+  // حدّث publishedAt للفصول الموجودة التي بلا تاريخ عندما توفر المصدر قيمة الآن
+  const nullDates = new Set(
+    existing.filter((r) => r.publishedAt == null).map((r) => Number(r.number)),
+  );
+  const dateFixes = deduped.filter(
+    (r) => r.publishedAt && nullDates.has(Number(r.number)),
+  );
+  for (const r of dateFixes) {
+    await db
+      .update(chapters)
+      .set({ publishedAt: r.publishedAt })
+      .where(
+        and(
+          eq(chapters.mangaId, mangaId),
+          eq(chapters.number, r.number),
+          isNull(chapters.publishedAt),
+        ),
+      );
   }
   return fresh.length;
 }
@@ -276,6 +324,81 @@ export async function importLatest(
     }
   }
   return { imported, failed, errors };
+}
+
+/**
+ * استيراد الكتالوج: ترقيم كامل عبر source.getLatest(page) من الصفحة 1
+ * حتى صفحة فارغة أو بلوغ maxPages. يتخطى السلاسل الموجودة مسبقاً لنفس المصدر
+ * (تحديث فصولها من مسؤولية refreshAll) ويقف عند limit سلسلة جديدة لكل دورة.
+ */
+export async function importCatalog(
+  sourceKey: string,
+  opts: { limit?: number; maxPages?: number } = {},
+): Promise<{ imported: number; failed: number; skipped: number; errors: string[] }> {
+  const limit = Math.max(1, opts.limit ?? 150);
+  const maxPages = Math.max(1, opts.maxPages ?? 30);
+  const scraper = getScraper(sourceKey);
+  if (!scraper) throw new Error(`مصدر غير معروف: ${sourceKey}`);
+  if (!scraper.enabled) {
+    return { imported: 0, failed: 0, skipped: 0, errors: [`${sourceKey} معطّل`] };
+  }
+
+  const db = getDb();
+  const source = await ensureSource(sourceKey);
+  const seen = new Set<string>();
+  let imported = 0;
+  let failed = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  let stop = false;
+  for (let page = 1; page <= maxPages && !stop; page++) {
+    let items: Awaited<ReturnType<BaseScraper["getLatest"]>>;
+    try {
+      items = await scraper.getLatest(page);
+    } catch (e) {
+      const msg = `page ${page}: ${(e as Error).message}`;
+      errors.push(msg);
+      console.warn(`[importer] catalog getLatest(${sourceKey}, ${msg.split(":")[0]}) فشل: ${(e as Error).message}`);
+      break; // فشل الصفحة = نهاية الترقيم غالباً
+    }
+    if (!items.length) break; // صفحة فارغة = نهاية الكتالوج
+    for (const it of items) {
+      if (!it.seriesUrl || seen.has(it.seriesUrl)) continue;
+      seen.add(it.seriesUrl);
+      try {
+        // تخطَّ المستورد مسبقاً من نفس المصدر (مطابقة بالرابط أو بالـ slug)
+        const slug = scraper.slugFromUrl(it.seriesUrl);
+        const existing = await db.query.manga.findFirst({
+          where: and(eq(manga.sourceId, source.id), eq(manga.sourceUrl, it.seriesUrl)),
+          columns: { id: true },
+        });
+        const existingBySlug =
+          !existing && slug
+            ? await db.query.manga.findFirst({
+                where: and(eq(manga.sourceId, source.id), eq(manga.slug, slug)),
+                columns: { id: true },
+              })
+            : undefined;
+        if (existing || existingBySlug) {
+          skipped += 1;
+          continue;
+        }
+        const res = await importSeries(sourceKey, it.seriesUrl);
+        if (res.created) imported += 1;
+        else skipped += 1; // مكرر بالعنوان من مصدر آخر أو تحديث لموجود
+      } catch (e) {
+        failed += 1;
+        errors.push(`${it.seriesUrl}: ${(e as Error).message}`);
+        console.warn(`[importer] فشل استيراد ${it.seriesUrl}: ${(e as Error).message}`);
+      }
+      if (imported >= limit) {
+        stop = true;
+        break;
+      }
+    }
+  }
+  return { imported, failed, skipped, errors };
 }
 
 /** تحديث فصول مانجا موجودة من مصدرها — يضيف الجديد فقط */

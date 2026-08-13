@@ -115,6 +115,8 @@ app.use("*", async (c, next) => {
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   c.header("Content-Security-Policy", CSP);
+  // HSTS: 6 أشهر — بلا includeSubDomains (دومين www غير موجود بعد)
+  c.header("Strict-Transport-Security", "max-age=15552000");
   c.res.headers.delete("x-powered-by");
 });
 
@@ -145,13 +147,13 @@ if (env.isProduction) {
     console.log(`Server running on http://localhost:${port}/`);
   });
 
-  // ===== محرك البيانات: استيراد أولي + تحديث دوري (لا يُسقط السيرفر أبداً) =====
+  // ===== محرك البيانات: استيراد أولي + كتالوج دوري + تحديث دوري (لا يُسقط السيرفر أبداً) =====
   try {
     const { count } = await import("drizzle-orm");
     const { getDb } = await import("./queries/connection");
     const { manga } = await import("@db/schema");
     const { enabledScrapers } = await import("./scrapers");
-    const { importLatest, refreshAll } = await import("./services/importer");
+    const { importLatest, importCatalog, refreshAll } = await import("./services/importer");
 
     const importOnEmpty = (process.env.IMPORT_ON_EMPTY ?? "true") !== "false";
     const limitPerSource = Math.max(
@@ -162,39 +164,101 @@ if (env.isProduction) {
       5,
       parseInt(process.env.SCRAPER_REFRESH_MIN || "30", 10) || 30,
     );
+    // استيراد الكتالوج الدوري (الوصول لكتالوج واسع تدريجياً)
+    const catalogHours = Math.max(
+      1,
+      parseInt(process.env.CATALOG_REFRESH_HOURS || "12", 10) || 12,
+    );
+    const catalogLimit = Math.max(
+      1,
+      parseInt(process.env.CATALOG_IMPORT_LIMIT || "150", 10) || 150,
+    );
+    const catalogMaxPages = Math.max(
+      1,
+      parseInt(process.env.CATALOG_MAX_PAGES || "30", 10) || 30,
+    );
 
     const db = getDb();
     const [{ total: mangaTotal }] = await db
       .select({ total: count() })
       .from(manga);
 
+    // علم مشترك يمنع تداخل أي دورتين (استيراد أولي / كتالوج / refreshAll)
+    let jobRunning = false;
+
+    /** دورة كتالوج: المصادر بالتتابع مع تسجيل نتيجة كل مصدر */
+    const runCatalog = async () => {
+      if (jobRunning) {
+        console.log("[scraper-job] دورة الكتالوج مؤجلة — مهمة خلفية أخرى تعمل");
+        return;
+      }
+      jobRunning = true;
+      try {
+        for (const s of enabledScrapers()) {
+          try {
+            console.log(
+              `[scraper-job] importCatalog(${s.name}, limit=${catalogLimit}, maxPages=${catalogMaxPages})…`,
+            );
+            const r = await importCatalog(s.name, {
+              limit: catalogLimit,
+              maxPages: catalogMaxPages,
+            });
+            console.log(
+              `[scraper-job] كتالوج ${s.name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
+            );
+          } catch (e) {
+            console.error(
+              `[scraper-job] فشل استيراد كتالوج ${s.name}: ${(e as Error).message}`,
+            );
+          }
+        }
+        console.log("[scraper-job] اكتملت دورة الكتالوج.");
+      } finally {
+        jobRunning = false;
+      }
+    };
+
     if (importOnEmpty && mangaTotal === 0) {
       console.log(
         `[scraper-job] قاعدة البيانات فارغة — استيراد أولي (${limitPerSource} سلسلة لكل مصدر)…`,
       );
       void (async () => {
-        for (const s of enabledScrapers()) {
-          try {
-            console.log(`[scraper-job] importLatest(${s.name})…`);
-            const r = await importLatest(s.name, limitPerSource);
-            console.log(
-              `[scraper-job] ${s.name}: استُوردت ${r.imported}، فشلت ${r.failed}`,
-            );
-          } catch (e) {
-            console.error(
-              `[scraper-job] فشل الاستيراد من ${s.name}: ${(e as Error).message}`,
-            );
+        jobRunning = true;
+        try {
+          for (const s of enabledScrapers()) {
+            try {
+              console.log(`[scraper-job] importLatest(${s.name})…`);
+              const r = await importLatest(s.name, limitPerSource);
+              console.log(
+                `[scraper-job] ${s.name}: استُوردت ${r.imported}، فشلت ${r.failed}`,
+              );
+            } catch (e) {
+              console.error(
+                `[scraper-job] فشل الاستيراد من ${s.name}: ${(e as Error).message}`,
+              );
+            }
           }
+          console.log("[scraper-job] اكتمل الاستيراد الأولي.");
+        } finally {
+          jobRunning = false;
         }
-        console.log("[scraper-job] اكتمل الاستيراد الأولي.");
+        // دورة كتالوج أولى مباشرة بعد الاستيراد الأولي
+        await runCatalog();
       })();
+    } else {
+      // أول دورة كتالوج بعد دقيقة من الإقلاع، ثم كل catalogHours
+      setTimeout(() => {
+        void runCatalog();
+      }, 60 * 1000);
     }
+    setInterval(() => {
+      void runCatalog();
+    }, catalogHours * 60 * 60 * 1000);
 
     // تحديث دوري بلا تداخل
-    let refreshing = false;
     setInterval(() => {
-      if (refreshing) return;
-      refreshing = true;
+      if (jobRunning) return;
+      jobRunning = true;
       console.log("[scraper-job] بدء refreshAll الدوري…");
       refreshAll()
         .then((r) => {
@@ -206,7 +270,7 @@ if (env.isProduction) {
           console.error(`[scraper-job] refreshAll فشل: ${(e as Error).message}`);
         })
         .finally(() => {
-          refreshing = false;
+          jobRunning = false;
         });
     }, refreshMin * 60 * 1000);
   } catch (e) {
