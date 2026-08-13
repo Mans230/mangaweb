@@ -37,7 +37,7 @@ export default function Layout() {
     <div className="flex min-h-[100dvh] flex-col">
       <div className="noise-overlay" aria-hidden />
       <Navbar />
-      <main className="flex-1 pb-20 lg:pb-0">
+      <main className="flex-1 pb-20 md:pb-0">
         <Outlet />
       </main>
       <Footer />

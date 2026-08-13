@@ -22,7 +22,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="mt-20 border-t border-app pb-24 lg:pb-0" style={{ background: "var(--surface)" }}>
+    <footer className="mt-20 border-t border-app pb-24 md:pb-0" style={{ background: "var(--surface)" }}>
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-3 md:px-6">
         {/* About */}
         <div>

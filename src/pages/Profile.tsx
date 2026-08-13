@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { Link } from "react-router";
+import { LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
@@ -12,18 +14,12 @@ import { ToastViewport } from "@/components/library/toast";
 import { normalizeApiManga, timeAgoAr } from "@/components/library/data";
 import type { LibraryData } from "@/components/library/data";
 
-const TG_KEY = "zeko-telegram-linked";
-
 export default function Profile() {
   const { t } = useLanguage();
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [telegramLinked, setTelegramLinked] = useState(
-    () => window.localStorage.getItem(TG_KEY) === "1",
-  );
 
-  useEffect(() => {
-    if (user?.telegramId) setTelegramLinked(true);
-  }, [user?.telegramId]);
+  // حالة ربط تليجرام تُشتق من بيانات الخادم فقط (user.telegramId) — بلا localStorage
+  const telegramLinked = !!user?.telegramId;
 
   // بيانات المكتبة لتغذية الإنجازات — API فقط، بلا بدائل وهمية
   const libraryQ = trpc.library.getLibrary.useQuery(undefined, {
@@ -87,11 +83,29 @@ export default function Profile() {
             role={user?.role ?? "user"}
             createdAt={user?.createdAt ?? null}
           />
+          {user?.role === "admin" && (
+            <Link
+              to="/admin"
+              className="glass flex items-center gap-3 !rounded-3xl p-5 transition-colors hover:border-primary/50"
+            >
+              <span className="gradient-primary flex h-11 w-11 items-center justify-center rounded-xl text-white">
+                <LayoutDashboard size={19} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-app">
+                  {t("لوحة الأدمن", "Admin Panel")}
+                </span>
+                <span className="mt-0.5 block text-[11.5px] text-app-3">
+                  {t("إدارة الطلبات والمحتوى والمستخدمين", "Manage requests, content, and users")}
+                </span>
+              </span>
+            </Link>
+          )}
           <Achievements data={libData} />
           <LinkedAccounts
             email={user?.email ?? null}
             telegramLinked={telegramLinked}
-            onTelegramChange={setTelegramLinked}
+            telegramUsername={user?.telegramUsername ?? null}
           />
           <Preferences telegramLinked={telegramLinked} />
           <DangerZone />
