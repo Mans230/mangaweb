@@ -9,6 +9,7 @@ import {
   findUserByEmail,
   findUserByGoogleId,
   touchLastSignIn,
+  updateUserProfile,
 } from "../queries/users";
 
 const STATE_COOKIE = "zeko_google_state";

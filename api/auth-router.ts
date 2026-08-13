@@ -12,10 +12,12 @@ import {
   createUser,
   findUserByEmail,
   findUserByTelegramId,
+  findUserByUsername,
   linkTelegramToUser,
   setUserRole,
   touchLastSignIn,
   unlinkTelegramFromUser,
+  updateUserProfile,
 } from "./queries/users";
 import { checkRateLimit, clientIp } from "./lib/rateLimit";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
@@ -41,6 +43,21 @@ const credentialsSchema = z.object({
 
 const registerSchema = credentialsSchema.extend({
   name: z.string().min(1, "Name is required").max(255),
+});
+
+const USERNAME_RE = /^[A-Za-z0-9._-]{3,20}$/;
+const USERNAME_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 يوماً
+
+const updateProfileSchema = z.object({
+  username: z
+    .string()
+    .regex(
+      USERNAME_RE,
+      "اسم المستخدم: 3-20 حرفاً (أحرف إنجليزية، أرقام، . _ -)",
+    )
+    .optional(),
+  avatarUrl: z.string().trim().url().max(2000).nullable().optional(),
+  bannerUrl: z.string().trim().url().max(2000).nullable().optional(),
 });
 
 const telegramAuthSchema = z.object({
@@ -69,6 +86,61 @@ export const authRouter = createRouter({
     appendSessionCookieClear(ctx.resHeaders, ctx.req.headers);
     return { success: true };
   }),
+
+  /**
+   * تحديث البروفايل: username (3-20 حرفاً، فريد، مرة كل 30 يوماً)
+   * + avatarUrl / bannerUrl (null = مسح، undefined = بلا تغيير).
+   */
+  updateProfile: authedQuery
+    .input(updateProfileSchema)
+    .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("updateProfile", ctx.req);
+      const userId = Number(ctx.user.id);
+      const patch: Parameters<typeof updateUserProfile>[1] = {};
+
+      if (input.username !== undefined && input.username !== ctx.user.username) {
+        if (ctx.user.usernameChangedAt) {
+          const elapsed =
+            Date.now() - new Date(ctx.user.usernameChangedAt).getTime();
+          if (elapsed < USERNAME_COOLDOWN_MS) {
+            const daysLeft = Math.ceil(
+              (USERNAME_COOLDOWN_MS - elapsed) / (24 * 60 * 60 * 1000),
+            );
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `لا يمكنك تغيير اسم المستخدم إلا مرة كل 30 يوماً — متبقٍ ${daysLeft} يوم`,
+            });
+          }
+        }
+        const taken = await findUserByUsername(input.username);
+        if (taken && Number(taken.id) !== userId) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "هذا الاسم مستخدم",
+          });
+        }
+        patch.username = input.username;
+        patch.usernameChangedAt = new Date();
+      }
+
+      if (input.avatarUrl !== undefined) patch.avatarUrl = input.avatarUrl;
+      if (input.bannerUrl !== undefined) patch.bannerUrl = input.bannerUrl;
+
+      if (Object.keys(patch).length) {
+        try {
+          await updateUserProfile(userId, patch);
+        } catch (err) {
+          if (isDuplicateEntry(err)) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "هذا الاسم مستخدم",
+            });
+          }
+          throw err;
+        }
+      }
+      return { success: true };
+    }),
 
   register: publicQuery
     .input(registerSchema)
@@ -188,6 +260,13 @@ export const authRouter = createRouter({
         }
       } else {
         await touchLastSignIn(Number(user.id));
+        // املأ الصورة تلقائياً من تيليجرام لو كانت فارغة
+        if (!user.avatarUrl && input.photo_url) {
+          await updateUserProfile(Number(user.id), {
+            avatarUrl: input.photo_url,
+          });
+          user = { ...user, avatarUrl: input.photo_url };
+        }
       }
 
       // Grant admin role on every login when the Telegram id is allow-listed
@@ -196,7 +275,7 @@ export const authRouter = createRouter({
         env.adminTelegramIds.includes(String(input.id))
       ) {
         await setUserRole(Number(user.id), "admin");
-        user = { ...user, role: "admin" };
+        user.role = "admin";
       }
 
       appendSessionCookie(ctx.resHeaders, ctx.req.headers, Number(user.id));
@@ -205,6 +284,9 @@ export const authRouter = createRouter({
 
   providers: publicQuery.query(() => ({
     telegram: Boolean(env.telegramBotToken && env.telegramBotUsername),
+    telegramBotUsername: env.telegramBotUsername || null,
+    // الجزء الرقمي العام من توكن البوت (قبل ":") — مطلوب لرابط OAuth البديل
+    telegramBotId: env.telegramBotToken ? env.telegramBotToken.split(":")[0] : null,
     google: Boolean(env.googleClientId && env.googleClientSecret),
   })),
 
@@ -257,6 +339,10 @@ export const authRouter = createRouter({
 
       try {
         await linkTelegramToUser(userId, telegramId, input.username);
+        // املأ الصورة من تيليجرام لو كانت فارغة
+        if (!ctx.user.avatarUrl && input.photo_url) {
+          await updateUserProfile(userId, { avatarUrl: input.photo_url });
+        }
       } catch (err) {
         if (isDuplicateEntry(err)) {
           throw new TRPCError({

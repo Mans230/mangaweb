@@ -219,6 +219,33 @@ export const mangaRouter = createRouter({
       return rows.map((r) => ({ ...r.manga, source: r.source }));
     }),
 
+  /** الأكثر مشاهدة — ترتيب viewCount تنازلياً، حقول البطاقات الأساسية */
+  mostViewed: publicQuery
+    .input(
+      z.object({ limit: z.number().int().min(1).max(50).default(10) }),
+    )
+    .query(async ({ input }) => {
+      const rows = await getDb()
+        .select({
+          id: manga.id,
+          slug: manga.slug,
+          title: manga.title,
+          coverUrl: manga.coverUrl,
+          type: manga.type,
+          status: manga.status,
+          genres: manga.genres,
+          rating: manga.rating,
+          viewCount: manga.viewCount,
+          chapterCount: manga.chapterCount,
+          source: { id: sources.id, name: sources.name },
+        })
+        .from(manga)
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .orderBy(desc(manga.viewCount), desc(manga.id))
+        .limit(input.limit);
+      return rows;
+    }),
+
   /** إحصاءات عامة حقيقية من قاعدة البيانات لشريط الأرقام في الرئيسية */
   publicStats: publicQuery.query(async () => {
     const db = getDb();

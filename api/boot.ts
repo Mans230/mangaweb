@@ -11,6 +11,7 @@ import { telegramResetHandler } from "./lib/telegramReset";
 import { isIpBanned } from "./lib/ipBan";
 import { clientIp } from "./lib/rateLimit";
 import { googleAuthStartHandler, googleCallbackHandler } from "./lib/google";
+import { downloadChapterHandler } from "./lib/download";
 import { Paths } from "@contracts/constants";
 import { BROWSER_UA, imageHostPolicy } from "./scrapers";
 

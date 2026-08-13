@@ -17,7 +17,11 @@ import {
 import { getDb } from "./queries/connection";
 import { createRouter, adminQuery } from "./middleware";
 import { enabledScrapers } from "./scrapers";
-import { importSeries, normalizeTitle } from "./services/importer";
+import {
+  fixMissingCovers,
+  importSeries,
+  normalizeTitle,
+} from "./services/importer";
 import { invalidateIpBanCache } from "./lib/ipBan";
 
 const sourceStatusEnum = z.enum(["active", "paused", "blocked"]);
@@ -510,5 +514,17 @@ export const adminRouter = createRouter({
         .set({ status: input.status })
         .where(eq(requests.id, input.id));
       return { success: true };
+    }),
+
+  /**
+   * إصلاح الأغلفة المفقودة: دفعة صغيرة (افتراضي 20) من المانجا بلا coverUrl،
+   * تعيد جلب الغلاف من المصدر وتُحدّث فصولها. لا توليد أغلفة AI إطلاقاً.
+   */
+  fixMissingCovers: adminQuery
+    .input(
+      z.object({ limit: z.number().int().min(1).max(100).default(20) }),
+    )
+    .mutation(async ({ input }) => {
+      return fixMissingCovers(input.limit);
     }),
 });
