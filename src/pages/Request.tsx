@@ -118,6 +118,7 @@ function RequestForm() {
   const [localError, setLocalError] = useState<string | null>(null);
   const blurTimer = useRef<number | null>(null);
 
+  const utils = trpc.useUtils();
   const createMutation = trpc.request.create.useMutation();
 
   // اقتراحات التكرار من كتالوج الـ API الحقيقي (بحث مؤجل 300ms)
@@ -182,7 +183,10 @@ function RequestForm() {
     createMutation.mutate(
       { title: title.trim(), sourceUrl, note: (typeNote + note.trim()).trim() || undefined },
       {
-        onSuccess: (res) => setSubmittedId(res.id),
+        onSuccess: (res) => {
+          setSubmittedId(res.id);
+          void utils.request.myRequests.invalidate();
+        },
         onError: () => {
           setLocalError(
             t("تعذّر إرسال الطلب — تحقق من اتصالك وحاول مجدداً.", "Couldn't send the request — check your connection and try again."),
