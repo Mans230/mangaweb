@@ -13,6 +13,7 @@ import PagedView from "@/components/reader/PagedView";
 import ChapterDrawer from "@/components/reader/ChapterDrawer";
 import ReaderSettingsPanel from "@/components/reader/ReaderSettingsPanel";
 import DownloadModal from "@/components/reader/DownloadModal";
+import ReportDialog from "@/components/ReportDialog";
 import CommentsSheet from "@/components/reader/CommentsSheet";
 import ChapterComments from "@/components/reader/ChapterComments";
 import EndCard from "@/components/reader/EndCard";
@@ -411,6 +412,21 @@ export default function Reader() {
         onOpenComments={openComments}
         markedRead={markedRead}
       />
+
+      {/* زر تبليغ عن الفصل — عائم أسفل شريط الأدوات، يظهر/يختفي معه */}
+      <motion.div
+        initial={false}
+        animate={{ y: chromeVisible ? 0 : -72, opacity: chromeVisible ? 1 : 0 }}
+        transition={{ duration: 0.25, ease: EASE }}
+        className={`fixed end-3 top-16 z-[61] ${chromeVisible ? "" : "pointer-events-none"}`}
+      >
+        <ReportDialog
+          mangaId={manga.id}
+          chapterId={current.id}
+          label={t("تبليغ عن الفصل", "Report chapter")}
+          className="btn-icon !h-9 !w-9 glass-strong"
+        />
+      </motion.div>
 
       {/* ===== Reading surface (mode switch crossfades) ===== */}
       <AnimatePresence mode="wait" initial={false}>

@@ -8,14 +8,23 @@ import {
   ChevronRight,
   Crown,
   Database,
+  Flame,
   Layers,
   RefreshCw,
   Send,
   Star,
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import { GENRES, adaptLatestChapter, adaptMangaRow, formatNum } from "@/lib/manga";
-import type { LatestChapterData } from "@/lib/manga";
+import {
+  GENRES,
+  adaptLatestChapter,
+  adaptMangaRow,
+  formatNum,
+  formatViews,
+  mangaStatusLabel,
+  typeLabel,
+} from "@/lib/manga";
+import type { LatestChapterData, MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import ChapterRow from "@/components/ChapterRow";
 import LazySection from "@/components/LazySection";
@@ -191,15 +200,6 @@ function HeroSlider() {
         </motion.div>
       </AnimatePresence>
 
-      {/* watermark number */}
-      <span
-        className="font-display pointer-events-none absolute end-5 top-4 text-7xl font-extrabold text-transparent md:text-8xl"
-        style={{ WebkitTextStroke: "2px rgba(255,255,255,0.35)", opacity: 0.5 }}
-        dir="ltr"
-      >
-        {String(safeIndex + 1).padStart(2, "0")}
-      </span>
-
       {/* محتوى الموبايل — مباشرة على التدرج الغامق بلا بطاقة glass */}
       <div className="absolute inset-x-0 bottom-0 p-5 md:hidden">
         <AnimatePresence mode="wait">
@@ -288,7 +288,7 @@ function HeroSlider() {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            className="glass grid grid-cols-[1fr_340px] items-center gap-8 rounded-3xl p-7"
+            className="glass grid grid-cols-[1fr_auto] items-center gap-8 rounded-3xl p-7"
             style={{ background: "rgba(20,16,40,0.42)", borderColor: "rgba(255,255,255,0.14)" }}
           >
             <div className="min-w-0">
@@ -354,7 +354,7 @@ function HeroSlider() {
                 alt={slide.title}
                 decoding="async"
                 fetchPriority={safeIndex === 0 ? "high" : "auto"}
-                className="relative aspect-[2/3] max-h-[calc(100svh_-_240px)] w-[340px] rounded-2xl object-cover shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+                className="relative aspect-[2/3] w-[min(340px,calc((100svh_-_240px)*2/3))] rounded-2xl object-cover ring-1 ring-white/25 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
               />
             </motion.div>
           </motion.div>
@@ -681,6 +681,69 @@ function PopularCarousel() {
   );
 }
 
+/* ================= 4.5 Most viewed — manga.mostViewed ================= */
+function MostViewed() {
+  const { t } = useLanguage();
+  const query = trpc.manga.mostViewed.useQuery({ limit: 10 }, { retry: false });
+
+  // mostViewed يعيد حقولاً أقل من ApiMangaRow — نبني بطاقات العرض مباشرة
+  const items: MangaCardData[] = (query.data ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type) as MangaType,
+    status: mangaStatusLabel(m.status) as MangaStatus,
+    rating: m.rating ?? 0,
+    ratingCount: 0,
+    chapters: m.chapterCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: "",
+    source: m.source?.name ?? "",
+    isAdult: false,
+    updatedAt: "",
+  }));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
+        <SectionHeader title={t("الأكثر مشاهدة 🔥", "Most viewed 🔥")} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-5 xl:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skeleton aspect-[2/3] !rounded-2xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
+      <SectionHeader title={t("الأكثر مشاهدة 🔥", "Most viewed 🔥")} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-5 xl:grid-cols-5">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 40, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.55, ease: EASE, delay: (i % 5) * 0.07 }}
+          >
+            <span className="glass-chip mb-2 inline-flex !px-2.5 !py-0.5 !text-[10.5px] font-bold text-warning">
+              <Flame size={11} />
+              {manga.views} {t("مشاهدة", "views")}
+            </span>
+            {/* MangaCard تستخدم loading="lazy" داخلياً لكل الأغلفة */}
+            <MangaCard manga={manga} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* ================= 5. Latest additions ================= */
 function LatestAdditions() {
   const { t } = useLanguage();
@@ -875,13 +938,29 @@ function SourcesStrip() {
 }
 
 /* ================= 8. Telegram CTA ================= */
+/** مواضع الأغلفة الزخرفية العائمة (ديسكتوب فقط) */
+const FLOAT_POSITIONS = [
+  { className: "-top-6 start-[8%] -rotate-12", delay: "0s" },
+  { className: "bottom-[-14px] start-[16%] rotate-6", delay: "1.2s" },
+  { className: "top-[30%] start-[2%] rotate-12", delay: "2.4s" },
+  { className: "top-[-10px] end-[10%] rotate-6", delay: "0.6s" },
+  { className: "bottom-[-18px] end-[20%] -rotate-6", delay: "1.8s" },
+  { className: "top-[36%] end-[3%] -rotate-12", delay: "3s" },
+];
+/** صور احتياطية ثابتة إن تعذّر جلب الأغلفة الحقيقية */
+const FALLBACK_COVERS = ["/cover-03.png", "/cover-07.png", "/cover-10.png"];
+
 function TelegramCTA() {
   const { t } = useLanguage();
-  const floatCovers = [
-    { src: "/cover-03.png", className: "-top-6 start-[8%] -rotate-12", delay: "0s" },
-    { src: "/cover-07.png", className: "bottom-[-14px] start-[16%] rotate-6", delay: "1.2s" },
-    { src: "/cover-10.png", className: "top-[30%] start-[2%] rotate-12", delay: "2.4s" },
-  ];
+  // نفس استعلام PopularCarousel تماماً ({ limit: 10 }) → يُقرأ من كاش react-query بلا طلب شبكة إضافي
+  const popularQ = trpc.manga.popular.useQuery({ limit: 10 }, { retry: false });
+  const realCovers = (popularQ.data ?? [])
+    .map((m) => adaptMangaRow(m).cover)
+    .filter(Boolean)
+    .slice(0, FLOAT_POSITIONS.length);
+  const covers = (realCovers.length > 0 ? realCovers : FALLBACK_COVERS).map(
+    (src, i) => ({ src, ...FLOAT_POSITIONS[i % FLOAT_POSITIONS.length] }),
+  );
   return (
     <section className="mx-auto max-w-7xl px-4 pb-4 md:px-6">
       <motion.div
@@ -891,8 +970,8 @@ function TelegramCTA() {
         transition={{ duration: 0.6, ease: EASE }}
         className="gradient-primary relative overflow-hidden rounded-[28px] p-8 shadow-[0_20px_60px_rgba(124,58,237,0.35)] md:p-12"
       >
-        {/* decorative covers */}
-        {floatCovers.map((c) => (
+        {/* decorative covers — أغلفة أشهر الأعمال من بيانات الموقع */}
+        {covers.map((c) => (
           <img
             key={c.src}
             src={c.src}
@@ -945,6 +1024,7 @@ export default function Home() {
       <QuickStats />
       <LatestChapters />
       <PopularCarousel />
+      <MostViewed />
       <LatestAdditions />
       <LazySection minHeight={260}>
         <GenreCloud />

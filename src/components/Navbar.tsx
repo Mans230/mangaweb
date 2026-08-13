@@ -18,6 +18,8 @@ import { useTheme } from "./ThemeProvider";
 import { useLanguage } from "./LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
+import { trpc } from "@/providers/trpc";
+import { adaptLatestChapter } from "@/lib/manga";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -29,6 +31,94 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
+
+/* ===== جرس الإشعارات — آخر الفصول المضافة (لا يوجد endpoint إشعارات متابعة بعد) ===== */
+function NotificationsBell() {
+  const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const query = trpc.manga.latest.useQuery(
+    { limit: 10 },
+    { retry: false, enabled: isAuthenticated },
+  );
+  const items = (query.data ?? []).map((c) => adaptLatestChapter(c));
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="btn-icon relative hidden sm:inline-flex"
+        aria-label={t("الإشعارات", "Notifications")}
+      >
+        <Bell size={18} />
+        {isAuthenticated && items.length > 0 && (
+          <span className="absolute end-2 top-2 h-2 w-2 rounded-full bg-danger" />
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-[21rem] max-w-[calc(100vw-2rem)] backdrop-blur-xl saturate-150"
+      >
+        <DropdownMenuLabel>{t("آخر الفصول", "Latest chapters")}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {!isAuthenticated ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
+            <Bell size={22} className="text-app-3" />
+            <p className="text-sm text-app-3">
+              {t("سجّل الدخول لترى إشعارات المتابعة", "Sign in to see follow notifications")}
+            </p>
+            <Link to={LOGIN_PATH} className="btn-primary !px-5 !py-2 text-xs">
+              {t("دخول", "Sign in")}
+            </Link>
+          </div>
+        ) : query.isLoading ? (
+          <div className="flex flex-col gap-2 p-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-14 !rounded-xl" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-app-3">
+            {t("لا جديد حالياً", "Nothing new yet")}
+          </p>
+        ) : (
+          <>
+            {items.map((item) => (
+              <DropdownMenuItem
+                key={item.id}
+                onClick={() => navigate(`/manga/${item.mangaSlug}/chapter/${item.chapter}`)}
+                className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(167,139,250,0.16)]"
+              >
+                <img
+                  src={item.cover}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-12 w-9 shrink-0 rounded-lg object-cover"
+                />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="line-clamp-1 text-sm font-semibold">{item.mangaTitle}</span>
+                  <span className="text-xs text-app-3">
+                    {t("فصل", "Ch.")} {item.chapter} · {item.timeAgo}
+                  </span>
+                </span>
+                {item.isNew && (
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-2" aria-hidden />
+                )}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => navigate("/browse?sort=latest")}
+              className="cursor-pointer justify-center !rounded-xl text-xs font-bold text-primary focus:bg-[rgba(167,139,250,0.16)]"
+            >
+              {t("عرض الكل", "View all")}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 const navLinks = [
   { to: "/", ar: "الرئيسية", en: "Home" },
@@ -149,10 +239,7 @@ export default function Navbar() {
               {t("EN", "ع")}
             </button>
 
-            <button className="btn-icon relative hidden sm:inline-flex" aria-label={t("الإشعارات", "Notifications")}>
-              <Bell size={18} />
-              <span className="absolute end-2 top-2 h-2 w-2 rounded-full bg-danger" />
-            </button>
+            <NotificationsBell />
 
             {/* AUTH-SLOT: wired to useAuth() */}
             {isLoading ? (

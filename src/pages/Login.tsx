@@ -136,7 +136,7 @@ export default function Login() {
       delete window.onTelegramAuth;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [telegramEnabled, botUsername]);
+  }, [telegramEnabled, botUsername, providersQ.isLoading]);
 
   // معالجة العودة من OAuth تليجرام (?id=...&hash=...&auth_date=...)
   useEffect(() => {
@@ -358,7 +358,8 @@ export default function Login() {
           )}
         </form>
 
-        {(telegramEnabled || googleEnabled) && (
+        {/* منطقة مزوّدي الدخول تظهر دائماً — skeleton أثناء التحميل ثم الودجت ثم الزر البديل */}
+        {(providersQ.isLoading || telegramEnabled || googleEnabled) && (
           <>
             <div className="my-6 flex items-center gap-3">
               <span className="h-px flex-1 bg-[var(--border)]" />
@@ -367,7 +368,9 @@ export default function Login() {
             </div>
 
             <div className="flex flex-col items-center gap-3">
-              {telegramEnabled && (
+              {providersQ.isLoading ? (
+                <div className="skeleton h-11 w-full max-w-72 !rounded-xl" aria-hidden />
+              ) : telegramEnabled ? (
                 <div className="flex w-full flex-col items-center gap-2">
                   {!widgetFailed && botUsername && (
                     <div ref={telegramRef} className="flex justify-center" />
@@ -383,7 +386,7 @@ export default function Login() {
                       الدخول عبر تليجرام
                     </a>
                   )}
-                  {telegramOAuthUrl && (
+                  {telegramOAuthUrl ? (
                     <a
                       href={telegramOAuthUrl}
                       target="_blank"
@@ -392,9 +395,18 @@ export default function Login() {
                     >
                       {t("لا يظهر زر تليجرام؟ اضغط هنا", "Telegram button not showing? Click here")}
                     </a>
+                  ) : (
+                    !botUsername && (
+                      <p className="text-center text-[11.5px] text-app-3">
+                        {t(
+                          "الدخول عبر تليجرام غير متاح حالياً — استخدم البريد الإلكتروني",
+                          "Telegram sign-in is unavailable right now — use email instead",
+                        )}
+                      </p>
+                    )
                   )}
                 </div>
-              )}
+              ) : null}
 
               {googleEnabled && (
                 <a href="/api/auth/google" className="btn-glass w-full !py-2.5 text-sm">
