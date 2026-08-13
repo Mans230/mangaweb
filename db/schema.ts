@@ -36,6 +36,17 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export const linkCodes = mysqlTable("link_codes", {
+  code: varchar("code", { length: 6 }).primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expiresAt").notNull(),
+});
+
+export type LinkCode = typeof linkCodes.$inferSelect;
+export type InsertLinkCode = typeof linkCodes.$inferInsert;
+
 // ================= zeko-manga tables =================
 
 export const sources = mysqlTable("sources", {
