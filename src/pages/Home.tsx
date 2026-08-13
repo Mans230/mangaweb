@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { GENRES, adaptLatestChapter, adaptMangaRow, formatNum } from "@/lib/manga";
+import type { LatestChapterData } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import ChapterRow from "@/components/ChapterRow";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
@@ -116,8 +117,7 @@ function HeroSlider() {
 
   return (
     <section
-      className="relative m-3 mt-4 overflow-hidden rounded-[28px] md:m-4 md:mt-6"
-      style={{ minHeight: "min(560px, calc(100svh - 88px))" }}
+      className="group/hero relative m-3 mt-4 min-h-[min(600px,78svh)] overflow-hidden rounded-[28px] md:m-4 md:mt-6 md:min-h-[min(640px,calc(100svh_-_88px))]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
@@ -128,11 +128,12 @@ function HeroSlider() {
         <motion.div
           key={slide.slug}
           className="absolute inset-0"
-          initial={{ scale: 1.08, x: -60, opacity: 0.6 }}
-          animate={{ scale: 1, x: 0, opacity: 1 }}
+          initial={{ scale: 1.06, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.8, ease: EASE }}
           drag="x"
+          style={{ touchAction: "pan-y" }}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.15}
           onDragEnd={(_, info) => {
@@ -141,8 +142,19 @@ function HeroSlider() {
             else if (info.offset.x < -60) go(-1);
           }}
         >
-          <img src={slide.cover} alt={slide.title} className="h-full w-full object-cover object-top" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+          {/* الموبايل: غلاف بملء البطاقة + تدرج غامق قوي من الأسفل */}
+          <img src={slide.cover} alt={slide.title} className="h-full w-full object-cover object-top md:hidden" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10 md:hidden" />
+          {/* الديسكتوب: خلفية ambient blur من نفس الغلاف — بلا تمديد للبورتريه */}
+          <div className="absolute inset-0 hidden md:block">
+            <img
+              src={slide.cover}
+              alt=""
+              aria-hidden
+              className="h-full w-full scale-125 object-cover opacity-40 blur-3xl"
+            />
+            <div className="absolute inset-0 bg-black/55" />
+          </div>
         </motion.div>
       </AnimatePresence>
 
@@ -155,8 +167,8 @@ function HeroSlider() {
         {String(safeIndex + 1).padStart(2, "0")}
       </span>
 
-      {/* content panel */}
-      <div className="absolute inset-x-3 bottom-3 md:inset-x-6 md:bottom-6 md:max-w-2xl">
+      {/* محتوى الموبايل — مباشرة على التدرج الغامق بلا بطاقة glass */}
+      <div className="absolute inset-x-0 bottom-0 p-5 md:hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.slug}
@@ -164,12 +176,11 @@ function HeroSlider() {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            className="glass rounded-3xl p-5 md:p-7"
-            style={{ background: "rgba(20,16,40,0.42)", borderColor: "rgba(255,255,255,0.14)" }}
+            className="flex flex-col"
           >
             {slide.genres.length > 0 && (
               <motion.div variants={contentItem} className="flex flex-wrap gap-2">
-                {slide.genres.slice(0, 4).map((g) => (
+                {slide.genres.slice(0, 3).map((g) => (
                   <span
                     key={g}
                     className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md"
@@ -181,15 +192,10 @@ function HeroSlider() {
             )}
             <motion.h1
               variants={contentItem}
-              className="font-display mt-3 text-[26px] font-extrabold leading-snug text-white md:text-4xl"
+              className="font-display mt-3 text-[26px] font-extrabold leading-snug text-white"
             >
               {slide.title}
             </motion.h1>
-            {slide.synopsis && (
-              <motion.p variants={contentItem} className="mt-2 line-clamp-2 text-sm text-white/80 md:text-[15px]">
-                {slide.synopsis}
-              </motion.p>
-            )}
             <motion.div variants={contentItem} className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/85">
               <span className="flex items-center gap-1 font-bold text-warning">
                 <Star size={14} fill="currentColor" /> {slide.rating.toFixed(1)}
@@ -201,44 +207,142 @@ function HeroSlider() {
               </span>
               <span>{slide.type}</span>
             </motion.div>
-            <motion.div variants={contentItem} className="mt-5 flex items-center gap-2.5">
-              <Link to={`/manga/${slide.slug}/chapter/1`} className="btn-primary !py-3 text-sm">
+            <motion.div variants={contentItem} className="mt-5">
+              <Link to={`/manga/${slide.slug}/chapter/1`} className="btn-primary w-full justify-center !py-3 text-sm">
                 <BookOpen size={16} />
                 {t("اقرأ الآن", "Read now")}
               </Link>
-              <Link
-                to={`/manga/${slide.slug}`}
-                className="btn-glass !border-white/25 !bg-white/10 !py-3 text-sm !text-white"
+            </motion.div>
+            {/* dots — تحت المحتوى جهة start */}
+            {count > 1 && (
+              <motion.div variants={contentItem} className="mt-4 flex items-center gap-2">
+                {slides.map((s, i) => (
+                  <button
+                    key={s.slug}
+                    onClick={() => setIndex(i)}
+                    aria-label={`slide ${i + 1}`}
+                    className={`relative h-2 overflow-hidden rounded-full transition-all duration-500 ${
+                      i === safeIndex ? "w-7" : "w-2 bg-white/40"
+                    }`}
+                  >
+                    {i === safeIndex && (
+                      <>
+                        <span className="absolute inset-0 rounded-full bg-white/30" />
+                        <motion.span
+                          key={`p-${safeIndex}-${paused}`}
+                          className="gradient-primary absolute inset-y-0 start-0 rounded-full"
+                          initial={{ width: "0%" }}
+                          animate={{ width: paused ? "0%" : "100%" }}
+                          transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
+                        />
+                      </>
+                    )}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* بطاقة Featured — ديسكتوب: نص + غلاف بورتريه */}
+      <div className="absolute inset-x-6 bottom-6 hidden md:block">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={slide.slug}
+            variants={contentStagger}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            className="glass grid grid-cols-[1fr_340px] items-center gap-8 rounded-3xl p-7"
+            style={{ background: "rgba(20,16,40,0.42)", borderColor: "rgba(255,255,255,0.14)" }}
+          >
+            <div className="min-w-0">
+              {slide.genres.length > 0 && (
+                <motion.div variants={contentItem} className="flex flex-wrap gap-2">
+                  {slide.genres.slice(0, 4).map((g) => (
+                    <span
+                      key={g}
+                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md"
+                    >
+                      {g}
+                    </span>
+                  ))}
+                </motion.div>
+              )}
+              <motion.h1
+                variants={contentItem}
+                className="font-display mt-3 text-4xl font-extrabold leading-snug text-white"
               >
-                {t("التفاصيل", "Details")}
-              </Link>
+                {slide.title}
+              </motion.h1>
+              {slide.synopsis && (
+                <motion.p variants={contentItem} className="mt-2 line-clamp-3 text-[15px] text-white/80">
+                  {slide.synopsis}
+                </motion.p>
+              )}
+              <motion.div variants={contentItem} className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/85">
+                <span className="flex items-center gap-1 font-bold text-warning">
+                  <Star size={14} fill="currentColor" /> {slide.rating.toFixed(1)}
+                </span>
+                <span>{slide.chapters} {t("فصل", "chapters")}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 rounded-full ${slide.status === "مستمر" ? "animate-pulse-soft bg-warning" : "bg-success"}`} />
+                  {slide.status}
+                </span>
+                <span>{slide.type}</span>
+              </motion.div>
+              <motion.div variants={contentItem} className="mt-5 flex items-center gap-2.5">
+                <Link to={`/manga/${slide.slug}/chapter/1`} className="btn-primary !py-3 text-sm">
+                  <BookOpen size={16} />
+                  {t("اقرأ الآن", "Read now")}
+                </Link>
+                <Link
+                  to={`/manga/${slide.slug}`}
+                  className="btn-glass !border-white/25 !bg-white/10 !py-3 text-sm !text-white"
+                >
+                  {t("التفاصيل", "Details")}
+                </Link>
+              </motion.div>
+            </div>
+            <motion.div variants={contentItem} className="relative">
+              {/* ambient blur من نفس الغلاف خلف البورتريه */}
+              <img
+                src={slide.cover}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 scale-110 rounded-2xl object-cover opacity-60 blur-2xl"
+              />
+              <img
+                src={slide.cover}
+                alt={slide.title}
+                className="relative aspect-[2/3] max-h-[calc(100svh_-_240px)] w-[340px] rounded-2xl object-cover shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+              />
             </motion.div>
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* indicators — bottom center mobile / right vertical desktop */}
+      {/* مؤشرات الديسكتوب العمودية — بلا style inline متعارض */}
       {count > 1 && (
-        <div className="absolute bottom-6 end-1/2 flex translate-x-1/2 items-center gap-2 md:bottom-1/2 md:end-6 md:translate-x-0 md:translate-y-1/2 md:flex-col">
+        <div className="absolute end-6 top-1/2 hidden -translate-y-1/2 flex-col items-center gap-2 md:flex">
           {slides.map((s, i) => (
             <button
               key={s.slug}
               onClick={() => setIndex(i)}
               aria-label={`slide ${i + 1}`}
-              className="relative h-2 overflow-hidden rounded-full transition-all duration-500 md:h-auto md:w-2"
-              style={{
-                width: i === safeIndex ? 28 : 8,
-                background: i === safeIndex ? "transparent" : "rgba(255,255,255,0.4)",
-              }}
+              className={`relative w-2 overflow-hidden rounded-full transition-all duration-500 ${
+                i === safeIndex ? "h-8" : "h-2 bg-white/40"
+              }`}
             >
               {i === safeIndex && (
                 <>
                   <span className="absolute inset-0 rounded-full bg-white/30" />
                   <motion.span
-                    key={`p-${safeIndex}-${paused}`}
-                    className="gradient-primary absolute inset-y-0 start-0 rounded-full"
-                    initial={{ width: "0%" }}
-                    animate={{ width: paused ? "0%" : "100%" }}
+                    key={`pd-${safeIndex}-${paused}`}
+                    className="gradient-primary absolute inset-x-0 top-0 rounded-full"
+                    initial={{ height: "0%" }}
+                    animate={{ height: paused ? "0%" : "100%" }}
                     transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
                   />
                 </>
@@ -248,9 +352,9 @@ function HeroSlider() {
         </div>
       )}
 
-      {/* desktop arrows */}
+      {/* desktop arrows — تظهر عبر group-hover/hero على الـsection */}
       {count > 1 && (
-        <div className="absolute end-16 top-1/2 hidden -translate-y-1/2 flex-col gap-2 opacity-0 transition-opacity duration-300 group-hover/hero:opacity-100 md:flex">
+        <div className="absolute start-5 top-5 hidden flex-row gap-2 opacity-0 transition-opacity duration-300 group-hover/hero:opacity-100 md:flex">
           <button onClick={() => go(1)} className="btn-icon !border-white/20 !bg-black/25 !text-white" aria-label="next">
             <ChevronRight size={18} className="rtl:-scale-x-100" />
           </button>
@@ -345,7 +449,7 @@ function QuickStats() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 pt-8 md:px-6">
-      <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-4 md:overflow-visible">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((s, i) => (
           <StatChip key={s.label} icon={s.icon} label={s.label} value={s.value} delay={i * 0.1} />
         ))}
@@ -373,18 +477,54 @@ function QuickStats() {
 }
 
 /* ================= 3. Latest chapters ================= */
+/** بطاقة فصل عمودية للموبايل: غلاف فوق + عنوان + رقم الفصل تحت */
+function ChapterTile({ item }: { item: LatestChapterData }) {
+  const { t } = useLanguage();
+  return (
+    <Link
+      to={`/manga/${item.mangaSlug}/chapter/${item.chapter}`}
+      className="glass group flex h-full flex-col overflow-hidden !rounded-2xl transition-colors hover:border-[var(--border-glow)]"
+    >
+      <div className="relative overflow-hidden">
+        <img
+          src={item.cover}
+          alt={item.mangaTitle}
+          loading="lazy"
+          className="aspect-[2/3] w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        {item.isNew && (
+          <span className="animate-pulse-soft absolute end-2 top-2 rounded-full bg-accent-2 px-2 py-0.5 text-[10px] font-bold text-white">
+            {t("جديد", "NEW")}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <h3 className="line-clamp-1 text-[13px] font-bold text-app transition-colors group-hover:text-primary">
+          {item.mangaTitle}
+        </h3>
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <span className="glass-chip !px-2.5 !py-0.5 !text-[11px] font-semibold text-primary">
+            {t("فصل", "Ch.")} {item.chapter}
+          </span>
+          <span className="text-[10.5px] text-app-3">{item.timeAgo}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function LatestChapters() {
   const { t } = useLanguage();
-  const query = trpc.manga.latest.useQuery({ limit: 9 }, { retry: false });
+  const query = trpc.manga.latest.useQuery({ limit: 8 }, { retry: false });
   const items = (query.data ?? []).map((c) => adaptLatestChapter(c));
 
   if (query.isLoading) {
     return (
       <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
         <SectionHeader title={t("أحدث الفصول", "Latest chapters")} moreTo="/browse?sort=latest" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="skeleton h-[104px] !rounded-2xl" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="skeleton aspect-[3/4] !rounded-2xl sm:aspect-auto sm:h-[104px]" />
           ))}
         </div>
       </section>
@@ -395,7 +535,7 @@ function LatestChapters() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
       <SectionHeader title={t("أحدث الفصول", "Latest chapters")} moreTo="/browse?sort=latest" />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {items.map((item, i) => (
           <motion.div
             key={item.id}
@@ -404,7 +544,13 @@ function LatestChapters() {
             viewport={{ once: true, margin: "-15%" }}
             transition={{ duration: 0.55, ease: EASE, delay: (i % 6) * 0.06 }}
           >
-            <ChapterRow item={item} />
+            {/* موبايل: بطاقة عمودية — sm فما فوق: صف أفقي */}
+            <div className="h-full sm:hidden">
+              <ChapterTile item={item} />
+            </div>
+            <div className="hidden sm:block">
+              <ChapterRow item={item} />
+            </div>
           </motion.div>
         ))}
       </div>
