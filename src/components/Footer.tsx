@@ -61,7 +61,7 @@ export default function Footer() {
             {t("اشترك بقناة الإشعارات ليصلك كل فصل جديد فور صدوره.", "Join the notification channel to get every new chapter the moment it drops.")}
           </p>
           <a
-            href="https://t.me/zekomanga"
+            href="https://t.me/dateranime"
             target="_blank"
             rel="noreferrer"
             className="btn-glass mt-4 !py-2.5 text-sm"

@@ -36,6 +36,7 @@ export default function MangaCard({ manga, rank, className = "" }: MangaCardProp
           src={manga.cover}
           alt={manga.title}
           loading="lazy"
+          decoding="async"
           className={`h-full w-full object-cover transition-transform duration-500 ease-expo-out group-hover:scale-[1.06] ${
             blurCover ? "scale-110 blur-lg" : ""
           }`}

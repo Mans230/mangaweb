@@ -21,6 +21,7 @@ export default function ChapterRow({ item }: ChapterRowProps) {
           src={item.cover}
           alt={item.mangaTitle}
           loading="lazy"
+          decoding="async"
           className="h-[84px] w-14 shrink-0 rounded-lg object-cover"
         />
         <div className="min-w-0 flex-1">
