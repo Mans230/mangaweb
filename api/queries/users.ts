@@ -42,6 +42,32 @@ export async function findUserByTelegramId(
   return rows.at(0);
 }
 
+export async function findUserByUsername(
+  username: string,
+): Promise<User | undefined> {
+  const rows = await getDb()
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.username, username))
+    .limit(1);
+  return rows.at(0);
+}
+
+export async function updateUserProfile(
+  userId: number,
+  patch: Partial<
+    Pick<
+      InsertUser,
+      "username" | "usernameChangedAt" | "avatarUrl" | "bannerUrl" | "name"
+    >
+  >,
+) {
+  await getDb()
+    .update(schema.users)
+    .set(patch)
+    .where(eq(schema.users.id, userId));
+}
+
 export async function findUserByGoogleId(
   googleId: string,
 ): Promise<User | undefined> {
