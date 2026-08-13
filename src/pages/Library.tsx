@@ -11,12 +11,9 @@ import FollowingTab from "@/components/library/FollowingTab";
 import HistoryTab from "@/components/library/HistoryTab";
 import StatsCard from "@/components/library/StatsCard";
 import GuestGate from "@/components/library/GuestGate";
+import ErrorState from "@/components/ErrorState";
 import { ToastViewport } from "@/components/library/toast";
-import {
-  mockLibrary,
-  normalizeApiManga,
-  timeAgoAr,
-} from "@/components/library/data";
+import { normalizeApiManga, timeAgoAr } from "@/components/library/data";
 import type { LibraryData } from "@/components/library/data";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -37,8 +34,8 @@ export default function Library() {
     staleTime: 30_000,
   });
 
-  // TODO(api): fallback إلى بيانات mock عند تعذّر الوصول للخادم — تُزال عند الاستقرار
   const isLive = isAuthenticated && !libraryQ.isError;
+  // بلا بدائل وهمية: عند الفشل تُعرض حالة خطأ حقيقية، وعند الفراغ قوائم فارغة
   const data: LibraryData = useMemo(() => {
     if (libraryQ.data) {
       return {
@@ -60,7 +57,7 @@ export default function Library() {
         }),
       };
     }
-    return mockLibrary;
+    return { favorites: [], following: [], history: [] };
   }, [libraryQ.data]);
 
   const total = data.favorites.length + data.following.length + data.history.length;
@@ -163,22 +160,31 @@ export default function Library() {
           </motion.div>
 
           {/* tab content */}
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: EASE }}
-          >
-            {tab === "favorites" && (
-              <FavoritesTab favorites={data.favorites} isLive={isLive} />
-            )}
-            {tab === "following" && (
-              <FollowingTab following={data.following} isLive={isLive} />
-            )}
-            {tab === "history" && <HistoryTab history={data.history} />}
-          </motion.div>
+          {libraryQ.isError ? (
+            <div className="glass">
+              <ErrorState
+                onRetry={() => libraryQ.refetch()}
+                retrying={libraryQ.isRefetching}
+              />
+            </div>
+          ) : (
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: EASE }}
+            >
+              {tab === "favorites" && (
+                <FavoritesTab favorites={data.favorites} isLive={isLive} />
+              )}
+              {tab === "following" && (
+                <FollowingTab following={data.following} isLive={isLive} />
+              )}
+              {tab === "history" && <HistoryTab history={data.history} />}
+            </motion.div>
+          )}
 
-          <StatsCard history={data.history} />
+          {!libraryQ.isError && <StatsCard history={data.history} />}
         </div>
       )}
 

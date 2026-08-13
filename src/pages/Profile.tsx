@@ -9,7 +9,7 @@ import Preferences from "@/components/profile/Preferences";
 import DangerZone from "@/components/profile/DangerZone";
 import GuestGate from "@/components/library/GuestGate";
 import { ToastViewport } from "@/components/library/toast";
-import { mockLibrary, normalizeApiManga, timeAgoAr } from "@/components/library/data";
+import { normalizeApiManga, timeAgoAr } from "@/components/library/data";
 import type { LibraryData } from "@/components/library/data";
 
 const TG_KEY = "zeko-telegram-linked";
@@ -25,8 +25,7 @@ export default function Profile() {
     if (user?.telegramId) setTelegramLinked(true);
   }, [user?.telegramId]);
 
-  // بيانات المكتبة لتغذية الإنجازات (محمية) مع fallback لـ mock
-  // TODO(api): إزالة الـ fallback عند استقرار الواجهة
+  // بيانات المكتبة لتغذية الإنجازات — API فقط، بلا بدائل وهمية
   const libraryQ = trpc.library.getLibrary.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
@@ -34,7 +33,7 @@ export default function Profile() {
   });
 
   const libData: LibraryData = useMemo(() => {
-    if (!libraryQ.data) return mockLibrary;
+    if (!libraryQ.data) return { favorites: [], following: [], history: [] };
     return {
       favorites: libraryQ.data.favorites.map((r) => normalizeApiManga(r.manga)),
       following: libraryQ.data.following.map((r) => ({

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  FlaskConical,
   GitMerge,
   Inbox,
   LayoutDashboard,
@@ -12,7 +11,6 @@ import {
   Users,
   BookOpen,
 } from "lucide-react";
-import EmptyState from "@/components/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
@@ -25,7 +23,7 @@ import AdminSources from "@/components/admin/Sources";
 import MergeDuplicates from "@/components/admin/MergeDuplicates";
 import UsersManager from "@/components/admin/UsersManager";
 import RequestsManager from "@/components/admin/RequestsManager";
-import { EASE, mockStats } from "@/components/admin/adminMock";
+import { EASE } from "@/components/admin/adminUtils";
 
 type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests";
 
@@ -39,16 +37,12 @@ const shortcutKeys: Record<string, AdminView> = {
   r: "requests",
 };
 
-function AdminShell({ demoMode }: { demoMode: boolean }) {
+function AdminShell() {
   const { t } = useLanguage();
   const [view, setView] = useState<AdminView>("dashboard");
 
-  const statsQuery = trpc.admin.stats.useQuery(undefined, {
-    retry: false,
-    enabled: !demoMode,
-  });
-  // TODO: fallback للـ mock عند تعذّر الـ API
-  const pendingCount = statsQuery.data?.pendingRequests ?? mockStats.pendingRequests;
+  const statsQuery = trpc.admin.stats.useQuery(undefined, { retry: false });
+  const pendingCount = statsQuery.data?.pendingRequests ?? 0;
 
   const tabs = useMemo(
     () =>
@@ -173,16 +167,6 @@ function AdminShell({ demoMode }: { demoMode: boolean }) {
           })}
         </div>
 
-        {demoMode && (
-          <div className="glass mb-4 flex items-center gap-2.5 !rounded-2xl border !border-accent-2/40 p-3 text-xs text-accent-2">
-            <FlaskConical size={15} className="shrink-0" />
-            {t(
-              "وضع المعاينة — تعذّر الاتصال بالخادم، تُعرض بيانات تجريبية.",
-              "Preview mode — server unreachable, showing mock data.",
-            )}
-          </div>
-        )}
-
         <div className="mb-4 flex items-center gap-3">
           <h1 className="font-display text-xl font-bold text-app md:text-2xl">{activeTab.label}</h1>
           <motion.span
@@ -216,70 +200,63 @@ function AdminShell({ demoMode }: { demoMode: boolean }) {
   );
 }
 
-export default function Admin() {
-  const { t } = useLanguage();
-  const { user, isAuthenticated, isLoading, error } = useAuth();
+function AdminSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-[1400px] space-y-4 px-4 py-8 md:px-6">
+      <div className="skeleton h-10 w-56" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="skeleton h-24" />
+        ))}
+      </div>
+      <div className="skeleton h-72" />
+    </div>
+  );
+}
 
-  // تعذّر الاتصال بالخادم → وضع معاينة ببيانات تجريبية (TODO: إزالة عند استقرار الـ API)
-  const serverDown = !!error && !isAuthenticated;
+function Forbidden() {
+  const { t } = useLanguage();
+  return (
+    <div className="mx-auto max-w-lg px-4 py-20">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: EASE }}
+        className="glass flex flex-col items-center p-10 text-center"
+      >
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-danger/15 text-danger">
+          <ShieldX size={30} />
+        </span>
+        <h1 className="font-display mt-5 text-2xl font-bold text-app">
+          {t("غير مصرّح لك بالوصول", "Access denied")}
+        </h1>
+        <p className="mt-2 text-sm text-app-2">
+          {t(
+            "هذه الصفحة مخصصة للمشرفين فقط. إن كنت تعتقد أن هذا خطأ، تواصل مع إدارة المنصة.",
+            "This page is for admins only. Contact the platform team if you think this is a mistake.",
+          )}
+        </p>
+        <Link to="/" className="btn-primary mt-6 !px-6 !py-2.5 text-sm">
+          {t("العودة للرئيسية", "Back to home")}
+        </Link>
+      </motion.div>
+    </div>
+  );
+}
+
+export default function Admin() {
+  const { user, isLoading } = useAuth();
 
   let body: React.ReactNode;
   if (isLoading) {
-    body = (
-      <div className="mx-auto w-full max-w-[1400px] space-y-4 px-4 py-8 md:px-6">
-        <div className="skeleton h-10 w-56" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="skeleton h-24" />
-          ))}
-        </div>
-        <div className="skeleton h-72" />
-      </div>
-    );
-  } else if (serverDown) {
-    body = <AdminShell demoMode />;
-  } else if (!isAuthenticated) {
-    body = (
-      <div className="mx-auto max-w-lg px-4 py-20">
-        <div className="glass">
-          <EmptyState
-            title={t("سجّل الدخول أولاً", "Sign in first")}
-            caption={t("لوحة التحكم متاحة للمشرفين فقط بعد تسجيل الدخول.", "The dashboard is available to admins after signing in.")}
-            ctaLabel={t("تسجيل الدخول", "Sign in")}
-            ctaTo={LOGIN_PATH}
-          />
-        </div>
-      </div>
-    );
-  } else if (user?.role !== "admin") {
-    body = (
-      <div className="mx-auto max-w-lg px-4 py-20">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, ease: EASE }}
-          className="glass flex flex-col items-center p-10 text-center"
-        >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-danger/15 text-danger">
-            <ShieldX size={30} />
-          </span>
-          <h1 className="font-display mt-5 text-2xl font-bold text-app">
-            {t("غير مصرّح", "Access denied")}
-          </h1>
-          <p className="mt-2 text-sm text-app-2">
-            {t(
-              "هذه الصفحة مخصصة للمشرفين فقط. إن كنت تعتقد أن هذا خطأ، تواصل مع إدارة المنصة.",
-              "This page is for admins only. Contact the platform team if you think this is a mistake.",
-            )}
-          </p>
-          <Link to="/" className="btn-primary mt-6 !px-6 !py-2.5 text-sm">
-            {t("العودة للرئيسية", "Back to home")}
-          </Link>
-        </motion.div>
-      </div>
-    );
+    body = <AdminSkeleton />;
+  } else if (!user) {
+    // غير مسجّل → تحويل لصفحة الدخول
+    body = <Navigate to={LOGIN_PATH} replace />;
+  } else if (user.role !== "admin") {
+    body = <Forbidden />;
   } else {
-    body = <AdminShell demoMode={false} />;
+    body = <AdminShell />;
   }
 
   return <AdminToastProvider>{body}</AdminToastProvider>;

@@ -3,8 +3,9 @@ import { Link, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, LayoutGrid, List, Loader2, X } from "lucide-react";
 import { trpc } from "@/providers/trpc";
-import type { Manga } from "@/data/mock";
+import type { MangaCardData } from "@/lib/manga";
 import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import SearchHero from "@/components/browse/SearchHero";
 import AdvancedFilters from "@/components/browse/AdvancedFilters";
@@ -16,7 +17,6 @@ import {
   DEFAULT_FILTERS,
   PAGE_SIZE,
   adaptListItem,
-  applyAllFiltersLocally,
   applyLocalOnlyFilters,
   filtersKey,
   filtersToParams,
@@ -97,33 +97,22 @@ export default function Browse() {
       maxChapters: filters.chMax < CH_MAX_LIMIT ? filters.chMax : undefined,
       sort: filters.sort === "alpha" ? "popular" : filters.sort, // alpha يُفرز محلياً
     },
-    { retry: 1 },
+    { retry: false },
   );
 
-  // TODO: fallback مؤقت على بيانات mock إذا تعذّر الـ API (أوفلاين/عدم توفر DB)
-  const isFallback = query.isError;
-
-  const pageItems: Manga[] = useMemo(() => {
-    if (isFallback) {
-      const all = applyAllFiltersLocally(filters);
-      return all.slice((filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE);
-    }
+  const pageItems: MangaCardData[] = useMemo(() => {
     if (!query.data) return [];
     return applyLocalOnlyFilters(query.data.items.map(adaptListItem), filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFallback, query.data, fKey, filters.page]);
+  }, [query.data, fKey, filters.page]);
 
-  const total = useMemo(() => {
-    if (isFallback) return applyAllFiltersLocally(filters).length;
-    return query.data?.total ?? 0;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFallback, query.data, fKey]);
+  const total = query.data?.total ?? 0;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const isFetching = query.isFetching && !isFallback;
+  const isFetching = query.isFetching;
 
   /* ====== تجميع الصفحات لزر "تحميل المزيد" على الموبايل ====== */
-  const [acc, setAcc] = useState<{ key: string; page: number; items: Manga[] }>({
+  const [acc, setAcc] = useState<{ key: string; page: number; items: MangaCardData[] }>({
     key: "",
     page: 1,
     items: [],
@@ -243,7 +232,8 @@ export default function Browse() {
 
   // أثناء الجلب: skeleton — إلا عند "تحميل المزيد" (تبقى القائمة المجمّعة ظاهرة)
   const showSkeleton = isFetching && !loadMoreClicked.current;
-  const isEmpty = !showSkeleton && !isFetching && displayItems.length === 0;
+  const isEmpty =
+    !showSkeleton && !isFetching && !query.isError && displayItems.length === 0;
 
   return (
     <div>
@@ -350,9 +340,13 @@ export default function Browse() {
               )}
             </AnimatePresence>
 
-            {/* المحتوى: skeleton / نتائج / حالة فارغة */}
+            {/* المحتوى: skeleton / خطأ / نتائج / حالة فارغة */}
             {showSkeleton ? (
               <ResultsSkeleton view={view} />
+            ) : query.isError ? (
+              <div className="glass !rounded-3xl">
+                <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+              </div>
             ) : isEmpty ? (
               <div className="glass !rounded-3xl">
                 <EmptyState
@@ -405,7 +399,7 @@ export default function Browse() {
             )}
 
             {/* رابط صفحة الطلب أسفل النتائج */}
-            {!isEmpty && !showSkeleton && (
+            {!isEmpty && !showSkeleton && !query.isError && (
               <p className="mt-10 text-center text-xs text-app-3">
                 {t("لم تجد ما تبحث عنه؟", "Can't find what you're looking for?")}{" "}
                 <Link
