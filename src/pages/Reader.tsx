@@ -6,7 +6,6 @@ import { BookOpen } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
-import { getMangaBySlug } from "@/data/mock";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import ReaderChrome from "@/components/reader/ReaderChrome";
 import WebtoonView from "@/components/reader/WebtoonView";
@@ -18,7 +17,6 @@ import CommentsSheet from "@/components/reader/CommentsSheet";
 import ChapterComments from "@/components/reader/ChapterComments";
 import EndCard from "@/components/reader/EndCard";
 import {
-  chapterPages,
   isChapterBookmarked,
   loadChapterRating,
   loadProgress,
@@ -41,53 +39,30 @@ export default function Reader() {
   const chapterNumber = Number.parseFloat(n) || 1;
   const chapterKey = `${slug}:${chapterNumber}`;
 
-  /* ===== Data: live API with mock fallback ===== */
+  /* ===== Data: live API (real scraped manga) ===== */
   const apiQuery = trpc.manga.getBySlug.useQuery(
     { slug },
     { retry: false, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
 
   const manga: ReaderManga | null = useMemo(() => {
-    if (apiQuery.data) {
-      const d = apiQuery.data;
-      return {
-        id: d.id,
-        slug: d.slug,
-        title: d.title,
-        cover: d.coverUrl ?? "/cover-01.png",
-        isAdult: d.isAdult,
-        fromApi: true,
-        chapters: d.chapters.map((c) => ({
-          id: c.id,
-          number: c.number,
-          title: c.title,
-          pageCount: c.pageCount,
-        })),
-      };
-    }
-    if (apiQuery.isError || apiQuery.data === null) {
-      // TODO: drop mock fallback once the API is guaranteed available
-      const m = getMangaBySlug(slug);
-      if (m) {
-        return {
-          id: m.id,
-          slug: m.slug,
-          title: m.title,
-          cover: m.cover,
-          isAdult: !!m.isAdult,
-          fromApi: false,
-          chapters: Array.from({ length: m.chapters }, (_, i) => ({
-            id: i + 1,
-            number: m.chapters - i,
-            title: null,
-            pageCount: 0,
-          })),
-        };
-      }
-      return null;
-    }
-    return null;
-  }, [apiQuery.data, apiQuery.isError, slug]);
+    if (!apiQuery.data) return null;
+    const d = apiQuery.data;
+    return {
+      id: d.id,
+      slug: d.slug,
+      title: d.title,
+      cover: d.coverUrl ?? "/cover-01.png",
+      isAdult: d.isAdult,
+      fromApi: true,
+      chapters: d.chapters.map((c) => ({
+        id: c.id,
+        number: c.number,
+        title: c.title,
+        pageCount: c.pageCount,
+      })),
+    };
+  }, [apiQuery.data]);
 
   const loading = apiQuery.isLoading;
   const chapters = useMemo(() => manga?.chapters ?? [], [manga]);
@@ -111,7 +86,23 @@ export default function Reader() {
     [chapters, chapterNumber],
   );
 
-  const pages = useMemo(() => (current ? chapterPages(current) : []), [current]);
+  /* ===== Real chapter pages from the source (proxied via /api/img) ===== */
+  const pagesQuery = trpc.manga.getChapterPages.useQuery(
+    { chapterId: current?.id ?? 0 },
+    {
+      enabled: !!current,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 10 * 60_000,
+    },
+  );
+  const rawPages = useMemo(() => pagesQuery.data?.pages ?? [], [pagesQuery.data]);
+  const pages = useMemo(
+    () => rawPages.map((u) => `/api/img?u=${encodeURIComponent(u)}`),
+    [rawPages],
+  );
+  const pagesLoading = !!current && pagesQuery.isLoading;
+  const pagesError = !!current && pagesQuery.isError;
 
   /* ===== Reader state ===== */
   const [settings, updateSettings] = useReaderSettings();
@@ -228,6 +219,16 @@ export default function Reader() {
   const updateProgressMut = trpc.library.updateProgress.useMutation();
   const updateProgressRef = useRef(updateProgressMut.mutate);
   updateProgressRef.current = updateProgressMut.mutate;
+
+  /* ===== عند فتح الفصل: سجّل التقدم فوراً لو كان المستخدم مسجّلاً ===== */
+  useEffect(() => {
+    if (!manga || !current || !isAuthenticated) return;
+    updateProgressRef.current({
+      mangaId: manga.id,
+      chapterId: current.id,
+      lastPage: 0,
+    });
+  }, [chapterKey, manga, current, isAuthenticated]);
 
   useEffect(() => {
     if (!manga || !current) return;
@@ -420,7 +421,28 @@ export default function Reader() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3, ease: EASE }}
         >
-          {settings.mode === "webtoon" ? (
+          {pagesLoading ? (
+            <div className="mx-auto flex w-full max-w-[800px] flex-col gap-3 px-2 pt-6">
+              <div className="skeleton h-[60vh] w-full" />
+              <div className="skeleton h-[60vh] w-full" />
+              <p className="py-4 text-center text-sm text-app-3">
+                {t("جارٍ جلب صفحات الفصل من المصدر…", "Fetching chapter pages from the source…")}
+              </p>
+            </div>
+          ) : pagesError ? (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
+              <BookOpen size={36} className="text-app-3" />
+              <p className="max-w-md text-sm text-app-3">
+                {t(
+                  "تعذّر جلب صفحات هذا الفصل من المصدر — حاول مجدداً بعد قليل.",
+                  "Couldn't fetch this chapter's pages from the source — try again shortly.",
+                )}
+              </p>
+              <button onClick={() => pagesQuery.refetch()} className="btn-glass !px-6 !py-2.5 text-sm">
+                {t("إعادة المحاولة", "Retry")}
+              </button>
+            </div>
+          ) : settings.mode === "webtoon" ? (
             <WebtoonView
               pages={pages}
               quality={settings.quality}

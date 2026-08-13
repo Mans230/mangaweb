@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import BackdropHero from "@/components/manga/BackdropHero";
 import InfoCard from "@/components/manga/InfoCard";
 import ChaptersTab from "@/components/manga/ChaptersTab";
@@ -15,9 +16,6 @@ import DownloadModal from "@/components/manga/DownloadModal";
 import AuthPrompt from "@/components/manga/AuthPrompt";
 import type { CommentVM, DetailVM } from "@/components/manga/types";
 import {
-  buildMockComments,
-  buildMockDetail,
-  buildMockSimilar,
   computeReadState,
   dbChapterToVM,
   dbMangaToCard,
@@ -33,20 +31,13 @@ export default function MangaDetail() {
   const { t, lang } = useLanguage();
   const { user, isAuthenticated } = useAuth();
 
-  /* ================= البيانات ================= */
+  /* ================= البيانات — API فقط، بلا بدائل وهمية ================= */
   const detailQuery = trpc.manga.getBySlug.useQuery(
     { slug },
     { enabled: !!slug, retry: false },
   );
-  // TODO: fallback مؤقت لبيانات mock عند تعذّر الـ API
-  const useMock = detailQuery.isError;
-  const mockDetail = useMemo(
-    () => (useMock ? buildMockDetail(slug, lang) : null),
-    [useMock, slug, lang],
-  );
 
   const vm: DetailVM | null = useMemo(() => {
-    if (useMock) return mockDetail;
     const d = detailQuery.data;
     if (!d) return null;
     const chapters = d.chapters.map((c) => dbChapterToVM(c, lang));
@@ -73,14 +64,13 @@ export default function MangaDetail() {
       isFollowing: d.userState.isFollowing,
       lastReadNumber: d.userState.progress?.chapter?.number ?? null,
       ...computeReadState(chapters, d.userState.progress?.chapter?.number ?? null),
-      isMock: false,
     };
-  }, [useMock, mockDetail, detailQuery.data, lang]);
+  }, [detailQuery.data, lang]);
 
   /* ================= حالة القراءة ================= */
   const progressQuery = trpc.library.getProgress.useQuery(
     { mangaId: vm?.id ?? 0 },
-    { enabled: !useMock && isAuthenticated && !!vm, retry: false },
+    { enabled: isAuthenticated && !!vm, retry: false },
   );
   const [lastReadOverride, setLastReadOverride] = useState<number | null | undefined>(undefined);
   const serverLastRead = progressQuery.data?.readChapters ?? vm?.lastReadNumber ?? null;
@@ -115,18 +105,18 @@ export default function MangaDetail() {
   const toggleFavorite = () => {
     if (!vm) return;
     setIsFavorite((v) => !v);
-    if (!vm.isMock) favMutation.mutate({ mangaId: vm.id });
+    favMutation.mutate({ mangaId: vm.id });
   };
   const toggleFollow = () => {
     if (!vm) return;
     setIsFollowing((v) => !v);
-    if (!vm.isMock) folMutation.mutate({ mangaId: vm.id });
+    folMutation.mutate({ mangaId: vm.id });
   };
 
   /* ================= التقييم ================= */
   const ratingQuery = trpc.engagement.getRating.useQuery(
     { mangaId: vm?.id ?? 0 },
-    { enabled: !useMock && !!vm, retry: false },
+    { enabled: !!vm, retry: false },
   );
   const [userStars, setUserStars] = useState<number | null>(null);
   const [ratingOverride, setRatingOverride] = useState<{ rating: number; count: number } | null>(null);
@@ -144,19 +134,20 @@ export default function MangaDetail() {
   const handleRate = (stars: number) => {
     if (!vm) return;
     setUserStars(stars);
-    if (!vm.isMock) rateMutation.mutate({ mangaId: vm.id, stars });
+    rateMutation.mutate({ mangaId: vm.id, stars });
   };
 
   /* ================= التعليقات ================= */
   const [commentLimit, setCommentLimit] = useState(20);
   const commentsQuery = trpc.engagement.listComments.useQuery(
     { mangaId: vm?.id ?? 0, page: 1, limit: commentLimit },
-    { enabled: !useMock && !!vm, retry: false },
+    { enabled: !!vm, retry: false },
   );
   const [localComments, setLocalComments] = useState<CommentVM[]>([]);
 
+  // عند فشل جلب التعليقات تُعرض قائمة فارغة حقيقية بدل تعليقات وهمية
   const serverComments: CommentVM[] = useMemo(() => {
-    if (useMock || commentsQuery.isError) return buildMockComments(lang);
+    if (commentsQuery.isError) return [];
     return (commentsQuery.data?.items ?? []).map((c) => ({
       id: c.id,
       author: c.user.name ?? t("مستخدم", "User"),
@@ -167,9 +158,9 @@ export default function MangaDetail() {
       isSpoiler: c.isSpoiler,
       likes: 0,
     }));
-  }, [useMock, commentsQuery.isError, commentsQuery.data, lang, t]);
+  }, [commentsQuery.isError, commentsQuery.data, lang, t]);
 
-  const commentTotal = useMock || commentsQuery.isError ? serverComments.length : (commentsQuery.data?.total ?? 0);
+  const commentTotal = commentsQuery.data?.total ?? 0;
   const allComments = [...localComments, ...serverComments];
 
   const addCommentMutation = trpc.engagement.addComment.useMutation({
@@ -193,35 +184,19 @@ export default function MangaDetail() {
 
   const submitComment = (content: string, isSpoiler: boolean) => {
     if (!vm) return;
-    if (vm.isMock) {
-      // TODO: إرسال محلي مؤقت في وضع mock
-      setLocalComments((prev) => [
-        {
-          id: Date.now(),
-          author: user?.name ?? t("أنا", "Me"),
-          avatar: user?.avatarUrl ?? "/avatar-4.png",
-          badge: "عضو",
-          timeAgo: t("الآن", "now"),
-          content,
-          isSpoiler,
-          likes: 0,
-        },
-        ...prev,
-      ]);
-      return;
-    }
     addCommentMutation.mutate({ mangaId: vm.id, content, isSpoiler });
   };
 
   /* ================= أعمال مشابهة ================= */
   const similarQuery = trpc.manga.similar.useQuery(
     { slug, limit: 6 },
-    { enabled: !useMock && !!slug, retry: false },
+    { enabled: !!slug, retry: false },
   );
+  // عند الفشل: قائمة فارغة حقيقية بدل أعمال وهمية
   const similarItems = useMemo(() => {
-    if (useMock || similarQuery.isError) return buildMockSimilar(slug);
+    if (similarQuery.isError) return [];
     return (similarQuery.data ?? []).map((m) => dbMangaToCard(m, lang));
-  }, [useMock, similarQuery.isError, similarQuery.data, slug, lang]);
+  }, [similarQuery.isError, similarQuery.data, lang]);
 
   /* ================= تحديد الكل كمقروء ================= */
   const progressMutation = trpc.library.updateProgress.useMutation();
@@ -231,9 +206,7 @@ export default function MangaDetail() {
     const latest = vm.chapters[0]; // مرتبة من الأحدث
     if (!latest) return;
     setLastReadOverride(latest.number);
-    if (!vm.isMock) {
-      progressMutation.mutate({ mangaId: vm.id, chapterId: latest.id, lastPage: 0 });
-    }
+    progressMutation.mutate({ mangaId: vm.id, chapterId: latest.id, lastPage: 0 });
   };
 
   /* ================= +18 ================= */
@@ -260,7 +233,7 @@ export default function MangaDetail() {
   }
 
   // تحميل
-  if (detailQuery.isLoading && !useMock) {
+  if (detailQuery.isLoading) {
     return (
       <div className="relative">
         <div className="skeleton h-[420px] !rounded-none lg:h-[480px]" />
@@ -276,6 +249,23 @@ export default function MangaDetail() {
         </div>
       </div>
     );
+  }
+
+  // فشل الجلب: NOT_FOUND → صفحة غير موجودة، وغيره → حالة خطأ مع إعادة محاولة
+  if (detailQuery.isError) {
+    const code = detailQuery.error?.data?.code;
+    if (code !== "NOT_FOUND") {
+      return (
+        <div className="mx-auto max-w-2xl px-4 pt-20">
+          <div className="glass">
+            <ErrorState
+              onRetry={() => detailQuery.refetch()}
+              retrying={detailQuery.isRefetching}
+            />
+          </div>
+        </div>
+      );
+    }
   }
 
   // غير موجودة
