@@ -46,6 +46,8 @@ export const SETTING_MAINTENANCE_MESSAGE = "maintenance_message";
 
 /** علم module-scope يمنع تشغيل triggerScrape مرتين بالتزامن */
 let scrapeRunning = false;
+/** علم module-scope يمنع تزامن مهمتي fixMetadata */
+let fixMetadataRunning = false;
 
 const sourceStatusEnum = z.enum(["active", "paused", "blocked"]);
 const requestStatusEnum = z.enum(["pending", "added", "rejected"]);
@@ -1131,6 +1133,133 @@ export const adminRouter = createRouter({
       meta: { sources: active },
     });
     return { started: true, sources: active };
+  }),
+
+  /**
+   * سكراب كامل للكتالوج: لكل مصدر مفعّل، ترقيم كامل (كل الصفحات، بلا سقف 150)
+   * في الخلفية مع rate limiting — يرجع فوراً { started, sources }.
+   */
+  importFullCatalog: adminQuery.mutation(async ({ ctx }) => {
+    if (scrapeRunning) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "دورة سكرابنغ تعمل حالياً — انتظر اكتمالها",
+      });
+    }
+    const { importCatalog } = await import("./services/importer");
+    const active = enabledScrapers().map((s) => s.name);
+    if (!active.length) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لا توجد مصادر مفعّلة",
+      });
+    }
+    scrapeRunning = true;
+    void (async () => {
+      try {
+        for (const name of active) {
+          try {
+            console.log(`[admin] importFullCatalog: كتالوج كامل ${name}…`);
+            const r = await importCatalog(name, {
+              limit: 100000,
+              maxPages: 500,
+            });
+            console.log(
+              `[admin] importFullCatalog: ${name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
+            );
+          } catch (e) {
+            console.error(
+              `[admin] importFullCatalog: فشل ${name}: ${(e as Error).message}`,
+            );
+          }
+        }
+        console.log("[admin] importFullCatalog: اكتمل السكراب الكامل.");
+      } finally {
+        scrapeRunning = false;
+      }
+    })();
+    await logAdminAction(ctx.user.id, "scraper.importFullCatalog", {
+      meta: { sources: active },
+    });
+    return { started: true, sources: active };
+  }),
+
+  /**
+   * تصحيح الأغلفة والأوصاف: يمر على كل المانجا على دفعات في الخلفية،
+   * يعيد جلب coverUrl + description من المصدر ويحدّثهما إن تغيّرا.
+   * لا يمس coverUrl للمانجا التي لها coverOverrideUrl يدوي.
+   */
+  fixMetadata: adminQuery.mutation(async ({ ctx }) => {
+    if (fixMetadataRunning) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "مهمة تصحيح بيانات تعمل حالياً — انتظر اكتمالها",
+      });
+    }
+    const db = getDb();
+    const [{ total }] = await db.select({ total: count() }).from(manga);
+    fixMetadataRunning = true;
+    const BATCH = 25;
+    void (async () => {
+      let scanned = 0;
+      let updated = 0;
+      let failed = 0;
+      try {
+        for (let offset = 0; ; offset += BATCH) {
+          const rows = await getDb()
+            .select({ manga: manga, source: sources })
+            .from(manga)
+            .innerJoin(sources, eq(manga.sourceId, sources.id))
+            .orderBy(manga.id)
+            .limit(BATCH)
+            .offset(offset);
+          if (!rows.length) break;
+          for (const { manga: m, source } of rows) {
+            scanned += 1;
+            try {
+              const scraper = getScraper(source.name);
+              if (!scraper || !scraper.enabled || !m.sourceUrl) continue;
+              const info = await scraper.getSeries(m.sourceUrl);
+              const patch: { coverUrl?: string; description?: string } = {};
+              if (
+                !m.coverOverrideUrl &&
+                info.cover &&
+                info.cover !== m.coverUrl
+              ) {
+                patch.coverUrl = info.cover;
+              }
+              if (info.description && info.description !== m.description) {
+                patch.description = info.description;
+              }
+              if (Object.keys(patch).length) {
+                await getDb()
+                  .update(manga)
+                  .set(patch)
+                  .where(eq(manga.id, m.id));
+                updated += 1;
+              }
+            } catch (e) {
+              failed += 1;
+              console.warn(
+                `[admin] fixMetadata(${m.id}) فشل: ${(e as Error).message}`,
+              );
+            }
+          }
+          console.log(
+            `[admin] fixMetadata: ${scanned}/${total} — حُدّثت ${updated}، فشلت ${failed}`,
+          );
+        }
+        console.log(
+          `[admin] fixMetadata اكتمل: فُحصت ${scanned}، حُدّثت ${updated}، فشلت ${failed}`,
+        );
+      } finally {
+        fixMetadataRunning = false;
+      }
+    })();
+    await logAdminAction(ctx.user.id, "scraper.fixMetadata", {
+      meta: { total },
+    });
+    return { started: true, total };
   }),
 
   // ================= طلبات التحديث =================
