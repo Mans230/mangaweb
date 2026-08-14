@@ -35,7 +35,7 @@ export default function Browse() {
   const [inputValue, setInputValue] = useState(filters.q);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [view, setView] = useState<ViewMode>(() =>
-    typeof window !== "undefined" && window.localStorage.getItem(VIEW_STORAGE_KEY) === "list"
+    typeof window !== "undefined" && window.sessionStorage.getItem(VIEW_STORAGE_KEY) === "list"
       ? "list"
       : "grid",
   );
@@ -82,7 +82,7 @@ export default function Browse() {
 
   /* ====== حفظ وضع العرض ====== */
   useEffect(() => {
-    window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    window.sessionStorage.setItem(VIEW_STORAGE_KEY, view);
   }, [view]);
 
   /* ====== استعلام tRPC الرئيسي ====== */

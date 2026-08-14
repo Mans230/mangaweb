@@ -44,6 +44,9 @@ import { SETTING_BANNED_WORDS, bannedWords } from "./lib/wordFilter";
 export const SETTING_MAINTENANCE_MODE = "maintenance_mode";
 export const SETTING_MAINTENANCE_MESSAGE = "maintenance_message";
 
+/** علم module-scope يمنع تشغيل triggerScrape مرتين بالتزامن */
+let scrapeRunning = false;
+
 const sourceStatusEnum = z.enum(["active", "paused", "blocked"]);
 const requestStatusEnum = z.enum(["pending", "added", "rejected"]);
 
@@ -1083,6 +1086,52 @@ export const adminRouter = createRouter({
         });
       }
     }),
+
+  /**
+   * تشغيل دورة كتالوج يدوية: importCatalog لكل المصادر المفعّلة بنفس منطق
+   * scraper-job في boot.ts. يعمل async (لا ينتظر الاكتمال) ويمنع التشغيل المتزامن.
+   */
+  triggerScrape: adminQuery.mutation(async ({ ctx }) => {
+    if (scrapeRunning) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "دورة سكرابنغ تعمل حالياً — انتظر اكتمالها",
+      });
+    }
+    const { importCatalog } = await import("./services/importer");
+    const active = enabledScrapers().map((s) => s.name);
+    if (!active.length) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لا توجد مصادر مفعّلة",
+      });
+    }
+    scrapeRunning = true;
+    void (async () => {
+      try {
+        for (const name of active) {
+          try {
+            console.log(`[admin] triggerScrape: importCatalog(${name})…`);
+            const r = await importCatalog(name);
+            console.log(
+              `[admin] triggerScrape: ${name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
+            );
+          } catch (e) {
+            console.error(
+              `[admin] triggerScrape: فشل ${name}: ${(e as Error).message}`,
+            );
+          }
+        }
+        console.log("[admin] triggerScrape: اكتملت الدورة اليدوية.");
+      } finally {
+        scrapeRunning = false;
+      }
+    })();
+    await logAdminAction(ctx.user.id, "scraper.trigger", {
+      meta: { sources: active },
+    });
+    return { started: true, sources: active };
+  }),
 
   // ================= طلبات التحديث =================
 

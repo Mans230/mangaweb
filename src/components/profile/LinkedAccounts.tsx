@@ -9,8 +9,6 @@ import TelegramLoginButton from "@/components/auth/TelegramLoginButton";
 import { trpc } from "@/providers/trpc";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const TG_BOT = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? "egmangabot";
-const TG_WIDGET_ENABLED = Boolean(import.meta.env.VITE_TELEGRAM_BOT_USERNAME);
 
 type TelegramAuthPayload = {
   id: number;
@@ -97,6 +95,15 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
   const [resetHelpOpen, setResetHelpOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
 
+  // اسم بوت تليجرام من الخادم (auth.providers) — لا متغيرات build-time
+  const providersQ = trpc.auth.providers.useQuery(undefined, {
+    staleTime: Infinity,
+    retry: false,
+  });
+  const tgBot =
+    (providersQ.data as { telegramBotUsername?: string | null } | undefined)
+      ?.telegramBotUsername ?? null;
+
   const unlinkMutation = trpc.auth.unlinkTelegram.useMutation({
     onSuccess: () => {
       void utils.auth.me.invalidate();
@@ -106,10 +113,10 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
       toast(e.message || t("تعذر إلغاء الربط — حاول مجدداً", "Could not unlink — try again"), { kind: "info" }),
   });
 
-  /** زر ربط تليجرام: المودال يعرض الودجت الفوري إن كان جاهزًا وإلا تدفق رمز الربط عبر البوت */
+  /** زر ربط تليجرام: المودال يعرض الودجت الفوري إن كان اسم البوت متاحًا وإلا تدفق رمز الربط */
   const onTelegramLink = () => {
-    if (!TG_WIDGET_ENABLED) {
-      toast(t("الربط الفوري بالودجت قريبًا — استخدم رمز الربط الآن", "Instant widget linking is coming soon — use the link code for now"), { kind: "info" });
+    if (!providersQ.isLoading && !tgBot) {
+      toast(t("الربط الفوري بالودجت غير متاح حالياً — استخدم رمز الربط", "Instant widget linking is unavailable — use the link code"), { kind: "info" });
     }
     setTgModal(true);
   };
@@ -227,19 +234,19 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
         />
       </div>
 
-      <TelegramModal open={tgModal} onClose={() => setTgModal(false)} />
+      <TelegramModal open={tgModal} onClose={() => setTgModal(false)} botUsername={tgBot} />
       <EmailVerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
       <PasswordResetHelp
         open={resetHelpOpen}
         onClose={() => setResetHelpOpen(false)}
-        botUsername={TG_BOT}
+        botUsername={tgBot}
       />
     </motion.section>
   );
 }
 
 /** مودال ربط تليجرام: ربط فوري عبر Telegram Login Widget أو رمز ربط يُرسله المستخدم للبوت. */
-function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function TelegramModal({ open, onClose, botUsername: tgBot }: { open: boolean; onClose: () => void; botUsername: string | null }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -309,8 +316,8 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
 
   return (
     <GlassModal open={open} onClose={onClose} title={t("ربط حساب تليجرام", "Link Telegram account")}>
-      {/* الطريقة الأولى: ربط فوري عبر ودجت تليجرام */}
-      {TG_WIDGET_ENABLED && (
+      {/* الطريقة الأولى: ربط فوري عبر ودجت تليجرام — يتطلب اسم البوت من الخادم */}
+      {tgBot && (
         <div className="mb-5">
           <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-app">
             <Zap size={14} className="text-accent" />
@@ -321,7 +328,7 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
               <Loader2 size={24} className="animate-spin text-app-3" />
             ) : (
               <TelegramLoginButton
-                botUsername={TG_BOT}
+                botUsername={tgBot}
                 onAuth={(u) => {
                   setWidgetError(null);
                   linkWidgetMutation.mutate(u);
@@ -390,15 +397,17 @@ function TelegramModal({ open, onClose }: { open: boolean; onClose: () => void }
         )}
       </div>
 
-      <a
-        href={code ? `https://t.me/${TG_BOT}?start=${code}` : `https://t.me/${TG_BOT}`}
-        target="_blank"
-        rel="noreferrer"
-        className="btn-glass w-full !py-2.5 text-sm"
-      >
-        <Send size={15} />
-        {t("فتح البوت في تليجرام", "Open bot in Telegram")}
-      </a>
+      {tgBot && (
+        <a
+          href={code ? `https://t.me/${tgBot}?start=${code}` : `https://t.me/${tgBot}`}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-glass w-full !py-2.5 text-sm"
+        >
+          <Send size={15} />
+          {t("فتح البوت في تليجرام", "Open bot in Telegram")}
+        </a>
+      )}
 
       <p className="glass mt-3 !rounded-xl px-3 py-2 text-[11.5px] leading-relaxed text-app-3">
         {t(

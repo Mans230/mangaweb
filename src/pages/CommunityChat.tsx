@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Archive,
-  BookOpen,
+  ArrowRight,
   Clock,
   Crown,
   Loader2,
@@ -33,7 +33,6 @@ import SettingsDrawer from "@/components/communities/SettingsDrawer";
 import { playSoftBeep } from "@/components/communities/sound";
 import {
   CommunityAvatar,
-  communityColor,
   type CommunityChatMsg,
 } from "@/components/communities/shared";
 
@@ -58,7 +57,7 @@ export default function CommunityChat() {
   const [joinPending, setJoinPending] = useState(false);
   const [soundOn, setSoundOn] = useState(() => {
     try {
-      return localStorage.getItem(SOUND_KEY) !== "0";
+      return sessionStorage.getItem(SOUND_KEY) !== "0";
     } catch {
       return true;
     }
@@ -83,14 +82,14 @@ export default function CommunityChat() {
     if (!community) return;
     let stored = false;
     try {
-      stored = localStorage.getItem(joinReqKey(community.id)) === "1";
+      stored = sessionStorage.getItem(joinReqKey(community.id)) === "1";
     } catch {
       /* ignore */
     }
     if (isMember) {
       setJoinPending(false);
       try {
-        localStorage.removeItem(joinReqKey(community.id));
+        sessionStorage.removeItem(joinReqKey(community.id));
       } catch {
         /* ignore */
       }
@@ -188,7 +187,7 @@ export default function CommunityChat() {
     onSuccess: () => {
       setJoinPending(true);
       try {
-        if (community) localStorage.setItem(joinReqKey(community.id), "1");
+        if (community) sessionStorage.setItem(joinReqKey(community.id), "1");
       } catch {
         /* ignore */
       }
@@ -239,7 +238,7 @@ export default function CommunityChat() {
     setSoundOn((v) => {
       const next = !v;
       try {
-        localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+        sessionStorage.setItem(SOUND_KEY, next ? "1" : "0");
       } catch {
         /* ignore */
       }
@@ -349,120 +348,75 @@ export default function CommunityChat() {
   );
 
   return (
-    <div className="relative mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
-      {/* ambient */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div
-          className="animate-blob-a absolute -top-24 end-8 h-72 w-72 rounded-full blur-3xl"
-          style={{ background: `${communityColor(color)}26` }}
-        />
-        <div className="animate-blob-b absolute top-1/2 start-0 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
-      </div>
-
-      <div className="relative flex flex-col gap-4">
-        {/* الرأس */}
-        <motion.header
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: EASE }}
-          className="glass relative flex items-center gap-4 overflow-hidden !rounded-3xl p-4 md:p-5"
+    /* شات ملء الشاشة — يطفو فوق هيدر الموقع والنافبار السفلي */
+    <div className="fixed inset-0 z-[70] flex flex-col bg-[var(--bg)]">
+      {/* شريط علوي رفيع: رجوع + الاسم + عدد الأعضاء + إجراءات */}
+      <header className="glass-strong flex h-11 shrink-0 items-center gap-2 border-x-0 border-t-0 px-2">
+        <Link
+          to="/communities"
+          className="btn-icon !h-8 !w-8 shrink-0"
+          aria-label={t("رجوع للمجتمعات", "Back to communities")}
+          title={t("رجوع للمجتمعات", "Back to communities")}
         >
-          {community.imageUrl && (
-            <>
-              <img
-                src={community.imageUrl}
-                alt=""
-                aria-hidden
-                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-20 blur-2xl"
-              />
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[var(--bg)]/60 to-[var(--bg)]/85" />
-            </>
-          )}
-          <div className="relative shrink-0">
-            <CommunityAvatar name={community.name} imageUrl={community.imageUrl} color={color} size="lg" />
+          <ArrowRight size={16} className="rtl:-scale-x-100" />
+        </Link>
+        <CommunityAvatar name={community.name} imageUrl={community.imageUrl} color={color} size="sm" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h1 className="line-clamp-1 text-[13.5px] font-extrabold text-app">
+              {community.name}
+            </h1>
+            {community.isPrivate && <Lock size={11} className="shrink-0 text-app-3" />}
+            {membership?.isOwner && <Crown size={11} className="shrink-0 text-warning" />}
           </div>
-          <div className="relative min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="font-display line-clamp-1 text-lg font-extrabold text-app md:text-2xl">
-                {community.name}
-              </h1>
-              {community.isPrivate && <Lock size={14} className="shrink-0 text-app-3" />}
-            </div>
-            {community.description && (
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-app-2 md:text-sm">
-                {community.description}
-              </p>
-            )}
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="glass-chip !px-2.5 !py-1 !text-[10.5px] font-bold">
-                <Users size={11} />
-                {community.memberCount} {t("عضو", "members")}
-              </span>
-              {community.mangaId && (
-                <span className="glass-chip !px-2.5 !py-1 !text-[10.5px] font-bold text-primary">
-                  <BookOpen size={11} />
-                  {t("مرتبط بعمل", "Linked to a title")}
-                </span>
-              )}
-              {membership?.isOwner && (
-                <span className="glass-chip !border-warning/40 !px-2.5 !py-1 !text-[10.5px] font-bold text-warning">
-                  <Crown size={11} />
-                  {t("أنت المالك", "You own it")}
-                </span>
-              )}
-              {membership?.roleName && (
-                <span
-                  className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
-                  style={{ background: `${communityColor(color)}26`, color: communityColor(color) }}
-                >
-                  {membership.roleName}
-                </span>
-              )}
-            </div>
-          </div>
-          {/* أزرار الرأس */}
-          <div className="relative flex shrink-0 flex-col gap-1.5">
+          <p className="flex items-center gap-1 text-[10px] leading-3 text-app-3">
+            <Users size={9} />
+            {community.memberCount} {t("عضو", "members")}
+            {membership?.roleName ? ` · ${membership.roleName}` : ""}
+          </p>
+        </div>
+        <button
+          onClick={toggleSound}
+          className="btn-icon !h-8 !w-8 shrink-0"
+          aria-label={soundOn ? t("كتم صوت التنبيه", "Mute notification sound") : t("تفعيل صوت التنبيه", "Enable notification sound")}
+          title={soundOn ? t("كتم صوت التنبيه", "Mute notification sound") : t("تفعيل صوت التنبيه", "Enable notification sound")}
+        >
+          {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+        </button>
+        {canMod && (
+          <>
             <button
-              onClick={toggleSound}
-              className="btn-icon !h-9 !w-9"
-              aria-label={soundOn ? t("كتم صوت التنبيه", "Mute notification sound") : t("تفعيل صوت التنبيه", "Enable notification sound")}
-              title={soundOn ? t("كتم صوت التنبيه", "Mute notification sound") : t("تفعيل صوت التنبيه", "Enable notification sound")}
+              onClick={() => setMembersOpen(true)}
+              className="btn-icon !h-8 !w-8 shrink-0"
+              aria-label={t("إدارة الأعضاء", "Manage members")}
+              title={t("إدارة الأعضاء", "Manage members")}
             >
-              {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              <Users size={14} />
             </button>
-            {canMod && (
-              <>
-                <button
-                  onClick={() => setMembersOpen(true)}
-                  className="btn-icon !h-9 !w-9"
-                  aria-label={t("إدارة الأعضاء", "Manage members")}
-                  title={t("إدارة الأعضاء", "Manage members")}
-                >
-                  <Users size={16} />
-                </button>
-                <button
-                  onClick={() => setSettingsOpen(true)}
-                  className="btn-icon !h-9 !w-9"
-                  aria-label={t("إعدادات المجتمع", "Community settings")}
-                  title={t("إعدادات المجتمع", "Community settings")}
-                >
-                  <Settings size={16} />
-                </button>
-              </>
-            )}
-            {isMember && !membership?.isOwner && (
-              <button
-                onClick={() => leaveMut.mutate({ communityId })}
-                disabled={leaveMut.isPending}
-                className="btn-icon !h-9 !w-9 !text-danger"
-                aria-label={t("مغادرة المجتمع", "Leave community")}
-                title={t("مغادرة المجتمع", "Leave community")}
-              >
-                <LogOut size={16} className="rtl:-scale-x-100" />
-              </button>
-            )}
-          </div>
-        </motion.header>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="btn-icon !h-8 !w-8 shrink-0"
+              aria-label={t("إعدادات المجتمع", "Community settings")}
+              title={t("إعدادات المجتمع", "Community settings")}
+            >
+              <Settings size={14} />
+            </button>
+          </>
+        )}
+        {isMember && !membership?.isOwner && (
+          <button
+            onClick={() => leaveMut.mutate({ communityId })}
+            disabled={leaveMut.isPending}
+            className="btn-icon !h-8 !w-8 shrink-0 !text-danger"
+            aria-label={t("مغادرة المجتمع", "Leave community")}
+            title={t("مغادرة المجتمع", "Leave community")}
+          >
+            <LogOut size={14} className="rtl:-scale-x-100" />
+          </button>
+        )}
+      </header>
+
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-2 overflow-hidden px-2 py-2 md:px-4">
 
         {/* شريط الأرشفة */}
         {archived && (
@@ -528,7 +482,7 @@ export default function CommunityChat() {
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="glass flex max-h-[58vh] min-h-[300px] flex-col gap-3 overflow-y-auto !rounded-3xl p-4"
+          className="glass flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto !rounded-2xl p-2.5"
         >
           {chatLoading ? (
             <div className="flex flex-col gap-3">
