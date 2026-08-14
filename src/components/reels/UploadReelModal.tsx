@@ -10,7 +10,7 @@ import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/library/toast";
-import { useVideoUpload, VIDEO_ACCEPT } from "@/lib/upload";
+import { useDirectUpload, VIDEO_ACCEPT } from "@/lib/upload";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const MAX_CAPTION = 300;
@@ -33,7 +33,8 @@ export default function UploadReelModal({ open, onClose }: UploadReelModalProps)
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [pickedManga, setPickedManga] = useState<{ id: number; title: string } | null>(null);
 
-  const { upload, uploading, progress, error: uploadError } = useVideoUpload();
+  // رفع مباشر multipart إلى /api/upload — تقدّم حقيقي ويعمل مع الملفات الكبيرة
+  const { upload, uploading, progress, error: uploadError } = useDirectUpload("video");
 
   const verified = Boolean(
     user && (user.emailVerifiedAt || user.telegramId || (user as { googleId?: string | null }).googleId),

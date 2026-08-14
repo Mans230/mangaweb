@@ -99,6 +99,82 @@ async function imageProxyHandler(c: Context) {
   }
 }
 
+const UPLOAD_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif"];
+const UPLOAD_VIDEO_EXTS = ["mp4", "webm", "mov"];
+const UPLOAD_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const UPLOAD_VIDEO_MIMES = ["video/mp4", "video/webm", "video/quicktime"];
+const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_UPLOAD_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
+
+/**
+ * رفع مباشر (multipart/form-data، حقل "file") إلى catbox — بديل عن base64
+ * الذي يتضخم ~33% ويفشل صامتاً مع الفيديوهات الكبيرة.
+ * المصادقة بكوكي الجلسة نفسه المستخدم في tRPC.
+ */
+async function directUploadHandler(c: Context) {
+  const { authenticateRequest } = await import("./lib/auth");
+  const { checkRateLimit } = await import("./lib/rateLimit");
+  const { uploadToCatbox } = await import("./lib/catbox");
+
+  let user: { id: number | string };
+  try {
+    user = await authenticateRequest(c.req.raw.headers);
+  } catch {
+    return c.json({ error: "غير مسجل الدخول" }, 401);
+  }
+
+  let file: File | null = null;
+  try {
+    const body = await c.req.parseBody();
+    const candidate = body["file"];
+    if (candidate instanceof File) file = candidate;
+  } catch {
+    return c.json({ error: "طلب multipart غير صالح" }, 400);
+  }
+  if (!file || !file.size) {
+    return c.json({ error: "الملف مفقود — أرسل الحقل file" }, 400);
+  }
+
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+  const mime = (file.type || "").toLowerCase();
+  const isImage =
+    UPLOAD_IMAGE_EXTS.includes(ext) && UPLOAD_IMAGE_MIMES.includes(mime);
+  const isVideo =
+    UPLOAD_VIDEO_EXTS.includes(ext) && UPLOAD_VIDEO_MIMES.includes(mime);
+  if (!isImage && !isVideo) {
+    return c.json(
+      {
+        error:
+          "صيغة غير مدعومة — صور: jpg, jpeg, png, webp, gif / فيديو: mp4, webm, mov",
+      },
+      400,
+    );
+  }
+
+  const maxBytes = isImage ? MAX_UPLOAD_IMAGE_BYTES : MAX_UPLOAD_VIDEO_BYTES;
+  if (file.size > maxBytes) {
+    return c.json({ error: "الملف أكبر من الحد المسموح" }, 413);
+  }
+
+  // نفس حدود uploadRouter: 10 صور/10د، 3 فيديوهات/ساعة لكل مستخدم
+  const key = isImage
+    ? `upload:image:${user.id}`
+    : `upload:video:${user.id}`;
+  const allowed = isImage
+    ? checkRateLimit(key, 10, 10 * 60 * 1000)
+    : checkRateLimit(key, 3, 60 * 60 * 1000);
+  if (!allowed) {
+    return c.json({ error: "رفعت ملفات كثيرة، جرب بعد شوية" }, 429);
+  }
+
+  try {
+    const url = await uploadToCatbox(file, file.name);
+    return c.json({ url });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 502);
+  }
+}
+
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 const CSP = [
@@ -144,6 +220,7 @@ app.post(Paths.linkVerify, linkVerifyHandler());
 app.post("/api/auth/telegram-reset", telegramResetHandler());
 app.get("/api/download/:slug/chapter/:num", downloadChapterHandler);
 app.get("/api/img", imageProxyHandler);
+app.post("/api/upload", directUploadHandler);
 // وضع الصيانة: غير الأدمن يحصل على MAINTENANCE لكل tRPC ما عدا auth.me/ping/admin.*
 app.use("/api/trpc/*", async (c, next) => {
   const { getSetting } = await import("./lib/siteSettings");

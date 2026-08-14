@@ -46,6 +46,98 @@ interface UploadState {
   error: string | null;
 }
 
+/**
+ * رفع مباشر multipart إلى POST /api/upload (حقل "file") — للفيديو والملفات
+ * الكبيرة حيث يفشل base64 عبر tRPC. تقدّم حقيقي عبر xhr.upload.onprogress،
+ * والمصادقة بكوكي الجلسة. يعيد {url} أو يرمي خطأً مترجماً من {error}.
+ */
+export function uploadFileDirect(
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload");
+    xhr.withCredentials = true; // كوكي الجلسة
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      let data: { url?: string; error?: string } = {};
+      try {
+        data = JSON.parse(xhr.responseText || "{}") as { url?: string; error?: string };
+      } catch {
+        /* رد غير JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.url) {
+        resolve(data.url);
+      } else {
+        reject(new Error(translateUploadError(data.error ?? `HTTP ${xhr.status}`)));
+      }
+    };
+    xhr.onerror = () => reject(new Error("فشل الاتصال بالخادم أثناء الرفع — تحقق من الشبكة"));
+    xhr.onabort = () => reject(new Error("أُلغي الرفع"));
+    const form = new FormData();
+    form.append("file", file);
+    xhr.send(form);
+  });
+}
+
+/**
+ * هوك رفع مباشر (صورة ≤5MB أو فيديو ≤200MB) عبر /api/upload بتقدّم حقيقي.
+ * يفضّل للملفات الكبيرة؛ دوال tRPC القديمة تبقى للصور الصغيرة.
+ */
+export function useDirectUpload(kind: "image" | "video") {
+  const [state, setState] = useState<UploadState>({
+    uploading: false,
+    progress: null,
+    error: null,
+  });
+
+  const upload = async (file: File): Promise<string | null> => {
+    const types = kind === "image" ? IMAGE_TYPES : VIDEO_TYPES;
+    const max = kind === "image" ? IMAGE_MAX_BYTES : VIDEO_MAX_BYTES;
+    if (!types.includes(file.type)) {
+      setState({
+        uploading: false,
+        progress: null,
+        error:
+          kind === "image"
+            ? "صيغة الصورة غير مدعومة — المسموح: jpg, png, webp, gif"
+            : "صيغة الفيديو غير مدعومة — المسموح: mp4, webm, mov",
+      });
+      return null;
+    }
+    if (file.size > max) {
+      setState({
+        uploading: false,
+        progress: null,
+        error: kind === "image" ? "الصورة أكبر من 5MB" : "الفيديو أكبر من 200MB",
+      });
+      return null;
+    }
+    setState({ uploading: true, progress: 0, error: null });
+    try {
+      const url = await uploadFileDirect(file, (pct) =>
+        setState((s) => (s.uploading ? { ...s, progress: pct } : s)),
+      );
+      setState({ uploading: false, progress: 100, error: null });
+      return url;
+    } catch (e) {
+      setState({
+        uploading: false,
+        progress: null,
+        error: translateUploadError((e as Error).message),
+      });
+      return null;
+    }
+  };
+
+  return { upload, ...state };
+}
+
 function useUploadBase() {
   const [state, setState] = useState<UploadState>({
     uploading: false,
