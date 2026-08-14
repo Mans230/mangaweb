@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ChartNoAxesCombined,
+  Clapperboard,
   Flag,
+  FolderCog,
   GitMerge,
   Inbox,
   LayoutDashboard,
   Link2,
   ListMusic,
   MessageSquare,
+  Settings,
   ShieldX,
   Users,
   UsersRound,
@@ -29,11 +33,19 @@ import RequestsManager from "@/components/admin/RequestsManager";
 import ReportsManager from "@/components/admin/ReportsManager";
 import CommentsManager from "@/components/admin/CommentsManager";
 import CommunitiesManager from "@/components/admin/CommunitiesManager";
+import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
+import ContentManager from "@/components/admin/ContentManager";
+import ReelsModeration from "@/components/admin/ReelsModeration";
+import AdminSettings from "@/components/admin/AdminSettings";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "reports" | "comments" | "communities";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "reports" | "comments" | "communities";
 
 const shortcutKeys: Record<string, AdminView> = {
+  n: "analytics",
+  k: "content",
+  l: "reels",
+  o: "settings",
   d: "dashboard",
   b: "manga",
   a: "add",
@@ -48,14 +60,20 @@ const shortcutKeys: Record<string, AdminView> = {
 
 function AdminShell() {
   const { t } = useLanguage();
-  const [view, setView] = useState<AdminView>("dashboard");
+  const [view, setView] = useState<AdminView>("analytics");
 
   const statsQuery = trpc.admin.stats.useQuery(undefined, { retry: false });
   const pendingCount = statsQuery.data?.pendingRequests ?? 0;
+  const pendingReelsQuery = trpc.analytics.overview.useQuery(undefined, { retry: false });
+  const pendingReels = pendingReelsQuery.data?.pendingReels ?? 0;
 
   const tabs = useMemo(
     () =>
       [
+        { id: "analytics", label: t("التحليلات", "Analytics"), icon: ChartNoAxesCombined },
+        { id: "content", label: t("إدارة المحتوى", "Content"), icon: FolderCog },
+        { id: "reels", label: t("مراجعة الريلز", "Reels review"), icon: Clapperboard, badge: pendingReels },
+        { id: "settings", label: t("الإعدادات", "Settings"), icon: Settings },
         { id: "dashboard", label: t("لوحة المعلومات", "Dashboard"), icon: LayoutDashboard },
         { id: "manga", label: t("إدارة المانجا", "Manga"), icon: BookOpen },
         { id: "add", label: t("إضافة بلينك", "Add by link"), icon: Link2 },
@@ -67,7 +85,7 @@ function AdminShell() {
         { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
         { id: "communities", label: t("المجتمعات", "Communities"), icon: UsersRound },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
-    [t, pendingCount],
+    [t, pendingCount, pendingReels],
   );
 
   // اختصارات لوحة المفاتيح: g ثم حرف
@@ -198,6 +216,10 @@ function AdminShell() {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.35, ease: EASE }}
           >
+            {view === "analytics" && <AnalyticsDashboard />}
+            {view === "content" && <ContentManager />}
+            {view === "reels" && <ReelsModeration />}
+            {view === "settings" && <AdminSettings />}
             {view === "dashboard" && <AdminDashboard />}
             {view === "manga" && <MangaManager />}
             {view === "add" && <AddByLink />}
