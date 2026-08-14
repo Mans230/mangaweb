@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Camera, Loader2, Send, Smile, X } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
-import { useImageUpload, IMAGE_ACCEPT } from "@/lib/upload";
+import { useDirectUpload, IMAGE_ACCEPT } from "@/lib/upload";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const MAX_LEN = 500;
@@ -40,7 +40,8 @@ export default function ChatComposer({
   const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { upload, uploading, error: uploadError } = useImageUpload();
+  // رفع مباشر multipart إلى /api/upload (بدون base64 عبر tRPC)
+  const { upload, uploading, error: uploadError } = useDirectUpload("image");
 
   const clearPendingFile = () => {
     if (pendingPreview) URL.revokeObjectURL(pendingPreview);
