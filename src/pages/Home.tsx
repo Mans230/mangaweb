@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useInView } from "framer-motion";
 import {
   ArrowLeft,
   BookOpen,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -73,7 +74,7 @@ function AmbientBackground() {
 }
 
 /* ================= Section header ================= */
-function SectionHeader({ title, moreTo }: { title: string; moreTo?: string }) {
+function SectionHeader({ title, moreTo, extra }: { title: string; moreTo?: string; extra?: React.ReactNode }) {
   const { t } = useLanguage();
   return (
     <div className="mb-6 flex items-end justify-between gap-4">
@@ -87,12 +88,15 @@ function SectionHeader({ title, moreTo }: { title: string; moreTo?: string }) {
           className="gradient-primary mt-2 block h-1 rounded-full"
         />
       </div>
-      {moreTo && (
-        <Link to={moreTo} className="btn-glass shrink-0 !px-4 !py-2 text-xs font-semibold">
-          {t("عرض الكل", "View all")}
-          <ArrowLeft size={14} className="rtl:-scale-x-100" />
-        </Link>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {extra}
+        {moreTo && (
+          <Link to={moreTo} className="btn-glass shrink-0 !px-4 !py-2 text-xs font-semibold">
+            {t("عرض الكل", "View all")}
+            <ArrowLeft size={14} className="rtl:-scale-x-100" />
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -574,7 +578,16 @@ function LatestChapters() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-14 md:px-6 md:py-20">
-      <SectionHeader title={t("أحدث الفصول", "Latest chapters")} moreTo="/browse?sort=latest" />
+      <SectionHeader
+        title={t("أحدث الفصول", "Latest chapters")}
+        moreTo="/browse?sort=latest"
+        extra={
+          <Link to="/today" className="btn-glass shrink-0 !px-4 !py-2 text-xs font-semibold !text-primary">
+            <CalendarClock size={14} />
+            {t("نزل اليوم", "Today")}
+          </Link>
+        }
+      />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {items.map((item, i) => (
           <motion.div
@@ -793,6 +806,7 @@ function LatestAdditions() {
                 src={featured.cover}
                 alt={featured.title}
                 loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <span className="glass-chip absolute end-3 top-3 !border-accent-2/40 !text-[10.5px] font-bold text-accent-2">

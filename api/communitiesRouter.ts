@@ -34,6 +34,7 @@ import {
 import { getDb } from "./queries/connection";
 import { checkRateLimit } from "./lib/rateLimit";
 import { isUserCommunitiesEnabled } from "./lib/siteSettings";
+import { containsBannedWord } from "./lib/wordFilter";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 
 type Db = ReturnType<typeof getDb>;
@@ -518,6 +519,12 @@ export const communitiesRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       rateLimitOrThrow(`communities:msg:${ctx.user.id}`, 20, 60 * 1000);
+      if (await containsBannedWord(input.content)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "الرسالة تحتوي كلمات مخالفة",
+        });
+      }
       const db = getDb();
       const community = await db.query.communities.findFirst({
         where: eq(communities.id, input.communityId),
