@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AtSign,
   Bell,
+  CheckCheck,
   Home,
   LayoutDashboard,
   Library,
@@ -18,8 +18,12 @@ import {
 import { useLanguage } from "./LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
-import { trpc } from "@/providers/trpc";
-import { adaptLatestChapter, timeAgo } from "@/lib/manga";
+import { timeAgo } from "@/lib/manga";
+import {
+  useMarkNotificationRead,
+  useNotificationsList,
+  type NotificationItem,
+} from "@/lib/notifications";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -32,55 +36,36 @@ import {
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-/* ===== جرس الإشعارات — منشن المجتمعات + آخر الفصول المضافة ===== */
+/* ===== جرس الإشعارات — مركز الإشعارات (trpc.notifications) ===== */
 function NotificationsBell() {
   const { t, lang } = useLanguage();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const query = trpc.manga.latest.useQuery(
-    { limit: 10 },
-    { retry: false, enabled: isAuthenticated },
-  );
-  const items = (query.data ?? []).map((c) => adaptLatestChapter(c));
+  // فشل الاستعلام (الباكند لم يسلّم الراوتر بعد) → جرس بدون badge ولا كسر
+  const query = useNotificationsList(isAuthenticated);
+  const markReadMut = useMarkNotificationRead(() => void query.refetch());
 
-  // إشعارات المجتمعات (المنشن)
-  const unreadQ = trpc.communities.unreadNotificationsCount.useQuery(undefined, {
-    retry: false,
-    enabled: isAuthenticated,
-    refetchInterval: 30000,
-  });
-  const mentionsQ = trpc.communities.myNotifications.useQuery(
-    { limit: 10 },
-    { retry: false, enabled: isAuthenticated && open },
-  );
-  const markReadMut = trpc.communities.markNotificationsRead.useMutation({
-    onSuccess: () => void unreadQ.refetch(),
-  });
-  const unread = unreadQ.data?.count ?? 0;
-  const mentions = mentionsQ.data ?? [];
+  const items = query.data?.items ?? [];
+  const unread = query.data?.unreadCount ?? 0;
 
-  const onOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (next && unread > 0) markReadMut.mutate({});
+  /** ضغطة إشعار: تعليمه مقروءاً ثم فتح صفحة المانجا (slug لو توفر وإلا id) */
+  const openItem = (n: NotificationItem) => {
+    if (!n.readAt) markReadMut.mutate({ id: n.id });
+    if (n.mangaSlug) navigate(`/manga/${n.mangaSlug}`);
+    else if (n.mangaId != null) navigate(`/manga/${n.mangaId}`);
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
+    <DropdownMenu>
       <DropdownMenuTrigger
         className="btn-icon relative hidden sm:inline-flex"
         aria-label={t("الإشعارات", "Notifications")}
       >
         <Bell size={18} />
-        {isAuthenticated && unread > 0 ? (
+        {isAuthenticated && unread > 0 && (
           <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white tabular-nums">
             {unread > 99 ? "99+" : unread}
           </span>
-        ) : (
-          isAuthenticated &&
-          items.length > 0 && (
-            <span className="absolute end-2 top-2 h-2 w-2 rounded-full bg-danger" />
-          )
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -91,7 +76,7 @@ function NotificationsBell() {
           <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
             <Bell size={22} className="text-app-3" />
             <p className="text-sm text-app-3">
-              {t("سجّل الدخول لترى إشعارات المتابعة", "Sign in to see follow notifications")}
+              {t("سجّل الدخول لترى إشعاراتك", "Sign in to see your notifications")}
             </p>
             <Link to={LOGIN_PATH} className="btn-primary !px-5 !py-2 text-xs">
               {t("دخول", "Sign in")}
@@ -99,106 +84,57 @@ function NotificationsBell() {
           </div>
         ) : (
           <>
-            {/* قسم المنشن */}
             <DropdownMenuLabel className="flex items-center gap-1.5">
-              <AtSign size={13} className="text-primary" />
-              {t("منشن", "Mentions")}
+              <Bell size={13} className="text-primary" />
+              {t("الإشعارات", "Notifications")}
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => markReadMut.mutate({})}
+                  disabled={markReadMut.isPending}
+                  className="ms-auto flex items-center gap-1 text-[10.5px] font-bold text-primary disabled:opacity-50"
+                >
+                  <CheckCheck size={12} />
+                  {t("تعليم الكل كمقروء", "Mark all as read")}
+                </button>
+              )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {mentionsQ.isLoading ? (
+            {query.isLoading ? (
               <div className="flex flex-col gap-2 p-2">
-                {[1, 2].map((i) => (
-                  <div key={i} className="skeleton h-12 !rounded-xl" />
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="skeleton h-14 !rounded-xl" />
                 ))}
               </div>
-            ) : mentions.length === 0 ? (
-              <p className="px-4 py-4 text-center text-xs text-app-3">
-                {t("لا منشنات بعد — سيظهر هنا ذكرك في المجتمعات.", "No mentions yet — community mentions appear here.")}
+            ) : items.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-app-3">
+                {t("لا إشعارات حالياً", "No notifications yet")}
               </p>
             ) : (
-              mentions.map((n) => (
+              items.map((n) => (
                 <DropdownMenuItem
                   key={n.id}
-                  onClick={() =>
-                    n.payload?.communitySlug && navigate(`/c/${n.payload.communitySlug}`)
-                  }
+                  onClick={() => openItem(n)}
                   className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(167,139,250,0.16)]"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                    <AtSign size={15} />
+                    <Bell size={15} />
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="line-clamp-1 text-xs font-semibold">
-                      {n.payload?.fromUsername ? (
-                        <>
-                          <span dir="ltr">@{n.payload.fromUsername}</span>{" "}
-                          {t("ذكرك في", "mentioned you in")} {n.payload?.communityName ?? ""}
-                        </>
-                      ) : (
-                        (n.payload?.communityName ?? t("إشعار مجتمع", "Community notification"))
-                      )}
-                    </span>
-                    {n.payload?.excerpt && (
-                      <span className="line-clamp-1 text-[11px] text-app-3">{n.payload.excerpt}</span>
+                    <span className="line-clamp-1 text-xs font-semibold">{n.title}</span>
+                    {n.body && (
+                      <span className="line-clamp-2 text-[11px] text-app-3">{n.body}</span>
                     )}
                     <span className="text-[10px] text-app-3">{timeAgo(n.createdAt, lang)}</span>
                   </span>
                   {!n.readAt && (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-accent-2" aria-hidden />
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-danger" aria-hidden />
                   )}
                 </DropdownMenuItem>
               ))
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t("آخر الفصول", "Latest chapters")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
           </>
         )}
-        {isAuthenticated && (query.isLoading ? (
-          <div className="flex flex-col gap-2 p-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="skeleton h-14 !rounded-xl" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-app-3">
-            {t("لا جديد حالياً", "Nothing new yet")}
-          </p>
-        ) : (
-          <>
-            {items.map((item) => (
-              <DropdownMenuItem
-                key={item.id}
-                onClick={() => navigate(`/manga/${item.mangaSlug}/chapter/${item.chapter}`)}
-                className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(167,139,250,0.16)]"
-              >
-                <img
-                  src={item.cover}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="h-12 w-9 shrink-0 rounded-lg object-cover"
-                />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="line-clamp-1 text-sm font-semibold">{item.mangaTitle}</span>
-                  <span className="text-xs text-app-3">
-                    {t("فصل", "Ch.")} {item.chapter} · {item.timeAgo}
-                  </span>
-                </span>
-                {item.isNew && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-accent-2" aria-hidden />
-                )}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => navigate("/browse?sort=latest")}
-              className="cursor-pointer justify-center !rounded-xl text-xs font-bold text-primary focus:bg-[rgba(167,139,250,0.16)]"
-            >
-              {t("عرض الكل", "View all")}
-            </DropdownMenuItem>
-          </>
-        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
