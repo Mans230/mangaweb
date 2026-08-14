@@ -154,11 +154,11 @@ export default function ChaptersTab({
           </span>
         )}
         {c.isNew && !isRead && !isNext && (
-          <span className="shrink-0 rounded-full bg-accent-2 px-2 py-0.5 text-[10px] font-bold text-white">
+          <span className="shrink-0 rounded-full bg-danger px-2 py-0.5 text-[10px] font-bold text-white">
             {t("جديد", "NEW")}
           </span>
         )}
-        <span className="hidden shrink-0 text-[11px] text-app-3 sm:inline">{c.timeAgo}</span>
+        <span className="shrink-0 text-[11px] text-app-3">{c.timeAgo}</span>
         <span className="hidden shrink-0 text-[11px] text-app-3 md:inline">
           {c.pageCount > 0 ? `${c.pageCount} ${t("صفحة", "pages")}` : ""}
         </span>
