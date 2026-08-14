@@ -91,21 +91,128 @@ export class AzoraFlyScraper extends BaseScraper {
       .filter((it: LatestItem) => it.chapter.number > 0);
   }
 
+  /**
+   * فك ترميز props جزيرة Astro: القيم ملفوفة كـ [type, value] —
+   * type رقم (0=قيمة خام، 1=مصفوفة/كائن مُشار إليه) والقيمة في الموضع 1.
+   */
+  private decodeAstroValue(node: any): any {
+    if (Array.isArray(node)) {
+      if (
+        node.length === 2 &&
+        typeof node[0] === "number" &&
+        node[0] >= -1 &&
+        node[0] <= 3
+      ) {
+        return this.decodeAstroValue(node[1]);
+      }
+      return node.map((x) => this.decodeAstroValue(x));
+    }
+    if (node && typeof node === "object") {
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(node)) out[k] = this.decodeAstroValue(v);
+      return out;
+    }
+    return node;
+  }
+
+  /** فك كيانات HTML الأساسية داخل خاصية attribute */
+  private unescapeAttr(s: string): string {
+    return s
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&");
+  }
+
+  /**
+   * صفحة السلسلة نفسها تحتوي جزيرة Astro فيها الكائن الكامل:
+   * { post: {...العنوان/الوصف/الغلاف/النوع/الحالة/التصنيفات/التقييم/المشاهدات},
+   *   initialChap: [كل الفصول] , totalChapterCount }
+   * أدق من بحث الـ API الذي لا يطابق السلاجات (فواصل عليا وكلمات ناقصة).
+   */
+  private parseSeriesPage(htmlDoc: string, slug: string): SeriesInfo | null {
+    const re = /props="([^"]*)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(htmlDoc))) {
+      const attr = m[1];
+      if (!attr.includes("postTitle") || !attr.includes("initialChap")) continue;
+      try {
+        const obj = this.decodeAstroValue(JSON.parse(this.unescapeAttr(attr)));
+        const post = obj?.post;
+        if (!post || post.slug !== slug) continue;
+        const chapters = (Array.isArray(obj.initialChap) ? obj.initialChap : [])
+          .filter(
+            (c: any) =>
+              c &&
+              Number.isFinite(Number(c.number)) &&
+              c.chapterStatus === "PUBLIC" &&
+              !(Number(c.finalPrice ?? c.price ?? 0) > 0) &&
+              c.isLocked !== true,
+          )
+          .map((c: any) => ({
+            number: Number(c.number),
+            title: c.title || "",
+            url: `${this.baseUrl}/series/${slug}/${c.slug || `chapter-${c.number}`}`,
+            date: c.createdAt || null,
+          }))
+          .sort((a: any, b: any) => a.number - b.number);
+        return {
+          title: post.postTitle || slug,
+          altTitles: Array.isArray(post.alternativeTitles)
+            ? post.alternativeTitles.filter((t: any) => typeof t === "string")
+            : undefined,
+          cover: this.abs(post.featuredImage || "") ?? "",
+          url: `${this.baseUrl}/series/${slug}`,
+          slug,
+          description: post.postContent || undefined,
+          status: post.seriesStatus,
+          type: post.seriesType,
+          rating:
+            obj.averageRating != null
+              ? Number(obj.averageRating)
+              : post.averageRating != null
+                ? Number(post.averageRating)
+                : undefined,
+          views: post.totalViews != null ? Number(post.totalViews) : undefined,
+          isAdult: post.isAdult ?? post.adult ?? undefined,
+          genres: (post.genres || [])
+            .map((g: any) => (typeof g === "string" ? g : g.name))
+            .filter(Boolean),
+          chapters,
+        };
+      } catch {
+        continue; // جزيرة تالفة — جرّب التالية
+      }
+    }
+    return null;
+  }
+
   async getSeries(urlOrSlug: string): Promise<SeriesInfo> {
     const slug = String(urlOrSlug).includes("/series/")
       ? String(urlOrSlug).match(/\/series\/([^/]+)/)?.[1]
       : String(urlOrSlug);
-    // لا يوجد endpoint مباشر للسلسلة — جرّب الـ slug الخام أولاً (يطابق حقل slug
-    // في فهرس المصدر غالباً) ثم ابحث بتقليص كلمات العنوان كـ fallback.
+    if (!slug) throw new Error(`[azorafly] السلسلة غير موجودة: ${slug}`);
+
+    // 1) صفحة السلسلة مباشرة — البيانات الكاملة مضمّنة فيها (الأدق)
+    try {
+      const htmlDoc = await this.getHtml(`/series/${slug}`);
+      const info = this.parseSeriesPage(htmlDoc, slug);
+      if (info) return info;
+    } catch {
+      /* نكمل للبحث كـ fallback */
+    }
+
+    // 2) fallback: بحث الـ API (لا يطابق السلاجات التي بها فواصل عليا)
     let posts: any[] = [];
     try {
-      const direct = await this.queryApi({ searchTerm: slug ?? "", orderBy: "" });
+      const direct = await this.queryApi({ searchTerm: slug, orderBy: "" });
       posts = direct?.posts || [];
     } catch {
       posts = [];
     }
     if (!posts.some((p: any) => p.slug === slug)) {
-      const term = decodeURIComponent(slug || "").replace(/-/g, " ");
+      const term = decodeURIComponent(slug).replace(/-/g, " ");
       const words = term.split(" ").filter(Boolean);
       for (let len = words.length; len >= 2; len--) {
         const data = await this.queryApi({
