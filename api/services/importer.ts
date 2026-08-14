@@ -1,5 +1,14 @@
-import { and, asc, count, eq, isNull, or } from "drizzle-orm";
-import { chapters, manga, sources } from "@db/schema";
+import { and, asc, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  chapters,
+  favorites,
+  follows,
+  manga,
+  notifications,
+  sources,
+  userListItems,
+  userLists,
+} from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getScraper } from "../scrapers";
 import type { BaseScraper, SeriesInfo } from "../scrapers";
@@ -124,8 +133,8 @@ function sanitizeSlug(slug: string, fallback: string): string {
 async function upsertChapters(
   mangaId: number,
   list: SeriesInfo["chapters"],
-): Promise<number> {
-  if (!list.length) return 0;
+): Promise<{ count: number; numbers: number[] }> {
+  if (!list.length) return { count: 0, numbers: [] };
   const db = getDb();
   const existing = await db
     .select({ number: chapters.number, publishedAt: chapters.publishedAt })
@@ -177,7 +186,92 @@ async function upsertChapters(
         ),
       );
   }
-  return fresh.length;
+  return { count: fresh.length, numbers: fresh.map((r) => Number(r.number)) };
+}
+
+/**
+ * إشعارات "فصل جديد" لكل مستخدم لديه المانجا في مفضلته أو متابعاته أو أي قائمة.
+ * يتجنب التكرار: لا يُنشئ إشعاراً ثانياً لنفس (userId, chapterId, type=new_chapter).
+ */
+export async function notifyNewChapters(
+  mangaRow: Pick<typeof manga.$inferSelect, "id" | "title" | "slug">,
+  numbers: number[],
+): Promise<number> {
+  if (!numbers.length) return 0;
+  const db = getDb();
+  const newChapters = await db
+    .select({ id: chapters.id, number: chapters.number })
+    .from(chapters)
+    .where(
+      and(eq(chapters.mangaId, mangaRow.id), inArray(chapters.number, numbers)),
+    );
+  if (!newChapters.length) return 0;
+
+  const [favUsers, folUsers, listUsers] = await Promise.all([
+    db
+      .select({ userId: favorites.userId })
+      .from(favorites)
+      .where(eq(favorites.mangaId, mangaRow.id)),
+    db
+      .select({ userId: follows.userId })
+      .from(follows)
+      .where(eq(follows.mangaId, mangaRow.id)),
+    db
+      .select({ userId: userLists.userId })
+      .from(userListItems)
+      .innerJoin(userLists, eq(userListItems.listId, userLists.id))
+      .where(eq(userListItems.mangaId, mangaRow.id)),
+  ]);
+  const userIds = [
+    ...new Set([
+      ...favUsers.map((r) => r.userId),
+      ...folUsers.map((r) => r.userId),
+      ...listUsers.map((r) => r.userId),
+    ]),
+  ];
+  if (!userIds.length) return 0;
+
+  // فصول موجودة مسبقاً لها إشعارات لهؤلاء المستخدمين (تفادي التكرار)
+  const chapterIds = newChapters.map((c) => c.id);
+  const existing = await db
+    .select({
+      userId: notifications.userId,
+      chapterId: sql<number>`JSON_EXTRACT(${notifications.payload}, '$.chapterId')`,
+    })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.type, "new_chapter"),
+        inArray(notifications.userId, userIds),
+        sql`JSON_EXTRACT(${notifications.payload}, '$.chapterId') IN (${sql.join(
+          chapterIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      ),
+    );
+  const seen = new Set(existing.map((r) => `${r.userId}:${Number(r.chapterId)}`));
+
+  const rows = [];
+  for (const ch of newChapters) {
+    for (const userId of userIds) {
+      if (seen.has(`${userId}:${ch.id}`)) continue;
+      rows.push({
+        userId,
+        type: "new_chapter",
+        payload: {
+          mangaId: mangaRow.id,
+          mangaTitle: mangaRow.title,
+          mangaSlug: mangaRow.slug,
+          chapterId: ch.id,
+          chapterNumber: Number(ch.number),
+        },
+      });
+    }
+  }
+  for (let i = 0; i < rows.length; i += 200) {
+    await db.insert(notifications).values(rows.slice(i, i + 200));
+  }
+  return rows.length;
 }
 
 export interface ImportResult {
@@ -283,7 +377,7 @@ export async function importSeries(
     }
   }
 
-  const chaptersAdded = await upsertChapters(mangaRow.id, info.chapters);
+  const { count: chaptersAdded } = await upsertChapters(mangaRow.id, info.chapters);
   const [[{ total }]] = await Promise.all([
     db.select({ total: count() }).from(chapters).where(eq(chapters.mangaId, mangaRow.id)),
   ]);
@@ -440,7 +534,27 @@ export async function refreshChapters(mangaId: number): Promise<{ chaptersAdded:
   }
 
   const info = await scraper.getSeries(m.sourceUrl);
-  const chaptersAdded = await upsertChapters(m.id, info.chapters);
+  const { count: chaptersAdded, numbers } = await upsertChapters(
+    m.id,
+    info.chapters,
+  );
+  if (numbers.length) {
+    try {
+      const notified = await notifyNewChapters(
+        { id: m.id, title: m.title, slug: m.slug },
+        numbers,
+      );
+      if (notified > 0) {
+        console.log(
+          `[importer] ${m.title}: ${numbers.length} فصل جديد — أُرسل ${notified} إشعار`,
+        );
+      }
+    } catch (e) {
+      console.warn(
+        `[importer] فشل إنشاء إشعارات ${m.id}: ${(e as Error).message}`,
+      );
+    }
+  }
 
   const [{ total }] = await db
     .select({ total: count() })
@@ -510,18 +624,26 @@ export async function fixMissingCovers(
   return { scanned: rows.length, fixed, failed };
 }
 
-/** تحديث كل المانجا — أخطاء كل عنصر تُلتقط بلا إيقاف */
+/**
+ * تحديث دوري للمانجا — دفعة واحدة لكل دورة (الافتراضي 40، REFRESH_BATCH_SIZE)
+ * بالتناوب: الأقدم تحديثاً أولاً، حتى لا نُحمّل المصادر بمئات الطلبات دفعة واحدة.
+ */
 export async function refreshAll(): Promise<{
   total: number;
   updated: number;
   chaptersAdded: number;
   failed: number;
 }> {
+  const batchSize = Math.max(
+    1,
+    parseInt(process.env.REFRESH_BATCH_SIZE || "40", 10) || 40,
+  );
   const db = getDb();
   const all = await db
     .select({ id: manga.id })
     .from(manga)
-    .orderBy(asc(manga.id));
+    .orderBy(asc(manga.updatedAt), asc(manga.id))
+    .limit(batchSize);
   let updated = 0;
   let chaptersAdded = 0;
   let failed = 0;
