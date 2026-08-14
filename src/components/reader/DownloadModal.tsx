@@ -42,13 +42,18 @@ export default function DownloadModal({ open, onClose, slug, chapterNumber }: Do
   return (
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[72] bg-black/45 backdrop-blur-sm"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-[72] flex items-center justify-center overflow-x-hidden p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("تحميل الفصل", "Download chapter")}
+        >
+          <div
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
@@ -56,10 +61,7 @@ export default function DownloadModal({ open, onClose, slug, chapterNumber }: Do
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="glass-strong fixed left-1/2 top-1/2 z-[73] w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl p-5"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("تحميل الفصل", "Download chapter")}
+            className="glass-strong relative w-full max-w-[min(92vw,400px)] max-h-[85dvh] overflow-y-auto rounded-3xl p-5"
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-bold text-app">
@@ -128,7 +130,7 @@ export default function DownloadModal({ open, onClose, slug, chapterNumber }: Do
               </a>
             </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );
