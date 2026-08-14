@@ -122,8 +122,8 @@ export const manga = mysqlTable(
   "manga",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     slug: varchar("slug", { length: 300 }).notNull().unique(),
     title: varchar("title", { length: 500 }).notNull(),
     altTitles: json("altTitles").$type<string[]>(),
@@ -173,8 +173,8 @@ export const chapters = mysqlTable(
   "chapters",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     mangaId: bigint("mangaId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => manga.id),
@@ -183,6 +183,9 @@ export const chapters = mysqlTable(
     url: text("url"),
     pageCount: int("pageCount").default(0).notNull(),
     publishedAt: timestamp("publishedAt"),
+    /** آخر صفحات مُجلوبة بنجاح من المصدر — fallback للقارئ عند تعذّر الجلب اللايف */
+    cachedPages: json("cachedPages").$type<string[]>(),
+    pagesCachedAt: timestamp("pagesCachedAt"),
     hiddenAt: timestamp("hiddenAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
@@ -203,8 +206,8 @@ export const favorites = mysqlTable(
   "favorites",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -227,8 +230,8 @@ export const follows = mysqlTable(
   "follows",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -251,8 +254,8 @@ export const readingProgress = mysqlTable(
   "reading_progress",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -282,8 +285,8 @@ export const comments = mysqlTable(
   "comments",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -309,8 +312,8 @@ export const ratings = mysqlTable(
   "ratings",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => users.id),
@@ -334,8 +337,8 @@ export const requests = mysqlTable(
   "requests",
   {
     id: bigint("id", { mode: "number", unsigned: true })
-    .autoincrement()
-    .primaryKey(),
+      .autoincrement()
+      .primaryKey(),
     userId: bigint("userId", { mode: "number", unsigned: true }).references(
       () => users.id,
     ),
@@ -686,6 +689,12 @@ export type NotificationPayload = {
   messageId?: number;
   fromUsername?: string;
   excerpt?: string;
+  /** new_chapter: إشعار فصل جديد */
+  mangaId?: number;
+  mangaTitle?: string;
+  mangaSlug?: string;
+  chapterId?: number;
+  chapterNumber?: number;
 };
 
 export const notifications = mysqlTable(
