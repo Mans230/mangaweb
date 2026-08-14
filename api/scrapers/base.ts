@@ -106,6 +106,8 @@ export class RateLimiter {
     const job = s.chain.then(async () => {
       const delay = this.min - (Date.now() - s.last);
       if (delay > 0) await sleep(delay);
+      // تأخير عشوائي بسيط حتى لا تبدو الطلبات آلية تماماً
+      await sleep(Math.floor(Math.random() * 400));
       s.last = Date.now();
     });
     // لا تكسر السلسلة لو فشل شيء ما
@@ -134,6 +136,8 @@ export abstract class BaseScraper {
   protected failures = 0;
   protected circuitOpenUntil = 0;
   protected circuitMs: number;
+  /** مدة الدائرة الأساسية — circuitMs الحالية تتضاعف مع كل 429 وتعود للأساسية عند أول نجاح */
+  protected readonly circuitBaseMs: number;
   protected maxRetries: number;
   protected limiter: RateLimiter;
   protected client: AxiosInstance;
@@ -148,6 +152,7 @@ export abstract class BaseScraper {
     this.imageReferer = `${this.baseUrl}/`;
     this.enabled = opts.enabled !== false;
     this.circuitMs = opts.circuitMs || 30 * 60 * 1000; // 30 دقيقة
+    this.circuitBaseMs = this.circuitMs;
     this.maxRetries = opts.maxRetries || 3; // محاولة أولى + إعادتان فعلياً
     this.limiter = new RateLimiter(opts.rateLimitMs ?? 1200);
 
@@ -195,7 +200,7 @@ export abstract class BaseScraper {
       if (this.failures >= 3) {
         this.circuitOpenUntil = Date.now() + this.circuitMs;
         console.error(
-          `[${this.name}] المصدر تعطّل مؤقتاً لمدة 30 دقيقة بعد تكرار الفشل. السبب: ${e.message}`,
+          `[${this.name}] المصدر تعطّل مؤقتاً لمدة ${Math.round(this.circuitMs / 60000)} دقيقة بعد تكرار الفشل. السبب: ${e.message}`,
         );
       }
       throw err;

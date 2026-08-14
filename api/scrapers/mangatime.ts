@@ -37,11 +37,44 @@ export class MangaTimeScraper extends BaseScraper {
     }));
   }
 
+  /** سلاجات المصدر قد تصل مُرمَّزة percent-encoding (روابط منسوبة من المتصفح) — الـ API يتوقع السلاج الخام */
+  private decodeSlug(slug: string): string {
+    try {
+      return decodeURIComponent(slug);
+    } catch {
+      return slug;
+    }
+  }
+
   async getSeries(urlOrSlug: string): Promise<SeriesInfo> {
-    const slug = String(urlOrSlug).includes("/")
-      ? this.slugFromUrl(urlOrSlug)
-      : String(urlOrSlug);
-    const s = await this.trpc("content.getSeriesBySlug", { slug });
+    let slug = this.decodeSlug(
+      String(urlOrSlug).includes("/")
+        ? this.slugFromUrl(urlOrSlug)
+        : String(urlOrSlug),
+    );
+    let s = await this.trpc("content.getSeriesBySlug", { slug }).catch(
+      () => null,
+    );
+    if (!s?.id && !s?.seriesId) {
+      // 404: سلاج غير مطابق — ابحث بالعنوان المستنتج من السلاج واستخدم سلاج النتيجة
+      const query = slug.replace(/[-_]+/g, " ").trim();
+      if (query) {
+        const res = await this.trpc("search.searchSeries", { query }).catch(
+          () => null,
+        );
+        const list = Array.isArray(res)
+          ? res
+          : res?.results || res?.series || [];
+        const hit = list[0];
+        if (hit?.slug) {
+          slug = this.decodeSlug(hit.slug);
+          s = await this.trpc("content.getSeriesBySlug", { slug });
+        }
+      }
+      if (!s?.id && !s?.seriesId) {
+        throw new Error(`[mangatime] السلسلة غير موجودة للسلاج: ${slug}`);
+      }
+    }
     const seriesId = s?.id || s?.seriesId;
     const chapters = seriesId ? await this.fetchChapters(seriesId, slug) : [];
     return {
@@ -76,7 +109,7 @@ export class MangaTimeScraper extends BaseScraper {
 
   async getPages(payload: string): Promise<string[]> {
     const m = String(payload).match(/\/series\/([^/]+)\/chapter[s]?\/(\d+(?:\.\d+)?)/i);
-    const seriesSlug = m?.[1];
+    const seriesSlug = m?.[1] ? this.decodeSlug(m[1]) : undefined;
     const chapterNumber = m ? Number(m[2]) : undefined;
     const res = await this.trpc("content.getChapterPages", { seriesSlug, chapterNumber });
     const pages = Array.isArray(res) ? res : res?.pages || res?.images || [];
