@@ -25,6 +25,7 @@ export const env = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   siteUrl: (process.env.SITE_URL ?? "").replace(/\/$/, ""),
+  smtpUrl: process.env.SMTP_URL ?? "",
 };
 
 if (!env.jwtSecret) {

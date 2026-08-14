@@ -11,6 +11,9 @@ import Footer from "./Footer";
 export default function Layout() {
   const { pathname } = useLocation();
   const isReader = /\/manga\/[^/]+\/chapter\//.test(pathname);
+  // مسارات بلا بار سفلي: القارئ، شات المجتمع، ريلز Fun
+  const hideBottomNav =
+    isReader || pathname.startsWith("/c/") || pathname.startsWith("/fun/reels");
 
   // Lenis smooth scroll site-wide (disabled on the reader page per design)
   useEffect(() => {
@@ -37,7 +40,7 @@ export default function Layout() {
     <div className="flex min-h-[100dvh] flex-col">
       <div className="noise-overlay" aria-hidden />
       <Navbar />
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className={`flex-1 ${hideBottomNav ? "" : "pb-20"} md:pb-0`}>
         <Outlet />
       </main>
       <Footer />

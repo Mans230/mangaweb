@@ -43,6 +43,13 @@
       "when": 1786650538061,
       "tag": "0005_organic_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786652400000,
+      "tag": "0006_reels_sessions_analytics",
+      "breakpoints": true
     }
   ]
 }

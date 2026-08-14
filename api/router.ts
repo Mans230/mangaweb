@@ -9,6 +9,9 @@ import { mangaRouter } from "./mangaRouter";
 import { reportsRouter } from "./reportsRouter";
 import { requestRouter } from "./requestRouter";
 import { importRouter } from "./importRouter";
+import { uploadRouter } from "./uploadRouter";
+import { reelsRouter } from "./reelsRouter";
+import { analyticsRouter } from "./analyticsRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -24,6 +27,9 @@ export const appRouter = createRouter({
   reports: reportsRouter,
   community: communityRouter,
   communities: communitiesRouter,
+  upload: uploadRouter,
+  reels: reelsRouter,
+  analytics: analyticsRouter,
 });
 
 export type AppRouter = typeof appRouter;

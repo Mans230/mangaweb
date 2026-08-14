@@ -16,6 +16,7 @@ const REAL_SOURCES: { name: string; baseUrl: string; status: "active" | "paused"
   { name: "despair", baseUrl: "https://despair-manga.net", status: "active" },
   // محمي بـ Cloudflare — يُفعَّل فقط عند ضبط FLARESOLVERR_URL
   { name: "mangadar", baseUrl: "https://mangadar.com", status: "paused" },
+  { name: "dilar", baseUrl: "https://dilar.tube", status: "active" },
 ];
 
 async function seed() {
