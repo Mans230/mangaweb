@@ -1,8 +1,9 @@
 /**
- * فقاعة رسالة بأسلوب تيليجرام لشات المجتمع:
- * رسائلي جهة اليسار (بتلوين خفيف)، والآخرون جهة اليمين،
- * مع شارة الدور الملونة بجانب الاسم، صورة قابلة للتكبير،
- * وأزرار إشراف (تثبيت/حذف) عند التحويم + زر تبليغ.
+ * سطر رسالة حرّ (بدون بالونة/فقاعة) لشات المجتمع:
+ * أفاتار صغير + اسم المستخدم بخط صغير ملوّن مع الوقت بجانبه،
+ * ثم نص الرسالة مباشرة تحته — بلا خلفية بطاقة أو حدود حول النص.
+ * رسائلي تتميز بتلوين خفيف على الاسم فقط، وأزرار الإشراف تظهر عند التحويم.
+ * الصور تبقى كروت rounded قابلة للتكبير.
  */
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -55,48 +56,37 @@ export default function ChatBubble({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: EASE }}
-      className={`group flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}
+      className="group flex items-start gap-2 px-1 py-0.5"
     >
       <img
         src={avatarSrc(message.user)}
         alt={displayName(message.user)}
         loading="lazy"
-        className="h-8 w-8 shrink-0 rounded-full border border-app object-cover"
+        className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover"
       />
 
-      <div
-        className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 sm:max-w-[65%] ${
-          mine ? "rounded-es-sm border" : "glass rounded-ee-sm"
-        }`}
-        style={
-          mine
-            ? {
-                background: `linear-gradient(135deg, ${color}2E, ${color}14)`,
-                borderColor: `${color}55`,
-              }
-            : undefined
-        }
-      >
-        {/* الاسم + شارة الدور + الوقت + الإجراءات */}
-        <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-app-3">
-          <span className="font-bold text-app-2" dir="ltr">
+      <div className="min-w-0 flex-1">
+        {/* الاسم + شارة الدور + الوقت + الإجراءات — سطر واحد فوق النص */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-app-3">
+          <span
+            className="font-bold"
+            dir="ltr"
+            style={{ color: mine ? color : undefined }}
+          >
             @{displayName(message.user)}
           </span>
           {authorIsOwner ? (
-            <span className="glass-chip !border-warning/40 !px-1.5 !py-0 !text-[9.5px] font-bold text-warning">
+            <span className="flex items-center gap-0.5 text-[9.5px] font-bold text-warning">
               <Crown size={9} />
               {t("المالك", "Owner")}
             </span>
           ) : (
             message.roleName && (
-              <span
-                className="rounded-full px-1.5 py-px text-[9.5px] font-bold"
-                style={{ background: `${color}26`, color }}
-              >
+              <span className="text-[9.5px] font-bold" style={{ color }}>
                 {message.roleName}
               </span>
             )
@@ -145,7 +135,7 @@ export default function ChatBubble({
           <button
             type="button"
             onClick={() => setZoomed(true)}
-            className="mt-2 block overflow-hidden rounded-xl border border-app"
+            className="mt-1.5 block overflow-hidden rounded-xl border border-app"
             aria-label={t("تكبير الصورة", "Zoom image")}
           >
             <img

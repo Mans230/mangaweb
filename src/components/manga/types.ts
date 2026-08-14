@@ -3,7 +3,16 @@
  * البيانات تأتي حصرياً من tRPC (صفوف قاعدة البيانات) — لا بدائل وهمية.
  */
 import type { Lang, MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
-import { STATUS_AR, TYPE_AR, formatViews, isWithin24h, timeAgo } from "@/lib/manga";
+import { STATUS_AR, TYPE_AR, formatViews, timeAgo } from "@/lib/manga";
+
+/** نافذة اعتبار الفصل "جديداً" — ٤٨ ساعة من نزوله */
+const NEW_CHAPTER_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+function isWithinNewWindow(dateLike: Date | string | null | undefined): boolean {
+  if (!dateLike) return false;
+  const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  return Date.now() - d.getTime() < NEW_CHAPTER_WINDOW_MS;
+}
 
 export type { Lang };
 export { timeAgo };
@@ -114,6 +123,7 @@ export function dbMangaToCard(m: DbMangaLike, lang: Lang): MangaCardData {
 }
 
 export function dbChapterToVM(c: DbChapterLike, lang: Lang): ChapterVM {
+  // TODO(backend): publishedAt اختياري — الباكند سيضيفه؛ حتى تسليمه نعتمد createdAt
   const when = c.publishedAt ?? c.createdAt;
   return {
     id: c.id,
@@ -121,7 +131,7 @@ export function dbChapterToVM(c: DbChapterLike, lang: Lang): ChapterVM {
     title: c.title,
     timeAgo: timeAgo(when, lang),
     pageCount: c.pageCount ?? 0,
-    isNew: isWithin24h(when),
+    isNew: isWithinNewWindow(when),
   };
 }
 
