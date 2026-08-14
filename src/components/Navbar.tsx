@@ -9,15 +9,12 @@ import {
   Library,
   LogOut,
   Menu,
-  Moon,
   Search,
-  Send,
-  Sun,
+  Sparkles,
   User,
   UsersRound,
   X,
 } from "lucide-react";
-import { useTheme } from "./ThemeProvider";
 import { useLanguage } from "./LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
@@ -215,8 +212,7 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const { theme, toggleTheme } = useTheme();
-  const { t, toggleLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -232,14 +228,19 @@ export default function Navbar() {
   const accountPath = isAuthenticated ? "/profile" : LOGIN_PATH;
   const bottomNav = [
     { to: "/", ar: "الرئيسية", en: "Home", icon: Home },
-    { to: "/browse", ar: "بحث", en: "Search", icon: Search },
+    { to: "/fun", ar: "Fun", en: "Fun", icon: Sparkles },
     { to: "/library", ar: "مكتبتي", en: "Library", icon: Library },
-    { to: "/request", ar: "الطلبات", en: "Requests", icon: Send },
+    { to: accountPath, ar: "حسابي", en: "Account", icon: User },
     ...(user?.role === "admin"
       ? [{ to: "/admin", ar: "الإدارة", en: "Admin", icon: LayoutDashboard }]
       : []),
-    { to: accountPath, ar: "حسابي", en: "Account", icon: User },
   ];
+
+  // البار السفلي يختفي في: القارئ، شات المجتمع، وريلز Fun
+  const hideBottomNav =
+    /\/manga\/[^/]+\/chapter\//.test(location.pathname) ||
+    location.pathname.startsWith("/c/") ||
+    location.pathname.startsWith("/fun/reels");
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,30 +314,6 @@ export default function Navbar() {
               onClick={() => setSearchOpen((v) => !v)}
             >
               {searchOpen ? <X size={18} /> : <Search size={18} />}
-            </button>
-
-            <button
-              className="btn-icon overflow-hidden"
-              aria-label={t("تبديل المظهر", "Toggle theme")}
-              onClick={toggleTheme}
-            >
-              <motion.span
-                key={theme}
-                initial={{ rotate: -180, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                transition={{ duration: 0.4, ease: EASE }}
-                className="flex"
-              >
-                {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-              </motion.span>
-            </button>
-
-            <button
-              onClick={toggleLanguage}
-              className="glass-chip h-10 items-center !px-3.5 font-semibold"
-              aria-label={t("تغيير اللغة", "Switch language")}
-            >
-              {t("EN", "ع")}
             </button>
 
             <NotificationsBell />
@@ -460,8 +437,9 @@ export default function Navbar() {
         </AnimatePresence>
       </motion.header>
 
-      {/* ===== Mobile bottom nav ===== */}
-      <nav className="glass-strong fixed inset-x-3 bottom-3 z-50 flex items-center justify-between rounded-2xl px-2 py-1.5 lg:hidden">
+      {/* ===== Mobile bottom nav — رفيع (~56px)، يختفي في القارئ وشات المجتمع وريلز Fun ===== */}
+      {!hideBottomNav && (
+      <nav className="glass-strong fixed inset-x-0 bottom-0 z-50 flex h-14 items-center justify-between border-x-0 border-b-0 px-2 lg:hidden">
         {bottomNav.map((item) => {
           const active =
             item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
@@ -480,9 +458,9 @@ export default function Navbar() {
                   transition={{ type: "spring", stiffness: 380, damping: 32 }}
                 />
               )}
-              <Icon size={20} className={`relative z-10 ${active ? "text-primary" : "text-app-3"}`} />
+              <Icon size={19} className={`relative z-10 ${active ? "text-primary" : "text-app-3"}`} />
               <span
-                className={`relative z-10 text-[10.5px] font-medium ${
+                className={`relative z-10 text-[10px] font-medium ${
                   active ? "text-app" : "text-app-3"
                 }`}
               >
@@ -492,6 +470,7 @@ export default function Navbar() {
           );
         })}
       </nav>
+      )}
     </>
   );
 }

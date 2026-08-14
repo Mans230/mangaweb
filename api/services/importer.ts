@@ -86,6 +86,7 @@ const SOURCE_SITE_URLS: Record<string, string> = {
   "3asq": "https://3asq.online",
   despair: "https://despair-manga.net",
   mangadar: "https://mangadar.com",
+  dilar: "https://dilar.tube",
 };
 
 /** أوجد صف المصدر بالاسم أو أنشئه */
