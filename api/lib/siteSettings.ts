@@ -9,6 +9,9 @@ import { getDb } from "../queries/connection";
 
 export const SETTING_COMMUNITY_USER_ENABLED = "community.user_enabled";
 export const SETTING_COMMUNITY_MANGA_ENABLED = "community.manga_enabled";
+/** إخفاء أقسام كاملة من الواجهة (روابط + صفحات) */
+export const SETTING_UI_HIDE_COMMUNITIES = "ui.hide_communities";
+export const SETTING_UI_HIDE_REELS = "ui.hide_reels";
 
 const CACHE_TTL_MS = 30 * 1000;
 
