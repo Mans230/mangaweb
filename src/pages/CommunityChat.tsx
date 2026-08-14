@@ -12,7 +12,6 @@ import {
   LogOut,
   MicOff,
   Pin,
-  Radio,
   Settings,
   UserPlus,
   Users,
@@ -471,12 +470,6 @@ export default function CommunityChat() {
             </AnimatePresence>
           </motion.div>
         )}
-
-        {/* حالة البث */}
-        <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-success">
-          <Radio size={12} className="animate-pulse-soft" />
-          {t("شات مباشر — يتحدّث تلقائياً كل ١٠ ثوانٍ", "Live chat — auto-refreshes every 10s")}
-        </div>
 
         {/* الرسائل */}
         <div
