@@ -162,27 +162,60 @@ export const mangaRouter = createRouter({
           message: "لا يوجد رابط مصدر لهذا الفصل",
         });
       }
+      /** fallback: آخر صفحات مخزنة في القاعدة إن وُجدت (القارئ لا يموت مع المصدر) */
+      const stored = Array.isArray(row.chapter.cachedPages)
+        ? row.chapter.cachedPages.filter(
+            (u): u is string => typeof u === "string" && !!u,
+          )
+        : [];
+      const fromCache = () => {
+        pagesCache.set(input.chapterId, { pages: stored, at: Date.now() });
+        return { pages: stored, cached: true as const };
+      };
+
       const scraper = getScraper(row.source.name);
       if (!scraper || !scraper.enabled) {
+        if (stored.length) return fromCache();
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `المصدر ${row.source.name} غير متاح حالياً`,
         });
       }
-      const pages = await scraper.getPages(row.chapter.url);
+      let pages: string[];
+      try {
+        pages = await scraper.getPages(row.chapter.url);
+      } catch (e) {
+        // circuit breaker / 429 / أي خطأ — ارجع بالنسخة المخزنة إن سبق جلب الفصل
+        if (stored.length) {
+          console.warn(
+            `[manga] getPages لايف فشل للفصل ${input.chapterId}: ${(e as Error).message} — استخدام النسخة المخزنة`,
+          );
+          return fromCache();
+        }
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "تعذّر جلب صفحات هذا الفصل من المصدر",
+        });
+      }
       if (!pages.length) {
+        if (stored.length) return fromCache();
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "تعذّر جلب صفحات هذا الفصل من المصدر",
         });
       }
       pagesCache.set(input.chapterId, { pages, at: Date.now() });
-      if (pages.length !== row.chapter.pageCount) {
-        await db
-          .update(chapters)
-          .set({ pageCount: pages.length })
-          .where(eq(chapters.id, input.chapterId));
-      }
+      // خزّن الصفحات في القاعدة عند كل جلب ناجح (تُحدَّث تلقائياً عند إعادة الجلب)
+      await db
+        .update(chapters)
+        .set({
+          cachedPages: pages,
+          pagesCachedAt: new Date(),
+          ...(pages.length !== row.chapter.pageCount
+            ? { pageCount: pages.length }
+            : {}),
+        })
+        .where(eq(chapters.id, input.chapterId));
       return { pages };
     }),
 
