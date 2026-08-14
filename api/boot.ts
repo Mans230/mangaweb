@@ -13,7 +13,7 @@ import { clientIp } from "./lib/rateLimit";
 import { googleAuthStartHandler, googleCallbackHandler } from "./lib/google";
 import { downloadChapterHandler } from "./lib/download";
 import { Paths } from "@contracts/constants";
-import { BROWSER_UA, imageHostPolicy } from "./scrapers";
+import { BROWSER_UA, imageHostPolicy, getScraper } from "./scrapers";
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB
 
@@ -51,11 +51,31 @@ async function imageProxyHandler(c: Context) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const upstream = await fetch(target.href, {
+    let upstream = await fetch(target.href, {
       headers,
       signal: controller.signal,
       redirect: "follow",
     });
+    // dilar.tube: توكن الصور (?t=) ينتهي خلال دقائق — جدّده وأعد المحاولة مرة واحدة
+    if (
+      !upstream.ok &&
+      (upstream.status === 401 || upstream.status === 403) &&
+      host === "dilar.tube" &&
+      target.pathname.startsWith("/uploads/releases/")
+    ) {
+      const dilar = getScraper("dilar") as unknown as {
+        getFreshMediaToken?: () => Promise<string | null>;
+      };
+      const fresh = await dilar?.getFreshMediaToken?.().catch(() => null);
+      if (fresh) {
+        target.searchParams.set("t", fresh);
+        upstream = await fetch(target.href, {
+          headers,
+          signal: controller.signal,
+          redirect: "follow",
+        });
+      }
+    }
     if (!upstream.ok || !upstream.body) {
       return c.json({ error: `Upstream error ${upstream.status}` }, 502);
     }
