@@ -38,7 +38,7 @@ import {
 } from "@/components/communities/shared";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const POLL_MS = 4000;
+const POLL_MS = 10_000;
 const PAGE = 30;
 const SOUND_KEY = "zeko:comm:sound";
 const joinReqKey = (communityId: number) => `zeko:joinreq:${communityId}`;
@@ -521,7 +521,7 @@ export default function CommunityChat() {
         {/* حالة البث */}
         <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-success">
           <Radio size={12} className="animate-pulse-soft" />
-          {t("شات مباشر — يتحدّث تلقائياً كل ٤ ثوانٍ", "Live chat — auto-refreshes every 4s")}
+          {t("شات مباشر — يتحدّث تلقائياً كل ١٠ ثوانٍ", "Live chat — auto-refreshes every 10s")}
         </div>
 
         {/* الرسائل */}
