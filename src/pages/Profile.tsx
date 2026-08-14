@@ -9,6 +9,7 @@ import CustomizeCard from "@/components/profile/CustomizeCard";
 import Achievements from "@/components/profile/Achievements";
 import LinkedAccounts from "@/components/profile/LinkedAccounts";
 import Preferences from "@/components/profile/Preferences";
+import SessionsCard from "@/components/profile/SessionsCard";
 import DangerZone from "@/components/profile/DangerZone";
 import GuestGate from "@/components/library/GuestGate";
 import { ToastViewport } from "@/components/library/toast";
@@ -21,6 +22,8 @@ export default function Profile() {
 
   // حالة ربط تليجرام تُشتق من بيانات الخادم فقط (user.telegramId) — بلا localStorage
   const telegramLinked = !!user?.telegramId;
+  // المستخدم الذي دخل بجوجل يملك googleId في سجله — نفس مصدر auth.me
+  const googleLinked = Boolean((user as { googleId?: string | null } | null)?.googleId);
 
   // بيانات المكتبة لتغذية الإنجازات — API فقط، بلا بدائل وهمية
   const libraryQ = trpc.library.getLibrary.useQuery(undefined, {
@@ -113,9 +116,12 @@ export default function Profile() {
           <Achievements data={libData} />
           <LinkedAccounts
             email={user?.email ?? null}
+            emailVerified={!!user?.emailVerifiedAt}
             telegramLinked={telegramLinked}
             telegramUsername={user?.telegramUsername ?? null}
+            googleLinked={googleLinked}
           />
+          <SessionsCard />
           <Preferences telegramLinked={telegramLinked} />
           <DangerZone />
         </div>

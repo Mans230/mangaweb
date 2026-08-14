@@ -5,6 +5,7 @@ import { communityMessages, manga, users } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { checkRateLimit, clientIp } from "./lib/rateLimit";
 import { isMangaCommunitiesEnabled } from "./lib/siteSettings";
+import { containsBannedWord } from "./lib/wordFilter";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 
 /** عند تعطيل مجتمعات المانجا تصبح أرشيفاً للقراءة فقط — تُحظر كل الكتابات */
@@ -35,6 +36,12 @@ export const communityRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await assertMangaCommunityWritable();
+      if (await containsBannedWord(input.body)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "الرسالة تحتوي كلمات مخالفة",
+        });
+      }
       if (!checkRateLimit(`community:${clientIp(ctx.req)}`, 10, 60 * 1000)) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
