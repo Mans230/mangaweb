@@ -58,7 +58,13 @@ export async function updateUserProfile(
   patch: Partial<
     Pick<
       InsertUser,
-      "username" | "usernameChangedAt" | "avatarUrl" | "bannerUrl" | "name"
+      | "username"
+      | "usernameChangedAt"
+      | "avatarUrl"
+      | "bannerUrl"
+      | "name"
+      | "notificationsTelegram"
+      | "dnd"
     >
   >,
 ) {

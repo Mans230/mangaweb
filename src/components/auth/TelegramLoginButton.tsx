@@ -18,12 +18,10 @@ export type TelegramAuthPayload = {
 
 type CallbackStore = Record<string, ((user: TelegramAuthPayload) => void) | undefined>;
 
-const ENV_BOT = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined;
-
 let callbackSeq = 0;
 
 interface TelegramLoginButtonProps {
-  /** اسم البوت — الافتراضي من VITE_TELEGRAM_BOT_USERNAME */
+  /** اسم البوت — من auth.providers (الخادم) */
   botUsername?: string | null;
   /** معالج مخصص — الافتراضي: auth.telegramLogin ثم إبطال الكاش */
   onAuth?: (user: TelegramAuthPayload) => void;
@@ -42,7 +40,7 @@ export default function TelegramLoginButton({
   size = "large",
   className,
 }: TelegramLoginButtonProps) {
-  const bot = botUsername ?? ENV_BOT ?? null;
+  const bot = botUsername ?? null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [callbackName] = useState(() => `onTelegramAuth_${++callbackSeq}`);
   const utils = trpc.useUtils();

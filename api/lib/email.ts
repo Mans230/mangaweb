@@ -82,12 +82,16 @@ async function smtpSend(
     await expect(Buffer.from(user).toString("base64"), [334]);
     await expect(Buffer.from(pass).toString("base64"), [235]);
 
-    await expect(`MAIL FROM:<${msg.fromEmail}>`, [250]);
+    // msg.from بصيغة "Name <email>" أو بريد صرف — MAIL FROM يتطلب البريد وحده
+    const fromMatch = msg.from.match(/<([^>]+)>/);
+    const fromEmail = (fromMatch ? fromMatch[1] : msg.from).trim();
+    const fromHeader = msg.from;
+    await expect(`MAIL FROM:<${fromEmail}>`, [250]);
     await expect(`RCPT TO:<${msg.to}>`, [250, 251]);
     await expect("DATA", [354]);
 
     const headers = [
-      `From: ${msg.fromHeader}`,
+      `From: ${fromHeader}`,
       `To: ${msg.to}`,
       `Subject: =?UTF-8?B?${Buffer.from(msg.subject, "utf8").toString("base64")}?=`,
       "MIME-Version: 1.0",

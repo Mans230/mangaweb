@@ -14,7 +14,7 @@ export interface DownloadRecord {
 }
 
 const KEY = "zeko-downloads";
-const MAX_RECORDS = 100;
+const MAX_RECORDS = 50;
 /** حدث مخصص يُبث بعد كل تغيير ليتحدث العرض فوراً ضمن نفس التبويب */
 export const DOWNLOADS_EVENT = "zeko:downloads-changed";
 

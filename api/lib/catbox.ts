@@ -3,16 +3,14 @@
  * POST https://catbox.moe/user/api.php مع reqtype=fileupload و fileToUpload.
  */
 export async function uploadToCatbox(
-  bytes: Uint8Array,
+  bytes: Uint8Array | Blob,
   filename: string,
 ): Promise<string> {
   const form = new FormData();
   form.append("reqtype", "fileupload");
-  form.append(
-    "fileToUpload",
-    new Blob([bytes.buffer as ArrayBuffer]),
-    filename,
-  );
+  const blob =
+    bytes instanceof Blob ? bytes : new Blob([bytes.buffer as ArrayBuffer]);
+  form.append("fileToUpload", blob, filename);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 120_000);

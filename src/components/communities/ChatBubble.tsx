@@ -82,7 +82,7 @@ export default function ChatBubble({
         }
       >
         {/* الاسم + شارة الدور + الوقت + الإجراءات */}
-        <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-app-3">
+        <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-app-3">
           <span className="font-bold text-app-2" dir="ltr">
             @{displayName(message.user)}
           </span>
@@ -137,7 +137,7 @@ export default function ChatBubble({
           </span>
         </div>
 
-        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-app">
+        <p className="whitespace-pre-wrap break-words text-[13px] leading-5 text-app">
           {message.content}
         </p>
 
@@ -152,7 +152,7 @@ export default function ChatBubble({
               src={message.imageUrl}
               alt=""
               loading="lazy"
-              className="max-h-52 max-w-full rounded-xl object-cover transition-transform hover:scale-[1.02]"
+              className="max-h-60 max-w-full rounded-xl object-cover transition-transform hover:scale-[1.02]"
             />
           </button>
         )}

@@ -109,6 +109,17 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+/** سقف 50 عنصراً لكل سجل — يحذف الأقدم (ترتيب الإدراج) لإبقاء التخزين صغيراً */
+const MAX_STORED_ENTRIES = 50;
+function prune<T>(obj: Record<string, T>): Record<string, T> {
+  const keys = Object.keys(obj);
+  if (keys.length <= MAX_STORED_ENTRIES) return obj;
+  const drop = keys.length - MAX_STORED_ENTRIES;
+  const next: Record<string, T> = {};
+  for (const k of keys.slice(drop)) next[k] = obj[k];
+  return next;
+}
+
 export function loadProgress(slug: string): SavedProgress | null {
   const all = readJson<Record<string, SavedProgress>>(PROGRESS_KEY, {});
   return all[slug] ?? null;
@@ -116,8 +127,9 @@ export function loadProgress(slug: string): SavedProgress | null {
 
 export function saveProgress(slug: string, progress: SavedProgress) {
   const all = readJson<Record<string, SavedProgress>>(PROGRESS_KEY, {});
+  delete all[slug]; // إعادة الإدراج تجعله الأحدث
   all[slug] = progress;
-  writeJson(PROGRESS_KEY, all);
+  writeJson(PROGRESS_KEY, prune(all));
 }
 
 export function loadReadSet(slug: string): number[] {
@@ -129,8 +141,9 @@ export function markChapterRead(slug: string, chapter: number) {
   const all = readJson<Record<string, number[]>>(READ_KEY, {});
   const list = new Set(all[slug] ?? []);
   list.add(chapter);
+  delete all[slug];
   all[slug] = [...list];
-  writeJson(READ_KEY, all);
+  writeJson(READ_KEY, prune(all));
 }
 
 export function isChapterBookmarked(slug: string, chapter: number): boolean {
@@ -143,8 +156,9 @@ export function toggleChapterBookmark(slug: string, chapter: number): boolean {
   const list = new Set(all[slug] ?? []);
   if (list.has(chapter)) list.delete(chapter);
   else list.add(chapter);
+  delete all[slug];
   all[slug] = [...list];
-  writeJson(BOOKMARK_KEY, all);
+  writeJson(BOOKMARK_KEY, prune(all));
   return list.has(chapter);
 }
 
@@ -155,8 +169,10 @@ export function loadChapterRating(slug: string, chapter: number): number {
 
 export function saveChapterRating(slug: string, chapter: number, stars: number) {
   const all = readJson<Record<string, number>>(RATE_KEY, {});
-  all[`${slug}:${chapter}`] = stars;
-  writeJson(RATE_KEY, all);
+  const k = `${slug}:${chapter}`;
+  delete all[k];
+  all[k] = stars;
+  writeJson(RATE_KEY, prune(all));
 }
 
 /** ====== Demo pages ====== */
