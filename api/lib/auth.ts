@@ -28,11 +28,18 @@ export function verifySessionToken(token: string): SessionPayload | null {
   }
 }
 
+/** استخراج توكن الجلسة الخام من ترويسات الطلب (cookies) */
+export function sessionTokenFromHeaders(headers: Headers): string | null {
+  const cookies = cookie.parse(headers.get("cookie") || "");
+  return cookies[Session.cookieName] ?? null;
+}
+
+/** يُلحق كوكي الجلسة ويعيد التوكن المُوقَّع (لتسجيله في جدول sessions) */
 export function appendSessionCookie(
   resHeaders: Headers,
   reqHeaders: Headers,
   userId: number,
-) {
+): string {
   const opts = getSessionCookieOptions(reqHeaders);
   const token = signSessionToken({ userId });
   resHeaders.append(
@@ -45,6 +52,7 @@ export function appendSessionCookie(
       maxAge: Session.maxAgeMs / 1000,
     }),
   );
+  return token;
 }
 
 export function appendSessionCookieClear(
