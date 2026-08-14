@@ -97,7 +97,7 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[80] flex items-center justify-center overflow-x-hidden p-4"
           role="dialog"
           aria-modal="true"
           aria-label={t("تحميل المانجا كاملة", "Download full manga")}
@@ -112,7 +112,7 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.94, opacity: 0 }}
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
-            className="glass-strong relative w-full max-w-md rounded-3xl p-6 md:p-7"
+            className="glass-strong relative w-full max-w-[min(92vw,28rem)] max-h-[85dvh] overflow-y-auto rounded-3xl p-6 md:p-7"
           >
             <button
               type="button"

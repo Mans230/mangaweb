@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, LogIn, Send, UserPlus } from "lucide-react";
@@ -6,6 +6,7 @@ import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import PasswordResetHelp from "@/components/auth/PasswordResetHelp";
+import TelegramLoginButton from "@/components/auth/TelegramLoginButton";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as
@@ -105,38 +106,7 @@ export default function Login() {
     registerMutation.isPending ||
     telegramMutation.isPending;
 
-  // Telegram Login Widget — مع كشف الفشل الصامت (سكربت telegram.org قد يكون محجوبًا)
-  const telegramRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!telegramEnabled || !botUsername || !telegramRef.current) {
-      return;
-    }
-    setWidgetFailed(false);
-    window.onTelegramAuth = (user) => telegramMutation.mutate(user);
-    const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.async = true;
-    script.setAttribute("data-telegram-login", botUsername);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-radius", "14");
-    script.setAttribute("data-onauth", "onTelegramAuth(user)");
-    script.setAttribute("data-request-access", "write");
-    script.onerror = () => setWidgetFailed(true);
-    const container = telegramRef.current;
-    container.innerHTML = "";
-    container.appendChild(script);
-    // بعد 5 ثوانٍ: إن لم يُنشأ iframe فالودجت فشل silently → اعرض الزر البديل
-    const timeout = window.setTimeout(() => {
-      if (!container.querySelector("iframe")) {
-        setWidgetFailed(true);
-      }
-    }, 5000);
-    return () => {
-      window.clearTimeout(timeout);
-      delete window.onTelegramAuth;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [telegramEnabled, botUsername, providersQ.isLoading]);
+  // Telegram Login Widget — المكوّن المشترك يكشف الفشل الصامت عبر onWidgetFailed
 
   // معالجة العودة من OAuth تليجرام (?id=...&hash=...&auth_date=...)
   useEffect(() => {
@@ -373,7 +343,11 @@ export default function Login() {
               ) : telegramEnabled ? (
                 <div className="flex w-full flex-col items-center gap-2">
                   {!widgetFailed && botUsername && (
-                    <div ref={telegramRef} className="flex justify-center" />
+                    <TelegramLoginButton
+                      botUsername={botUsername}
+                      onAuth={(u) => telegramMutation.mutate(u)}
+                      onWidgetFailed={() => setWidgetFailed(true)}
+                    />
                   )}
                   {(widgetFailed || !botUsername) && telegramOAuthUrl && (
                     <a
