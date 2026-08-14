@@ -23,6 +23,14 @@ const userCard = {
   avatarUrl: users.avatarUrl,
 } as const;
 
+/** مضيفو الفيديو المقبولون: catbox (مع userhash) أو uguu.se (الاحتياطي التلقائي) */
+const ALLOWED_VIDEO_HOSTS = new Set([
+  "files.catbox.moe",
+  "uguu.se",
+  "d.uguu.se",
+  "www.uguu.se",
+]);
+
 function assertCatboxVideoUrl(url: string) {
   let host = "";
   try {
@@ -30,10 +38,10 @@ function assertCatboxVideoUrl(url: string) {
   } catch {
     host = "";
   }
-  if (host !== "files.catbox.moe") {
+  if (!ALLOWED_VIDEO_HOSTS.has(host)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "رابط الفيديو يجب أن يكون من files.catbox.moe (ارفع عبر upload.uploadVideo)",
+      message: "رابط الفيديو يجب أن يكون مرفوعاً عبر الموقع (upload.uploadVideo)",
     });
   }
 }
