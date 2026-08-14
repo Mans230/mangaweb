@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
-import { Bell, BookOpenCheck, Download, Heart, History, ListChecks } from "lucide-react";
+import { Bell, BookOpenCheck, Download, Heart, History, ListChecks, Send } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
@@ -131,6 +131,17 @@ export default function Library() {
             historyCount={data.history.length}
             catchUpPct={catchUpPct}
           />
+
+          {/* رابط صفحة الطلبات — نُقلت من البار السفلي إلى هنا */}
+          <div className="flex justify-end">
+            <Link
+              to="/request"
+              className="btn-glass !px-4 !py-2 text-xs"
+            >
+              <Send size={13} />
+              {t("طلبات المانجا", "Manga requests")}
+            </Link>
+          </div>
 
           {/* tab bar — قابلة للتمرير أفقياً على الموبايل */}
           <motion.div

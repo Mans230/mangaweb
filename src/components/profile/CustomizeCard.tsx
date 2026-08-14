@@ -14,7 +14,7 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
 import { useToast } from "@/components/library/toast";
-import { CLOUDINARY_ENABLED, uploadToCloudinary } from "@/lib/cloudinary";
+import { useImageUpload, IMAGE_ACCEPT } from "@/lib/upload";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,20}$/;
@@ -178,8 +178,8 @@ function ImageRow({
   const utils = trpc.useUtils();
   const [urlDraft, setUrlDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { upload, uploading } = useImageUpload();
 
   const updateMut = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
@@ -212,17 +212,14 @@ function ImageRow({
       setError(t("اختر ملف صورة", "Pick an image file"));
       return;
     }
-    setUploading(true);
     setError(null);
-    try {
-      const url = await uploadToCloudinary(file);
+    const url = await upload(file);
+    if (url) {
       apply(url);
-    } catch {
+    } else {
       setError(t("فشل رفع الصورة — جرّب مرة أخرى", "Image upload failed — try again"));
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   return (
@@ -292,26 +289,22 @@ function ImageRow({
           <Check size={13} />
           {t("استخدام الرابط", "Use URL")}
         </button>
-        {/* الرفع يظهر فقط عند توفر إعداد Cloudinary */}
-        {CLOUDINARY_ENABLED && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => void onPickFile(e.target.files?.[0])}
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading || updateMut.isPending}
-              className="btn-primary shrink-0 !px-3.5 !py-2 text-xs disabled:opacity-50"
-            >
-              {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-              {uploading ? t("جارٍ الرفع…", "Uploading…") : t("رفع من جهازك", "Upload")}
-            </button>
-          </>
-        )}
+        {/* رفع من الجهاز عبر catbox (jpg/png/webp/gif — 5MB) */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          className="hidden"
+          onChange={(e) => void onPickFile(e.target.files?.[0])}
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || updateMut.isPending}
+          className="btn-primary shrink-0 !px-3.5 !py-2 text-xs disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+          {uploading ? t("جارٍ الرفع…", "Uploading…") : t("رفع من جهازك", "Upload")}
+        </button>
       </div>
       {error && <p className="mt-2 ps-14 text-xs font-semibold text-danger">{error}</p>}
     </div>
