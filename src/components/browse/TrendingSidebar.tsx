@@ -64,6 +64,7 @@ function RankRow({ manga, rank }: { manga: MangaCardData; rank: number }) {
           src={manga.cover}
           alt={manga.title}
           loading="lazy"
+          decoding="async"
           className="h-[60px] w-10 shrink-0 rounded-lg object-cover"
         />
         <div className="min-w-0 flex-1">
@@ -91,6 +92,7 @@ function FreshRow({ item }: { item: LatestChapterData }) {
         src={item.cover}
         alt={item.mangaTitle}
         loading="lazy"
+        decoding="async"
         className="h-[60px] w-10 shrink-0 rounded-lg object-cover"
       />
       <div className="min-w-0 flex-1">
@@ -208,6 +210,7 @@ export function TrendingRail() {
               src={m.cover}
               alt={m.title}
               loading="lazy"
+              decoding="async"
               className="h-14 w-10 shrink-0 rounded-lg object-cover"
             />
             <span className="min-w-0 flex-1 truncate text-xs font-bold text-app">{m.title}</span>

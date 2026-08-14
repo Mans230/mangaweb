@@ -17,7 +17,8 @@ export type SourceName =
   | "rocksmanga"
   | "3asq"
   | "despair-manga"
-  | "mangadar";
+  | "mangadar"
+  | "dilar";
 
 /** شكل بطاقة المانجا الذي تتوقعه MangaCard ومشتقاتها */
 export interface MangaCardData {
@@ -121,6 +122,7 @@ const SOURCE_DOMAIN_TOKENS: { token: string; source: SourceName }[] = [
   { token: "3asq", source: "3asq" },
   { token: "despair", source: "despair-manga" },
   { token: "mangadar", source: "mangadar" },
+  { token: "dilar", source: "dilar" },
 ];
 
 /** كشف المصدر تلقائياً من رابط — يعيد اسم المصدر أو null إن كان غير مدعوم */
