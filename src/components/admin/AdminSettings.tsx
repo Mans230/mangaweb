@@ -1,0 +1,279 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Construction,
+  Loader2,
+  Save,
+  ScrollText,
+  ShieldBan,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import ErrorState from "@/components/ErrorState";
+import { useLanguage } from "@/components/LanguageProvider";
+import { trpc } from "@/providers/trpc";
+import { timeAgo } from "@/lib/manga";
+import { EASE } from "./adminUtils";
+import { useAdminToast } from "./AdminToast";
+
+const LOGS_PAGE_SIZE = 20;
+
+/* ================= فلتر الكلمات ================= */
+function BannedWordsCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const query = trpc.admin.getBannedWords.useQuery(undefined, { retry: false });
+  // null = لم يعدّل المستخدم بعد → نعرض قيمة السيرفر
+  const [edited, setEdited] = useState<string | null>(null);
+  const text = edited ?? (query.data?.words.join("\n") ?? "");
+  const setText = (v: string) => setEdited(v);
+
+  const save = trpc.admin.setBannedWords.useMutation({
+    onSuccess: (res) => {
+      toast(t(`تم حفظ ${res.count} كلمة`, `Saved ${res.count} words`));
+      query.refetch();
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+
+  const wordsCount = text.split("\n").map((w) => w.trim()).filter(Boolean).length;
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-1 flex items-center gap-2 text-sm font-bold text-app">
+        <ShieldBan size={16} className="text-danger" />
+        {t("فلتر الكلمات المحظورة", "Banned words filter")}
+      </h3>
+      <p className="mb-3 text-xs text-app-3">
+        {t("كلمة واحدة في كل سطر. تُطبَّق على التعليقات والمحتوى المُنشأ من المستخدمين.", "One word per line. Applied to comments and user-generated content.")}
+      </p>
+      {query.isLoading ? (
+        <div className="skeleton h-44" />
+      ) : query.isError ? (
+        <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+      ) : (
+        <>
+          <textarea
+            rows={10}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t("اكتب كل كلمة في سطر…", "One word per line…")}
+            className="input-glass w-full resize-y text-sm leading-7"
+          />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-xs tabular-nums text-app-3">
+              {wordsCount} {t("كلمة", "words")}
+            </span>
+            <button
+              disabled={save.isPending}
+              onClick={() =>
+                save.mutate({
+                  words: [...new Set(text.split("\n").map((w) => w.trim()).filter(Boolean))],
+                })
+              }
+              className="btn-primary !px-5 !py-2.5 text-sm disabled:opacity-50"
+            >
+              {save.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {t("حفظ", "Save")}
+            </button>
+          </div>
+        </>
+      )}
+    </motion.section>
+  );
+}
+
+/* ================= وضع الصيانة ================= */
+function MaintenanceCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const query = trpc.admin.getMaintenance.useQuery(undefined, { retry: false });
+  // null = لم يعدّل المستخدم بعد → نعرض قيمة السيرفر
+  const [editedEnabled, setEditedEnabled] = useState<boolean | null>(null);
+  const [editedMessage, setEditedMessage] = useState<string | null>(null);
+  const enabled = editedEnabled ?? query.data?.enabled ?? false;
+  const message = editedMessage ?? query.data?.message ?? "";
+  const setEnabled = (v: boolean) => setEditedEnabled(v);
+  const setMessage = (v: string) => setEditedMessage(v);
+
+  const save = trpc.admin.setMaintenance.useMutation({
+    onSuccess: () => {
+      toast(t("تم حفظ إعدادات الصيانة", "Maintenance settings saved"));
+      query.refetch();
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.08 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <Construction size={16} className="text-warning" />
+        {t("وضع الصيانة", "Maintenance mode")}
+      </h3>
+      {query.isLoading ? (
+        <div className="skeleton h-32" />
+      ) : query.isError ? (
+        <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+      ) : (
+        <div className="space-y-3">
+          <div className="glass flex items-center justify-between !rounded-2xl p-3.5">
+            <span className="text-sm font-semibold text-app">
+              {enabled ? t("الصيانة مفعّلة — الموقع مغلق للزوار", "Maintenance ON — site closed") : t("الصيانة متوقفة — الموقع يعمل", "Maintenance OFF — site live")}
+            </span>
+            <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-app-2">
+              {t("رسالة الصيانة", "Maintenance message")}
+            </label>
+            <textarea
+              rows={3}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={t("نعود إليكم قريباً…", "We'll be back soon…")}
+              className="input-glass w-full resize-none text-sm"
+            />
+          </div>
+
+          {/* معاينة */}
+          {enabled && (
+            <div className="rounded-2xl border border-dashed border-warning/50 bg-warning/5 p-4 text-center">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-warning">
+                {t("معاينة", "Preview")}
+              </span>
+              <div className="mt-2 flex flex-col items-center gap-2">
+                <Construction size={26} className="text-warning" />
+                <p className="font-display text-base font-bold text-app">
+                  {t("المنصة تحت الصيانة", "Under maintenance")}
+                </p>
+                <p className="text-sm text-app-2">
+                  {message.trim() || t("نعود إليكم قريباً…", "We'll be back soon…")}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              disabled={save.isPending}
+              onClick={() => save.mutate({ enabled, message: message.trim() || undefined })}
+              className="btn-primary !px-5 !py-2.5 text-sm disabled:opacity-50"
+            >
+              {save.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {t("حفظ", "Save")}
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
+/* ================= سجل الأدمن ================= */
+function AdminLogsCard() {
+  const { t } = useLanguage();
+  const [page, setPage] = useState(1);
+  const query = trpc.admin.adminLogs.useQuery(
+    { page, limit: LOGS_PAGE_SIZE },
+    { retry: false, placeholderData: (prev) => prev },
+  );
+  const totalPages = Math.max(1, Math.ceil((query.data?.total ?? 0) / LOGS_PAGE_SIZE));
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <ScrollText size={16} className="text-accent-2" />
+        {t("سجل عمليات الأدمن", "Admin activity log")}
+      </h3>
+      {query.isLoading ? (
+        <div className="space-y-2">{[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-11" />)}</div>
+      ) : query.isError ? (
+        <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+      ) : (query.data?.items ?? []).length === 0 ? (
+        <p className="py-8 text-center text-sm text-app-3">
+          {t("لا عمليات مسجّلة بعد", "No logged actions yet")}
+        </p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
+              <thead>
+                <tr className="border-b border-app text-xs text-app-3">
+                  <th className="p-2.5 text-start font-semibold">{t("العملية", "Action")}</th>
+                  <th className="p-2.5 text-start font-semibold">{t("الهدف", "Target")}</th>
+                  <th className="p-2.5 text-start font-semibold">{t("الأدمن", "Admin")}</th>
+                  <th className="p-2.5 text-start font-semibold">{t("الوقت", "Time")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {query.data!.items.map((log) => (
+                  <tr key={log.id} className="border-b border-app/50 last:border-0">
+                    <td className="p-2.5">
+                      <span className="glass-chip !px-2.5 !py-1 !text-[11px] font-semibold" dir="ltr">
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="p-2.5 text-xs text-app-2">
+                      {log.targetType ? (
+                        <span dir="ltr">
+                          {log.targetType}
+                          {log.targetId ? ` #${log.targetId}` : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="p-2.5 text-xs text-app-2">
+                      {log.admin.name}
+                      <span className="text-app-3" dir="ltr"> @{log.admin.username}</span>
+                    </td>
+                    <td className="whitespace-nowrap p-2.5 text-xs text-app-3">
+                      {timeAgo(log.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-3">
+              <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="btn-icon !h-8 !w-8 disabled:opacity-40" aria-label={t("السابق", "Prev")}>
+                <ChevronRight size={15} />
+              </button>
+              <span className="text-xs tabular-nums text-app-2">{page} / {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="btn-icon !h-8 !w-8 disabled:opacity-40" aria-label={t("التالي", "Next")}>
+                <ChevronLeft size={15} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </motion.section>
+  );
+}
+
+export default function AdminSettings() {
+  return (
+    <div className="space-y-4">
+      <BannedWordsCard />
+      <MaintenanceCard />
+      <AdminLogsCard />
+    </div>
+  );
+}

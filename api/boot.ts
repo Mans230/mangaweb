@@ -126,7 +126,8 @@ app.use("*", async (c, next) => {
   c.res.headers.delete("x-powered-by");
 });
 
-app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+// 280MB لاستيعاب رفع الفيديو base64 (حد 200MB خام)
+app.use(bodyLimit({ maxSize: 280 * 1024 * 1024 }));
 
 // فرض حظر الـ IP على كل /api/* (كاش 60 ثانية)
 app.use("/api/*", async (c, next) => {
@@ -143,6 +144,45 @@ app.post(Paths.linkVerify, linkVerifyHandler());
 app.post("/api/auth/telegram-reset", telegramResetHandler());
 app.get("/api/download/:slug/chapter/:num", downloadChapterHandler);
 app.get("/api/img", imageProxyHandler);
+// وضع الصيانة: غير الأدمن يحصل على MAINTENANCE لكل tRPC ما عدا auth.me/ping/admin.*
+app.use("/api/trpc/*", async (c, next) => {
+  const { getSetting } = await import("./lib/siteSettings");
+  const mode = await getSetting("maintenance_mode", "0");
+  if (mode !== "1") return next();
+
+  const procs = c.req.path
+    .replace(/^\/api\/trpc\//, "")
+    .split("/")[0]
+    .split(",")
+    .filter(Boolean);
+  const allowed = (p: string) =>
+    p === "ping" ||
+    p === "auth.me" ||
+    p === "auth.login" ||
+    p === "auth.telegramLogin" ||
+    p.startsWith("admin.");
+  if (procs.length && procs.every(allowed)) return next();
+
+  try {
+    const { authenticateRequest } = await import("./lib/auth");
+    const user = await authenticateRequest(c.req.raw.headers);
+    if (user.role === "admin") return next();
+  } catch {
+    /* غير مسجل أو جلسة منتهية */
+  }
+
+  const message = await getSetting("maintenance_message", "");
+  return c.json(
+    {
+      error: {
+        code: "MAINTENANCE",
+        message: message || "الموقع تحت الصيانة حالياً — عود لاحقاً",
+      },
+    },
+    503,
+  );
+});
+
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",

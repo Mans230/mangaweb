@@ -5,12 +5,15 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import { useToast } from "@/components/library/toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const AGE_KEY = "zeko-age-confirmed";
 const UNBLUR_KEY = "zeko-adult-unblur";
 const QUALITY_KEY = "zeko-image-quality";
 const READMODE_KEY = "zeko-reading-mode";
+const TG_NOTIF_KEY = "zeko-notifications-telegram";
+const DND_KEY = "zeko-dnd";
 
 interface PreferencesProps {
   telegramLinked: boolean;
@@ -20,11 +23,21 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
   const { t, lang, toggleLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const { user } = useAuth();
+  // القيم الابتدائية من الخادم إن توفّرت، وإلا من التخزين المحلي
+  // (auth.updateProfile لا يقبل الحقلين بعد — يُحفظان محلياً حتى يدعمهما)
+  const serverTgNotif = (user as { notificationsTelegram?: boolean | null } | null)?.notificationsTelegram;
+  const serverDnd = (user as { dnd?: boolean | null } | null)?.dnd;
 
   const [adult, setAdult] = useState(isAgeConfirmed);
   const [gateOpen, setGateOpen] = useState(false);
   const [unblur, setUnblur] = useState(() => window.localStorage.getItem(UNBLUR_KEY) === "1");
-  const [notif, setNotif] = useState(false);
+  const [notif, setNotif] = useState(
+    () => serverTgNotif ?? window.localStorage.getItem(TG_NOTIF_KEY) === "1",
+  );
+  const [dnd, setDnd] = useState(
+    () => serverDnd ?? window.localStorage.getItem(DND_KEY) === "1",
+  );
   const [quality, setQuality] = useState(() => window.localStorage.getItem(QUALITY_KEY) ?? "auto");
   const [readMode, setReadMode] = useState(() => window.localStorage.getItem(READMODE_KEY) ?? "webtoon");
 
@@ -152,8 +165,25 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
             disabled={!telegramLinked}
             onChange={(v) => {
               setNotif(v);
-              // TODO(api): حفظ تفضيل الإشعارات على الخادم
-              toast(v ? t("فُعّلت الإشعارات", "Notifications enabled") : t("عُطّلت الإشعارات", "Notifications disabled"));
+              window.localStorage.setItem(TG_NOTIF_KEY, v ? "1" : "0");
+              toast(v ? t("فُعّلت إشعارات تليجرام", "Telegram notifications enabled") : t("عُطّلت إشعارات تليجرام", "Telegram notifications disabled"));
+            }}
+          />
+        </PrefRow>
+
+        {/* عدم الإزعاج */}
+        <PrefRow
+          icon={Moon}
+          title={t("عدم الإزعاج", "Do not disturb")}
+          desc={t("يوقف كل إشعارات تليجرام مؤقتاً.", "Temporarily mutes all Telegram notifications.")}
+        >
+          <Toggle
+            checked={dnd && telegramLinked}
+            disabled={!telegramLinked}
+            onChange={(v) => {
+              setDnd(v);
+              window.localStorage.setItem(DND_KEY, v ? "1" : "0");
+              toast(v ? t("فُعّل عدم الإزعاج", "Do not disturb enabled") : t("عُطّل عدم الإزعاج", "Do not disturb disabled"));
             }}
           />
         </PrefRow>
