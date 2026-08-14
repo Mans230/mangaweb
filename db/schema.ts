@@ -27,7 +27,13 @@ export const users = mysqlTable("users", {
   bannerUrl: text("bannerUrl"),
   telegramId: varchar("telegramId", { length: 64 }).unique(),
   telegramUsername: varchar("telegramUsername", { length: 64 }),
+  telegramPhotoUrl: text("telegramPhotoUrl"),
   googleId: varchar("googleId", { length: 255 }).unique(),
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
+  notificationsTelegram: boolean("notificationsTelegram")
+    .default(false)
+    .notNull(),
+  dnd: boolean("dnd").default(false).notNull(),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
@@ -51,6 +57,48 @@ export const linkCodes = mysqlTable("link_codes", {
 
 export type LinkCode = typeof linkCodes.$inferSelect;
 export type InsertLinkCode = typeof linkCodes.$inferInsert;
+
+export const sessions = mysqlTable(
+  "sessions",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: varchar("token", { length: 512 }).notNull().unique(),
+    userAgent: varchar("userAgent", { length: 500 }),
+    ip: varchar("ip", { length: 45 }),
+    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("sessions_user_idx").on(table.userId),
+  }),
+);
+
+export type SessionRow = typeof sessions.$inferSelect;
+export type InsertSession = typeof sessions.$inferInsert;
+
+export const emailCodes = mysqlTable(
+  "email_codes",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 6 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("email_codes_user_idx").on(table.userId),
+  }),
+);
+
+export type EmailCode = typeof emailCodes.$inferSelect;
 
 // ================= zeko-manga tables =================
 
@@ -102,6 +150,9 @@ export const manga = mysqlTable(
       .notNull()
       .references(() => sources.id),
     sourceUrl: text("sourceUrl"),
+    hiddenAt: timestamp("hiddenAt"),
+    featuredAt: timestamp("featuredAt"),
+    coverOverrideUrl: text("coverOverrideUrl"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
       .defaultNow()
@@ -132,6 +183,7 @@ export const chapters = mysqlTable(
     url: text("url"),
     pageCount: int("pageCount").default(0).notNull(),
     publishedAt: timestamp("publishedAt"),
+    hiddenAt: timestamp("hiddenAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({
@@ -660,3 +712,147 @@ export const notifications = mysqlTable(
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+// ================= الريلز =================
+
+export const reels = mysqlTable(
+  "reels",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    videoUrl: text("videoUrl").notNull(),
+    caption: varchar("caption", { length: 300 }),
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true }).references(
+      () => manga.id,
+      { onDelete: "set null" },
+    ),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"])
+      .default("pending")
+      .notNull(),
+    rejectReason: text("rejectReason"),
+    likesCount: int("likesCount").default(0).notNull(),
+    viewsCount: int("viewsCount").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("reels_status_idx").on(table.status),
+    userIdx: index("reels_user_idx").on(table.userId),
+  }),
+);
+
+export type Reel = typeof reels.$inferSelect;
+export type InsertReel = typeof reels.$inferInsert;
+
+export const reelLikes = mysqlTable(
+  "reel_likes",
+  {
+    reelId: bigint("reelId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => reels.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.reelId, table.userId] }),
+  }),
+);
+
+export type ReelLike = typeof reelLikes.$inferSelect;
+
+export const reelComments = mysqlTable(
+  "reel_comments",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    reelId: bigint("reelId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => reels.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: varchar("content", { length: 500 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    reelIdx: index("reel_comments_reel_idx").on(table.reelId, table.id),
+  }),
+);
+
+export type ReelComment = typeof reelComments.$inferSelect;
+
+// ================= التحليلات وسجلات الأدمن =================
+
+export const pageViews = mysqlTable(
+  "page_views",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    path: varchar("path", { length: 300 }).notNull(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
+    ipHash: varchar("ipHash", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    createdIdx: index("page_views_created_idx").on(table.createdAt),
+  }),
+);
+
+export type PageView = typeof pageViews.$inferSelect;
+
+export const adminLogs = mysqlTable(
+  "admin_logs",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    adminId: bigint("adminId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 100 }).notNull(),
+    targetType: varchar("targetType", { length: 50 }),
+    targetId: varchar("targetId", { length: 100 }),
+    meta: json("meta"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    createdIdx: index("admin_logs_created_idx").on(table.createdAt),
+  }),
+);
+
+export type AdminLog = typeof adminLogs.$inferSelect;
+export type InsertAdminLog = typeof adminLogs.$inferInsert;
+
+export const updateRequests = mysqlTable(
+  "update_requests",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => manga.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: mysqlEnum("status", ["pending", "resolved"])
+      .default("pending")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("update_requests_status_idx").on(table.status),
+  }),
+);
+
+export type UpdateRequest = typeof updateRequests.$inferSelect;

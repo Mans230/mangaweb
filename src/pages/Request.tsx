@@ -298,7 +298,7 @@ function RequestForm() {
                             to={`/manga/${m.slug}`}
                             className="flex items-center gap-3 rounded-xl px-3 py-2 transition-colors hover:bg-primary-soft/15"
                           >
-                            <img src={m.cover} alt="" className="h-12 w-8 rounded-md object-cover" />
+                            <img src={m.cover} alt="" loading="lazy" decoding="async" className="h-12 w-8 rounded-md object-cover" />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-app">{m.title}</span>
                               <span className="block text-xs text-app-3">{m.type} · {m.chapters} {t("فصل", "chapters")}</span>
