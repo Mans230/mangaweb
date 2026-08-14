@@ -132,13 +132,26 @@ export default function InfoCard({
       : (vm.chapters[vm.chapters.length - 1]?.number ?? 1);
 
   const share = async () => {
+    const url = window.location.href;
+    const nav = navigator as Navigator & {
+      share?: (d: { title: string; text?: string; url: string }) => Promise<void>;
+    };
+    // Web Share API أولاً (الموبايل)، ثم نسخ الرابط كبديل
+    if (nav.share) {
+      try {
+        await nav.share({ title: vm.title, text: vm.synopsis?.slice(0, 120) || undefined, url });
+        return;
+      } catch {
+        // ألغى المستخدم المشاركة أو غير مدعومة — نكمل للنسخ
+      }
+    }
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(url);
+      setShareToast(true);
+      window.setTimeout(() => setShareToast(false), 1800);
     } catch {
       // clipboard غير متاح — لا شيء
     }
-    setShareToast(true);
-    window.setTimeout(() => setShareToast(false), 1800);
   };
 
   const handleToggleFavorite = () => {

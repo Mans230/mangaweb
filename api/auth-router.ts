@@ -5,7 +5,18 @@ import { env } from "./lib/env";
 import {
   appendSessionCookie,
   appendSessionCookieClear,
+  sessionTokenFromHeaders,
 } from "./lib/auth";
+import {
+  deleteSessionByToken,
+  listUserSessions,
+  recordSession,
+  revokeUserSession,
+} from "./lib/sessions";
+import { sendEmail } from "./lib/email";
+import { emailCodes, users } from "@db/schema";
+import { and, eq, gt } from "drizzle-orm";
+import { getDb } from "./queries/connection";
 import { createLinkCode } from "./lib/linkCodes";
 import { verifyTelegramAuth } from "./lib/telegram";
 import {
@@ -83,9 +94,95 @@ export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
 
   logout: authedQuery.mutation(async ({ ctx }) => {
+    const token = sessionTokenFromHeaders(ctx.req.headers);
+    if (token) {
+      await deleteSessionByToken(token).catch(() => {});
+    }
     appendSessionCookieClear(ctx.resHeaders, ctx.req.headers);
     return { success: true };
   }),
+
+  /** قائمة جلسات المستخدم الحالية (الأحدث نشاطاً أولاً) */
+  sessions: authedQuery.query(async ({ ctx }) => {
+    const token = sessionTokenFromHeaders(ctx.req.headers) ?? undefined;
+    return listUserSessions(Number(ctx.user.id), token);
+  }),
+
+  /** إلغاء جلسة يملكها المستخدم الحالي */
+  revokeSession: authedQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const ok = await revokeUserSession(Number(ctx.user.id), input.id);
+      if (!ok) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "الجلسة غير موجودة" });
+      }
+      return { success: true };
+    }),
+
+  /**
+   * إرسال كود توثيق إيميل (6 أرقام، صالح 10 دقائق).
+   * الإرسال الفعلي عبر SMTP لو توفّر SMTP_URL، وإلا يُسجَّل في اللوج
+   * ويُعاد الكود كـ devCode في وضع غير production.
+   */
+  sendEmailCode: authedQuery.mutation(async ({ ctx }) => {
+    assertAuthRateLimit("sendEmailCode", ctx.req);
+    const email = ctx.user.email;
+    if (!email) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لا يوجد بريد إلكتروني مرتبط بهذا الحساب",
+      });
+    }
+    if (ctx.user.emailVerifiedAt) {
+      return { success: true, alreadyVerified: true };
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const db = getDb();
+    await db.delete(emailCodes).where(eq(emailCodes.userId, ctx.user.id));
+    await db.insert(emailCodes).values({
+      userId: ctx.user.id,
+      code,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    });
+    const sent = await sendEmail(
+      email,
+      "كود توثيق البريد — Zeko",
+      `كود التوثيق الخاص بك: ${code}\nصالح لمدة 10 دقائق.`,
+    );
+    return {
+      success: true,
+      alreadyVerified: false,
+      sent,
+      ...(env.isProduction ? {} : { devCode: sent ? undefined : code }),
+    };
+  }),
+
+  /** التحقق من كود البريد وتعليم emailVerifiedAt */
+  verifyEmail: authedQuery
+    .input(z.object({ code: z.string().trim().regex(/^\d{6}$/) }))
+    .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("verifyEmail", ctx.req);
+      const db = getDb();
+      const row = await db.query.emailCodes.findFirst({
+        where: and(
+          eq(emailCodes.userId, ctx.user.id),
+          eq(emailCodes.code, input.code),
+          gt(emailCodes.expiresAt, new Date()),
+        ),
+      });
+      if (!row) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "الكود غير صحيح أو منتهي الصلاحية",
+        });
+      }
+      await db.delete(emailCodes).where(eq(emailCodes.userId, ctx.user.id));
+      await db
+        .update(users)
+        .set({ emailVerifiedAt: new Date() })
+        .where(eq(users.id, ctx.user.id));
+      return { success: true };
+    }),
 
   /**
    * تحديث البروفايل: username (3-20 حرفاً، فريد، مرة كل 30 يوماً)
@@ -174,7 +271,12 @@ export const authRouter = createRouter({
         throw err;
       }
 
-      appendSessionCookie(ctx.resHeaders, ctx.req.headers, Number(user.id));
+      const regToken = appendSessionCookie(
+        ctx.resHeaders,
+        ctx.req.headers,
+        Number(user.id),
+      );
+      await recordSession(Number(user.id), regToken, ctx.req);
       return { success: true, user: { ...user, passwordHash: null } };
     }),
 
@@ -233,6 +335,45 @@ export const authRouter = createRouter({
       }
 
       const telegramId = String(input.id);
+
+      // لو فيه مستخدم مسجّل دخوله حالياً: ربط الحساب بدل إنشاء/تسجيل دخول جديد
+      if (ctx.user) {
+        const userId = Number(ctx.user.id);
+        if (ctx.user.telegramId && ctx.user.telegramId !== telegramId) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "هذا الحساب مربوط بحساب تيليجرام آخر، ألغِ الربط الحالي أولاً",
+          });
+        }
+        const takenBy = await findUserByTelegramId(telegramId);
+        if (takenBy && Number(takenBy.id) !== userId) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "حساب تيليجرام هذا مربوط بحساب آخر",
+          });
+        }
+        try {
+          await linkTelegramToUser(
+            userId,
+            telegramId,
+            input.username,
+            input.photo_url,
+          );
+        } catch (err) {
+          if (isDuplicateEntry(err)) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "حساب تيليجرام هذا مربوط بحساب آخر",
+            });
+          }
+          throw err;
+        }
+        if (!ctx.user.avatarUrl && input.photo_url) {
+          await updateUserProfile(userId, { avatarUrl: input.photo_url });
+        }
+        return { success: true, linked: true };
+      }
+
       let user = await findUserByTelegramId(telegramId);
       if (user?.bannedAt) {
         throw new TRPCError({
@@ -266,6 +407,15 @@ export const authRouter = createRouter({
             avatarUrl: input.photo_url,
           });
           user = { ...user, avatarUrl: input.photo_url };
+        }
+        if (input.photo_url && user.telegramPhotoUrl !== input.photo_url) {
+          await getDb()
+            .update(users)
+            .set({
+              telegramPhotoUrl: input.photo_url,
+              telegramUsername: input.username ?? user.telegramUsername,
+            })
+            .where(eq(users.id, user.id));
         }
       }
 
