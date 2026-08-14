@@ -7,11 +7,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import PasswordResetHelp from "@/components/auth/PasswordResetHelp";
 import TelegramLoginButton from "@/components/auth/TelegramLoginButton";
+import { ToastViewport, useToast } from "@/components/library/toast";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as
-  | string
-  | undefined;
 
 type TelegramAuthPayload = {
   id: number;
@@ -45,22 +43,23 @@ export default function Login() {
   const [widgetFailed, setWidgetFailed] = useState(false);
   const [resetHelpOpen, setResetHelpOpen] = useState(false);
   const { t } = useLanguage();
+  const { toast } = useToast();
 
   const providersQ = trpc.auth.providers.useQuery(undefined, {
     staleTime: Infinity,
     retry: false,
   });
   const googleEnabled = providersQ.data?.google ?? false;
-  // عقد الباكند المتوازي يضيف telegramBotUsername/telegramBotId — نقرؤها بتساهل حتى تُنفَّذ
+  // اسم البوت يُقرأ من الخادم فقط (auth.providers) — لا اعتماد على متغيرات build-time
   const providers = providersQ.data as
     | {
         telegramBotUsername?: string | null;
         telegramBotId?: string | null;
       }
     | undefined;
-  const botUsername =
-    providers?.telegramBotUsername ?? TELEGRAM_BOT_USERNAME ?? null;
+  const botUsername = providers?.telegramBotUsername ?? null;
   const botId = providers?.telegramBotId ?? null;
+  // لا نخفي الزر أثناء تحميل providers — نعرض skeleton حتى تصل الإجابة
   const telegramEnabled = providersQ.data?.telegram ?? true;
   const telegramOAuthUrl = botId
     ? `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(
@@ -69,6 +68,8 @@ export default function Login() {
         window.location.origin + "/login",
       )}`
     : null;
+  // فولباك دائم متاح طالما اسم البوت معروف — يفتح محادثة البوت مباشرة
+  const telegramFallbackUrl = botUsername ? `https://t.me/${botUsername}` : null;
 
   const onSuccess = async () => {
     setFormError(null);
@@ -98,7 +99,13 @@ export default function Login() {
   });
   const telegramMutation = trpc.auth.telegramLogin.useMutation({
     onSuccess,
-    onError: (e) => onError(e.message),
+    onError: (e) => {
+      onError(e.message);
+      toast(t(
+        "تعذر تسجيل الدخول عبر تليجرام — تأكد أن البوت مفعّل أو جرّب طريقة أخرى",
+        "Could not sign in with Telegram — make sure the bot is enabled or try another method",
+      ), { kind: "info" });
+    },
   });
 
   const busy =
@@ -349,9 +356,9 @@ export default function Login() {
                       onWidgetFailed={() => setWidgetFailed(true)}
                     />
                   )}
-                  {(widgetFailed || !botUsername) && telegramOAuthUrl && (
+                  {(widgetFailed || !botUsername) && (telegramOAuthUrl ?? telegramFallbackUrl) && (
                     <a
-                      href={telegramOAuthUrl}
+                      href={(telegramOAuthUrl ?? telegramFallbackUrl)!}
                       target="_blank"
                       rel="noreferrer"
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#229ED9] px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
@@ -360,9 +367,9 @@ export default function Login() {
                       الدخول عبر تليجرام
                     </a>
                   )}
-                  {telegramOAuthUrl ? (
+                  {telegramFallbackUrl ? (
                     <a
-                      href={telegramOAuthUrl}
+                      href={telegramFallbackUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[11.5px] font-medium text-app-3 underline-offset-2 transition-colors hover:text-accent hover:underline"
@@ -400,6 +407,7 @@ export default function Login() {
         onClose={() => setResetHelpOpen(false)}
         botUsername={botUsername}
       />
+      <ToastViewport />
     </div>
   );
 }

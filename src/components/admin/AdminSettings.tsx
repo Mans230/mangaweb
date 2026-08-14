@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Construction,
   Loader2,
+  RefreshCw,
   Save,
   ScrollText,
   ShieldBan,
@@ -85,6 +86,65 @@ function BannedWordsCard() {
           </div>
         </>
       )}
+    </motion.section>
+  );
+}
+
+/* ================= تشغيل السكرابر يدويًا ================= */
+function ScrapeTriggerCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const trigger = trpc.admin.triggerScrape.useMutation({
+    onSuccess: (d) =>
+      toast(
+        t(
+          `بدأ فحص ${d.sources.length} مصدر — الفصول الجديدة ستظهر تباعًا`,
+          `Scrape started for ${d.sources.length} sources`,
+        ),
+      ),
+    onError: (e) =>
+      toast(
+        e.data?.code === "CONFLICT"
+          ? t("فحص يعمل بالفعل — انتظر حتى ينتهي", "A scrape is already running")
+          : e.message,
+        "danger",
+      ),
+  });
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.04 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <RefreshCw size={16} className="text-primary" />
+        {t("فحص المصادر (سكرابر)", "Sources scraper")}
+      </h3>
+      <div className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5">
+        <p className="text-xs leading-relaxed text-muted">
+          {t(
+            "الفحص التلقائي يعمل دوريًا — اضغط هنا لتشغيله فورًا وجلب أحدث الفصول الآن",
+            "Auto-scan runs periodically — press to run it right now",
+          )}
+        </p>
+        <button
+          type="button"
+          onClick={() => trigger.mutate()}
+          disabled={trigger.isPending}
+          className="btn-primary flex shrink-0 items-center gap-2 !rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50"
+        >
+          {trigger.isPending ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <RefreshCw size={14} />
+          )}
+          {trigger.isPending
+            ? t("جارٍ التشغيل…", "Starting…")
+            : t("افحص الآن", "Scan now")}
+        </button>
+      </div>
     </motion.section>
   );
 }
@@ -272,6 +332,7 @@ export default function AdminSettings() {
   return (
     <div className="space-y-4">
       <BannedWordsCard />
+      <ScrapeTriggerCard />
       <MaintenanceCard />
       <AdminLogsCard />
     </div>

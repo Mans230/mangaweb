@@ -69,6 +69,8 @@ const updateProfileSchema = z.object({
     .optional(),
   avatarUrl: z.string().trim().url().max(2000).nullable().optional(),
   bannerUrl: z.string().trim().url().max(2000).nullable().optional(),
+  notificationsTelegram: z.boolean().optional(),
+  dnd: z.boolean().optional(),
 });
 
 const telegramAuthSchema = z.object({
@@ -222,6 +224,9 @@ export const authRouter = createRouter({
 
       if (input.avatarUrl !== undefined) patch.avatarUrl = input.avatarUrl;
       if (input.bannerUrl !== undefined) patch.bannerUrl = input.bannerUrl;
+      if (input.notificationsTelegram !== undefined)
+        patch.notificationsTelegram = input.notificationsTelegram;
+      if (input.dnd !== undefined) patch.dnd = input.dnd;
 
       if (Object.keys(patch).length) {
         try {

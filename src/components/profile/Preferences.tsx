@@ -31,15 +31,15 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
 
   const [adult, setAdult] = useState(isAgeConfirmed);
   const [gateOpen, setGateOpen] = useState(false);
-  const [unblur, setUnblur] = useState(() => window.localStorage.getItem(UNBLUR_KEY) === "1");
+  const [unblur, setUnblur] = useState(() => window.sessionStorage.getItem(UNBLUR_KEY) === "1");
   const [notif, setNotif] = useState(
-    () => serverTgNotif ?? window.localStorage.getItem(TG_NOTIF_KEY) === "1",
+    () => serverTgNotif ?? window.sessionStorage.getItem(TG_NOTIF_KEY) === "1",
   );
   const [dnd, setDnd] = useState(
-    () => serverDnd ?? window.localStorage.getItem(DND_KEY) === "1",
+    () => serverDnd ?? window.sessionStorage.getItem(DND_KEY) === "1",
   );
-  const [quality, setQuality] = useState(() => window.localStorage.getItem(QUALITY_KEY) ?? "auto");
-  const [readMode, setReadMode] = useState(() => window.localStorage.getItem(READMODE_KEY) ?? "webtoon");
+  const [quality, setQuality] = useState(() => window.sessionStorage.getItem(QUALITY_KEY) ?? "auto");
+  const [readMode, setReadMode] = useState(() => window.sessionStorage.getItem(READMODE_KEY) ?? "webtoon");
 
   const themes = [
     { key: "light" as const, label: t("فاتح", "Light"), icon: Sun },
@@ -58,7 +58,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
     else {
       window.localStorage.removeItem(AGE_KEY);
       setUnblur(false);
-      window.localStorage.removeItem(UNBLUR_KEY);
+      window.sessionStorage.removeItem(UNBLUR_KEY);
     }
     toast(next ? t("فُعّل محتوى +18", "+18 content enabled") : t("عُطّل محتوى +18", "+18 content disabled"));
   };
@@ -146,7 +146,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
                 onChange={(v) => {
                   setUnblur(v);
                   // TODO(api): اجعل MangaCard يقرأ هذا التفضيل عند الدمج النهائي
-                  window.localStorage.setItem(UNBLUR_KEY, v ? "1" : "0");
+                  window.sessionStorage.setItem(UNBLUR_KEY, v ? "1" : "0");
                   toast(t("حُفظ التفضيل", "Preference saved"));
                 }}
               />
@@ -165,7 +165,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
             disabled={!telegramLinked}
             onChange={(v) => {
               setNotif(v);
-              window.localStorage.setItem(TG_NOTIF_KEY, v ? "1" : "0");
+              window.sessionStorage.setItem(TG_NOTIF_KEY, v ? "1" : "0");
               toast(v ? t("فُعّلت إشعارات تليجرام", "Telegram notifications enabled") : t("عُطّلت إشعارات تليجرام", "Telegram notifications disabled"));
             }}
           />
@@ -182,7 +182,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
             disabled={!telegramLinked}
             onChange={(v) => {
               setDnd(v);
-              window.localStorage.setItem(DND_KEY, v ? "1" : "0");
+              window.sessionStorage.setItem(DND_KEY, v ? "1" : "0");
               toast(v ? t("فُعّل عدم الإزعاج", "Do not disturb enabled") : t("عُطّل عدم الإزعاج", "Do not disturb disabled"));
             }}
           />
@@ -194,7 +194,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
             value={quality}
             onChange={(e) => {
               setQuality(e.target.value);
-              window.localStorage.setItem(QUALITY_KEY, e.target.value);
+              window.sessionStorage.setItem(QUALITY_KEY, e.target.value);
               toast(t("حُفظ التفضيل", "Preference saved"));
             }}
             className={selectStyle}
@@ -211,7 +211,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
             value={readMode}
             onChange={(e) => {
               setReadMode(e.target.value);
-              window.localStorage.setItem(READMODE_KEY, e.target.value);
+              window.sessionStorage.setItem(READMODE_KEY, e.target.value);
               toast(t("حُفظ التفضيل", "Preference saved"));
             }}
             className={selectStyle}
