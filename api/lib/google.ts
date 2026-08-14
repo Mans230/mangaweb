@@ -8,9 +8,10 @@ import {
   createUser,
   findUserByEmail,
   findUserByGoogleId,
+  linkGoogleToUser,
   touchLastSignIn,
-  updateUserProfile,
 } from "../queries/users";
+import { recordSession } from "./sessions";
 
 const STATE_COOKIE = "zeko_google_state";
 
@@ -104,7 +105,12 @@ export function googleCallbackHandler() {
 
       let user = await findUserByGoogleId(profile.sub);
       if (!user && profile.email) {
+        // دمج: نفس الإيميل عنده حساب — نربط googleId به فوراً (دخول بجوجل = مرتبط)
         user = await findUserByEmail(profile.email);
+        if (user && !user.googleId) {
+          await linkGoogleToUser(Number(user.id), profile.sub);
+          user = { ...user, googleId: profile.sub };
+        }
       }
       if (!user) {
         user = await createUser({
@@ -119,7 +125,12 @@ export function googleCallbackHandler() {
       }
 
       const resHeaders = new Headers();
-      appendSessionCookie(resHeaders, c.req.raw.headers, Number(user.id));
+      const token = appendSessionCookie(
+        resHeaders,
+        c.req.raw.headers,
+        Number(user.id),
+      );
+      await recordSession(Number(user.id), token, c.req.raw);
       const setCookieHeader = resHeaders.get("set-cookie");
       return new Response(null, {
         status: 302,

@@ -3,6 +3,8 @@ import { and, avg, count, desc, eq } from "drizzle-orm";
 import { comments, manga, ratings, users } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
+import { containsBannedWord } from "./lib/wordFilter";
+import { TRPCError } from "@trpc/server";
 
 export const engagementRouter = createRouter({
   addComment: authedQuery
@@ -15,6 +17,12 @@ export const engagementRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (await containsBannedWord(input.content)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "التعليق يحتوي كلمات مخالفة",
+        });
+      }
       const db = getDb();
       const [{ id }] = await db
         .insert(comments)

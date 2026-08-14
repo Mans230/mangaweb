@@ -1,10 +1,10 @@
 /**
- * حقول مشتركة لنماذج المجتمعات: لوحة ألوان جاهزة + حقل صورة (رابط أو رفع Cloudinary).
+ * حقول مشتركة لنماذج المجتمعات: لوحة ألوان جاهزة + حقل صورة (رابط أو رفع من الجهاز عبر catbox).
  */
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Check, ImagePlus, Link2, Loader2 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
-import { CLOUDINARY_ENABLED, uploadToCloudinary } from "@/lib/cloudinary";
+import { useImageUpload, IMAGE_ACCEPT } from "@/lib/upload";
 
 /** لوحة ألوان جاهزة متناسقة مع الثيم البنفسجي الداكن */
 export const COMMUNITY_COLOR_PALETTE = [
@@ -70,7 +70,7 @@ export function CommunityImageField({
 }) {
   const { t } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const { upload, uploading } = useImageUpload();
 
   const pickFile = async (file: File | undefined) => {
     if (!file) return;
@@ -78,16 +78,13 @@ export function CommunityImageField({
       onError(t("اختر ملف صورة صالحاً", "Pick a valid image file"));
       return;
     }
-    setUploading(true);
-    try {
-      const url = await uploadToCloudinary(file);
+    const url = await upload(file);
+    if (url) {
       onChange(url);
-    } catch {
+    } else {
       onError(t("فشل رفع الصورة — جرّب لصق رابط بدلاً من ذلك", "Upload failed — try pasting a URL instead"));
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   return (
@@ -109,30 +106,26 @@ export function CommunityImageField({
             className="input-glass w-full !ps-9 text-sm"
           />
         </div>
-        {CLOUDINARY_ENABLED && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => void pickFile(e.target.files?.[0])}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="btn-glass shrink-0 !px-4 !py-2.5 text-xs disabled:opacity-50"
-            >
-              {uploading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <ImagePlus size={14} />
-              )}
-              {uploading ? t("جارٍ الرفع…", "Uploading…") : t("رفع صورة", "Upload")}
-            </button>
-          </>
-        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          className="hidden"
+          onChange={(e) => void pickFile(e.target.files?.[0])}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="btn-glass shrink-0 !px-4 !py-2.5 text-xs disabled:opacity-50"
+        >
+          {uploading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <ImagePlus size={14} />
+          )}
+          {uploading ? t("جارٍ الرفع…", "Uploading…") : t("رفع صورة", "Upload")}
+        </button>
       </div>
       {value.trim() && (
         <img
