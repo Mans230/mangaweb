@@ -33,8 +33,16 @@ import {
   fixMissingCovers,
   importSeries,
   normalizeTitle,
+  refreshChapters,
 } from "./services/importer";
 import { invalidateIpBanCache } from "./lib/ipBan";
+import { adminLogs, updateRequests } from "@db/schema";
+import { getScraper } from "./scrapers";
+import { logAdminAction } from "./lib/adminLog";
+import { SETTING_BANNED_WORDS, bannedWords } from "./lib/wordFilter";
+
+export const SETTING_MAINTENANCE_MODE = "maintenance_mode";
+export const SETTING_MAINTENANCE_MESSAGE = "maintenance_message";
 
 const sourceStatusEnum = z.enum(["active", "paused", "blocked"]);
 const requestStatusEnum = z.enum(["pending", "added", "rejected"]);
@@ -735,5 +743,481 @@ export const adminRouter = createRouter({
       }
       await db.delete(communities).where(eq(communities.id, community.id));
       return { success: true };
+    }),
+
+  // ================= إدارة الفصول =================
+
+  /** فصول مانجا (الأحدث رقماً أولاً) */
+  listChapters: adminQuery
+    .input(
+      z.object({
+        mangaId: z.number().int().positive(),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const where = eq(chapters.mangaId, input.mangaId);
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select()
+          .from(chapters)
+          .where(where)
+          .orderBy(desc(chapters.number))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(chapters).where(where),
+      ]);
+      return { items: rows, total, page: input.page, limit: input.limit };
+    }),
+
+  hideChapter: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      await db
+        .update(chapters)
+        .set({ hiddenAt: new Date() })
+        .where(eq(chapters.id, input.id));
+      await logAdminAction(ctx.user.id, "chapter.hide", {
+        targetType: "chapter",
+        targetId: input.id,
+      });
+      return { success: true };
+    }),
+
+  unhideChapter: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      await db
+        .update(chapters)
+        .set({ hiddenAt: null })
+        .where(eq(chapters.id, input.id));
+      await logAdminAction(ctx.user.id, "chapter.unhide", {
+        targetType: "chapter",
+        targetId: input.id,
+      });
+      return { success: true };
+    }),
+
+  deleteChapter: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const chapter = await db.query.chapters.findFirst({
+        where: eq(chapters.id, input.id),
+      });
+      if (!chapter) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "الفصل غير موجود" });
+      }
+      await db.delete(chapters).where(eq(chapters.id, input.id));
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(chapters)
+        .where(eq(chapters.mangaId, chapter.mangaId));
+      await db
+        .update(manga)
+        .set({ chapterCount: total })
+        .where(eq(manga.id, chapter.mangaId));
+      await logAdminAction(ctx.user.id, "chapter.delete", {
+        targetType: "chapter",
+        targetId: input.id,
+        meta: { mangaId: chapter.mangaId, number: chapter.number },
+      });
+      return { success: true };
+    }),
+
+  editChapter: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        number: z.number().positive().optional(),
+        title: z.string().trim().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const chapter = await db.query.chapters.findFirst({
+        where: eq(chapters.id, input.id),
+      });
+      if (!chapter) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "الفصل غير موجود" });
+      }
+      const patch: Partial<typeof chapters.$inferInsert> = {};
+      if (input.number !== undefined) patch.number = input.number;
+      if (input.title !== undefined) patch.title = input.title;
+      if (Object.keys(patch).length) {
+        await db.update(chapters).set(patch).where(eq(chapters.id, input.id));
+      }
+      await logAdminAction(ctx.user.id, "chapter.edit", {
+        targetType: "chapter",
+        targetId: input.id,
+        meta: patch as Record<string, unknown>,
+      });
+      return { success: true };
+    }),
+
+  /** إعادة سحب صفحات فصل من المصدر وتحديث عدد الصفحات */
+  rescrapeChapter: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const row = await db
+        .select({ chapter: chapters, manga: manga, source: sources })
+        .from(chapters)
+        .innerJoin(manga, eq(chapters.mangaId, manga.id))
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(eq(chapters.id, input.id))
+        .limit(1);
+      if (!row.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "الفصل غير موجود" });
+      }
+      const { chapter, source } = row[0];
+      if (!chapter.url) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "لا يوجد رابط مصدر لهذا الفصل",
+        });
+      }
+      const scraper = getScraper(source.name);
+      if (!scraper) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `لا يوجد سكرابر للمصدر: ${source.name}`,
+        });
+      }
+      try {
+        const pages = await scraper.getPages(chapter.url);
+        await db
+          .update(chapters)
+          .set({ pageCount: pages.length })
+          .where(eq(chapters.id, chapter.id));
+        await logAdminAction(ctx.user.id, "chapter.rescrape", {
+          targetType: "chapter",
+          targetId: chapter.id,
+          meta: { pageCount: pages.length },
+        });
+        return { success: true, pageCount: pages.length };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `فشل سحب الصفحات: ${(e as Error).message}`,
+        });
+      }
+    }),
+
+  // ================= إدارة المانجا (موسّعة) =================
+
+  /** تعديل شامل لبيانات مانجا */
+  editManga: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        title: z.string().trim().min(1).max(500).optional(),
+        description: z.string().max(10000).optional(),
+        genres: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
+        type: z.enum(["manga", "manhwa", "manhua"]).optional(),
+        status: z.enum(["ongoing", "completed"]).optional(),
+        coverUrl: z.string().trim().max(2000).optional(),
+        isAdult: z.boolean().optional(),
+        isTrending: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const existing = await db.query.manga.findFirst({
+        where: eq(manga.id, input.id),
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المانجا غير موجودة" });
+      }
+      const { id, ...fields } = input;
+      const patch: Partial<typeof manga.$inferInsert> = {};
+      for (const [k, v] of Object.entries(fields)) {
+        if (v !== undefined) (patch as Record<string, unknown>)[k] = v;
+      }
+      if (Object.keys(patch).length) {
+        await db.update(manga).set(patch).where(eq(manga.id, id));
+      }
+      await logAdminAction(ctx.user.id, "manga.edit", {
+        targetType: "manga",
+        targetId: id,
+        meta: patch as Record<string, unknown>,
+      });
+      return db.query.manga.findFirst({ where: eq(manga.id, id) });
+    }),
+
+  hideManga: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb()
+        .update(manga)
+        .set({ hiddenAt: new Date() })
+        .where(eq(manga.id, input.id));
+      await logAdminAction(ctx.user.id, "manga.hide", {
+        targetType: "manga",
+        targetId: input.id,
+      });
+      return { success: true };
+    }),
+
+  unhideManga: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb()
+        .update(manga)
+        .set({ hiddenAt: null })
+        .where(eq(manga.id, input.id));
+      await logAdminAction(ctx.user.id, "manga.unhide", {
+        targetType: "manga",
+        targetId: input.id,
+      });
+      return { success: true };
+    }),
+
+  setFeatured: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb()
+        .update(manga)
+        .set({ featuredAt: new Date() })
+        .where(eq(manga.id, input.id));
+      await logAdminAction(ctx.user.id, "manga.feature", {
+        targetType: "manga",
+        targetId: input.id,
+      });
+      return { success: true };
+    }),
+
+  unsetFeatured: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await getDb()
+        .update(manga)
+        .set({ featuredAt: null })
+        .where(eq(manga.id, input.id));
+      await logAdminAction(ctx.user.id, "manga.unfeature", {
+        targetType: "manga",
+        targetId: input.id,
+      });
+      return { success: true };
+    }),
+
+  /** غلاف مخصص يطغى على غلاف المصدر (coverOverrideUrl) */
+  setCover: adminQuery
+    .input(
+      z.object({
+        mangaId: z.number().int().positive(),
+        url: z.string().trim().url().max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const existing = await db.query.manga.findFirst({
+        where: eq(manga.id, input.mangaId),
+        columns: { id: true },
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المانجا غير موجودة" });
+      }
+      await db
+        .update(manga)
+        .set({ coverOverrideUrl: input.url })
+        .where(eq(manga.id, input.mangaId));
+      await logAdminAction(ctx.user.id, "manga.setCover", {
+        targetType: "manga",
+        targetId: input.mangaId,
+        meta: { url: input.url },
+      });
+      return { success: true };
+    }),
+
+  /** أغلفة بديلة: نفس المانهوا (تطابق العنوان المُطبَّع) من مصادر أخرى */
+  coverAlternatives: adminQuery
+    .input(z.object({ mangaId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const current = await db.query.manga.findFirst({
+        where: eq(manga.id, input.mangaId),
+      });
+      if (!current) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "المانجا غير موجودة" });
+      }
+      const norm = normalizeTitle(current.title);
+      const all = await db
+        .select({
+          id: manga.id,
+          title: manga.title,
+          coverUrl: manga.coverUrl,
+          sourceId: manga.sourceId,
+        })
+        .from(manga);
+      return all
+        .filter(
+          (r) =>
+            r.id !== current.id &&
+            r.coverUrl &&
+            normalizeTitle(r.title) === norm,
+        )
+        .map((r) => ({ mangaId: r.id, sourceId: r.sourceId, coverUrl: r.coverUrl }));
+    }),
+
+  /** إعادة استيراد فصول مانجا من مصدرها */
+  rescrapeManga: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await refreshChapters(input.id);
+        await logAdminAction(ctx.user.id, "manga.rescrape", {
+          targetType: "manga",
+          targetId: input.id,
+          meta: result,
+        });
+        return { success: true, ...result };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `فشل التحديث: ${(e as Error).message}`,
+        });
+      }
+    }),
+
+  // ================= طلبات التحديث =================
+
+  listUpdateRequests: adminQuery
+    .input(
+      z.object({
+        status: z.enum(["pending", "resolved"]).default("pending"),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const where = eq(updateRequests.status, input.status);
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            request: updateRequests,
+            user: { id: users.id, name: users.name, username: users.username },
+            manga: { id: manga.id, title: manga.title, slug: manga.slug },
+          })
+          .from(updateRequests)
+          .innerJoin(users, eq(updateRequests.userId, users.id))
+          .innerJoin(manga, eq(updateRequests.mangaId, manga.id))
+          .where(where)
+          .orderBy(desc(updateRequests.createdAt))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(updateRequests).where(where),
+      ]);
+      return {
+        items: rows.map((r) => ({ ...r.request, user: r.user, manga: r.manga })),
+        total,
+        page: input.page,
+        limit: input.limit,
+      };
+    }),
+
+  resolveUpdateRequest: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const existing = await db.query.updateRequests.findFirst({
+        where: eq(updateRequests.id, input.id),
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "الطلب غير موجود" });
+      }
+      await db
+        .update(updateRequests)
+        .set({ status: "resolved" })
+        .where(eq(updateRequests.id, input.id));
+      await logAdminAction(ctx.user.id, "update_request.resolve", {
+        targetType: "update_request",
+        targetId: input.id,
+        meta: { mangaId: existing.mangaId },
+      });
+      return { success: true };
+    }),
+
+  // ================= فلتر الكلمات المحظورة =================
+
+  getBannedWords: adminQuery.query(async () => ({
+    words: await bannedWords(),
+  })),
+
+  setBannedWords: adminQuery
+    .input(
+      z.object({ words: z.array(z.string().trim().min(1).max(100)).max(500) }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await setSetting(SETTING_BANNED_WORDS, input.words.join(","));
+      await logAdminAction(ctx.user.id, "settings.banned_words", {
+        meta: { count: input.words.length },
+      });
+      return { success: true, count: input.words.length };
+    }),
+
+  // ================= وضع الصيانة =================
+
+  getMaintenance: adminQuery.query(async () => {
+    const [mode, message] = await Promise.all([
+      getSetting(SETTING_MAINTENANCE_MODE, "0"),
+      getSetting(SETTING_MAINTENANCE_MESSAGE, ""),
+    ]);
+    return { enabled: mode === "1", message: message ?? "" };
+  }),
+
+  setMaintenance: adminQuery
+    .input(
+      z.object({
+        enabled: z.boolean(),
+        message: z.string().trim().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await setSetting(SETTING_MAINTENANCE_MODE, input.enabled ? "1" : "0");
+      if (input.message !== undefined) {
+        await setSetting(SETTING_MAINTENANCE_MESSAGE, input.message);
+      }
+      await logAdminAction(ctx.user.id, "settings.maintenance", {
+        meta: { enabled: input.enabled },
+      });
+      return { success: true };
+    }),
+
+  // ================= سجل عمليات الأدمن =================
+
+  adminLogs: adminQuery
+    .input(
+      z.object({
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(30),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            log: adminLogs,
+            admin: { id: users.id, name: users.name, username: users.username },
+          })
+          .from(adminLogs)
+          .innerJoin(users, eq(adminLogs.adminId, users.id))
+          .orderBy(desc(adminLogs.id))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(adminLogs),
+      ]);
+      return {
+        items: rows.map((r) => ({ ...r.log, admin: r.admin })),
+        total,
+        page: input.page,
+        limit: input.limit,
+      };
     }),
 });
