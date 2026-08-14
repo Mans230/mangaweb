@@ -112,12 +112,14 @@ export async function linkTelegramToUser(
   userId: number,
   telegramId: string,
   telegramUsername?: string,
+  telegramPhotoUrl?: string,
 ) {
   await getDb()
     .update(schema.users)
     .set({
       telegramId,
       telegramUsername: telegramUsername ?? null,
+      telegramPhotoUrl: telegramPhotoUrl ?? null,
     })
     .where(eq(schema.users.id, userId));
 }
@@ -128,7 +130,15 @@ export async function unlinkTelegramFromUser(userId: number) {
     .set({
       telegramId: null,
       telegramUsername: null,
+      telegramPhotoUrl: null,
     })
+    .where(eq(schema.users.id, userId));
+}
+
+export async function linkGoogleToUser(userId: number, googleId: string) {
+  await getDb()
+    .update(schema.users)
+    .set({ googleId })
     .where(eq(schema.users.id, userId));
 }
 

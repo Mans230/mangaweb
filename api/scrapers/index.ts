@@ -7,6 +7,7 @@ import RocksMangaScraper from "./rocksmanga";
 import Asq3Scraper from "./asq3";
 import DespairScraper from "./despair";
 import MangadarScraper from "./mangadar";
+import DilarScraper from "./dilar";
 
 export * from "./base";
 
@@ -21,6 +22,7 @@ const REGISTRY: Record<string, ScraperCtor> = {
   "3asq": Asq3Scraper,
   despair: DespairScraper,
   mangadar: MangadarScraper,
+  dilar: DilarScraper,
 };
 
 const DEFAULT_ENABLED = [
@@ -31,6 +33,7 @@ const DEFAULT_ENABLED = [
   "rocksmanga",
   "3asq",
   "despair",
+  "dilar",
 ];
 
 let scrapers: BaseScraper[] | null = null;
