@@ -379,7 +379,7 @@ function RequestForm() {
                       type="button"
                       onClick={() => setType(opt)}
                       className={`glass-chip transition-all ${
-                        type === opt ? "!border-transparent !bg-gradient-to-l !from-[#7C3AED] !via-[#A78BFA] !to-[#E879F9] !text-white shadow-md" : ""
+                        type === opt ? "!border-transparent !bg-[#E0561F] !text-white shadow-md" : ""
                       }`}
                     >
                       {t(opt, opt === "مانهوا" ? "Manhwa" : opt === "مانجا" ? "Manga" : opt === "مانها" ? "Manhua" : "Not sure")}
@@ -689,11 +689,11 @@ export default function Request() {
         <div className="gradient-hero-bg absolute inset-x-0 top-0 h-[480px]" />
         <div
           className="animate-blob-a absolute -top-10 end-[-8vw] h-[320px] w-[320px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(167,139,250,0.4), transparent 65%)", filter: "blur(70px)" }}
+          style={{ background: "radial-gradient(circle, rgba(224,86,31,0.4), transparent 65%)", filter: "blur(70px)" }}
         />
         <div
           className="animate-blob-b absolute top-72 start-[-6vw] h-[260px] w-[260px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(232,121,249,0.3), transparent 65%)", filter: "blur(70px)" }}
+          style={{ background: "radial-gradient(circle, rgba(217,164,65,0.28), transparent 65%)", filter: "blur(70px)" }}
         />
       </div>
       <RequestHero />
