@@ -112,8 +112,8 @@ export default function ChapterDrawer({
                     }}
                     className={`mb-1.5 flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-start transition-colors ${
                       isCurrent
-                        ? "border-transparent [background:linear-gradient(var(--surface-strong),var(--surface-strong))_padding-box,linear-gradient(135deg,#7c3aed,#a78bfa_55%,#e879f9)_border-box]"
-                        : "border-transparent hover:bg-[rgba(167,139,250,0.12)]"
+                        ? "border-[var(--primary)] bg-[rgba(224,86,31,0.12)]"
+                        : "border-transparent hover:bg-[rgba(224,86,31,0.12)]"
                     }`}
                   >
                     <span

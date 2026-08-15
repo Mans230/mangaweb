@@ -152,8 +152,8 @@ export default function ChaptersTab({
         to={`/manga/${slug}/chapter/${fmtChapter(c.number)}`}
         className={`group flex h-[60px] items-center gap-3 rounded-2xl border px-3 transition-colors ${
           isNext
-            ? "border-[var(--border-glow)] bg-[rgba(167,139,250,0.1)]"
-            : "border-transparent hover:bg-[rgba(167,139,250,0.08)]"
+            ? "border-[rgba(224,86,31,0.35)] bg-[rgba(224,86,31,0.12)]"
+            : "border-transparent hover:bg-[rgba(224,86,31,0.08)]"
         } ${isRead ? "opacity-55" : ""}`}
       >
         <span

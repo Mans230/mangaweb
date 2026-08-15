@@ -34,8 +34,8 @@ export default function Footer() {
           </Link>
           <p className="mt-4 max-w-xs text-sm text-app-2">
             {t(
-              "منصة عربية تجمع لك أحدث فصول المانهوا والمانجا من 8 مصادر — تحديث تلقائي كل 30 دقيقة، بتجربة قراءة زجاجية فريدة.",
-              "An Arabic platform aggregating the latest manhwa & manga chapters from 8 sources — auto-refreshed every 30 minutes in a unique glassy reading experience."
+              "منصة عربية تجمع لك أحدث فصول المانهوا والمانجا من 8 مصادر — تحديث تلقائي كل 15 دقيقة، بتجربة قراءة نظيفة بروح المجلات المطبوعة.",
+              "An Arabic platform aggregating the latest manhwa & manga chapters from 8 sources — auto-refreshed every 15 minutes in a clean editorial reading experience."
             )}
           </p>
         </div>

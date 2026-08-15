@@ -61,7 +61,7 @@ export default function BackdropHero({ cover, extraBlurred = false }: BackdropHe
             height: p.size,
             background: "var(--primary-soft)",
             opacity: 0.55,
-            boxShadow: "0 0 12px 2px rgba(167,139,250,0.5)",
+            boxShadow: "0 0 12px 2px rgba(224,86,31,0.5)",
             animationDelay: `${p.delay}s`,
             animationDuration: `${5 + (i % 3)}s`,
           }}

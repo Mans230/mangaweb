@@ -93,7 +93,7 @@ export default function DangerZone() {
           <button
             onClick={attemptDelete}
             className="btn-primary flex-1 !py-2.5 text-sm"
-            style={{ background: "linear-gradient(135deg,#FB7185,#E879F9)", boxShadow: "0 6px 20px rgba(251,113,133,.35)" }}
+            style={{ background: "var(--danger)", boxShadow: "0 6px 20px rgba(251,113,133,.35)" }}
           >
             {t("حذف نهائي", "Delete permanently")}
           </button>
