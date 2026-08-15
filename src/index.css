@@ -92,7 +92,7 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(167, 139, 250, 0.35);
+    background: rgba(154, 145, 127, 0.5);
     border-radius: 999px;
   }
 }
