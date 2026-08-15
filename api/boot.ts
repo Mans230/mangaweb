@@ -317,7 +317,7 @@ if (env.isProduction) {
     );
     const refreshMin = Math.max(
       5,
-      parseInt(process.env.SCRAPER_REFRESH_MIN || "30", 10) || 30,
+      parseInt(process.env.SCRAPER_REFRESH_MIN || "15", 10) || 15,
     );
     // استيراد الكتالوج الدوري (الوصول لكتالوج واسع تدريجياً)
     const catalogHours = Math.max(
