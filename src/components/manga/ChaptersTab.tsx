@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   Play,
   Search,
+  X,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { ChapterVM } from "./types";
@@ -57,11 +58,13 @@ export default function ChaptersTab({
   nextChapter,
   markAllPending,
   onMarkAllRead,
+  onMarkAllUnread,
 }: ChaptersTabProps) {
   const { t } = useLanguage();
   const [newestFirst, setNewestFirst] = useState(true);
   const [query, setQuery] = useState("");
   const [confirmMark, setConfirmMark] = useState(false);
+  const [confirmUnmark, setConfirmUnmark] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState({ start: 0, end: 40 });
   const [barVisible, setBarVisible] = useState(false);
@@ -142,7 +145,13 @@ export default function ChaptersTab({
             : "border-transparent hover:bg-[rgba(167,139,250,0.08)]"
         } ${isRead ? "opacity-55" : ""}`}
       >
-        <span className="glass-chip shrink-0 !px-2.5 !py-0.5 !text-[11px] font-semibold text-primary">
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+            isRead
+              ? "border-[rgba(52,211,153,0.45)] bg-[rgba(52,211,153,0.12)] text-[#34d399]"
+              : "border-[var(--glass-border)] bg-[rgba(10,12,20,0.55)] text-app-3"
+          }`}
+        >
           {t("فصل", "Ch.")} {fmtChapter(c.number)}
         </span>
         <span className={`min-w-0 flex-1 truncate text-sm font-medium text-app ${isRead ? "line-through decoration-app-3/40" : ""}`}>
@@ -220,6 +229,17 @@ export default function ChaptersTab({
             <CheckCheck size={14} />
             {confirmMark ? t("تأكيد؟", "Confirm?") : t("تحديد الكل كمقروء", "Mark all read")}
           </button>
+          {lastReadNumber !== null && lastReadNumber > 0 && (
+            <button
+              type="button"
+              onClick={handleUnmarkAll}
+              disabled={markAllPending}
+              className={`glass-chip !py-2 text-[11px] font-semibold text-app-3 ${confirmUnmark ? "!border-danger/60 !text-danger" : ""}`}
+            >
+              <X size={14} />
+              {confirmUnmark ? t("تأكيد؟", "Confirm?") : t("إلغاء تحديد الكل", "Unmark all")}
+            </button>
+          )}
         </div>
       </div>
 

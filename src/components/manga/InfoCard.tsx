@@ -14,6 +14,7 @@ import {
   ListPlus,
   Lock,
   Play,
+  Send,
   Share2,
   Users,
 } from "lucide-react";
@@ -99,7 +100,7 @@ export default function InfoCard({
   onAuthRequired,
 }: InfoCardProps) {
   const { t } = useLanguage();
-  const { hideCommunities } = useUiToggles();
+  const { hideCommunities, communityGroupUrl } = useUiToggles();
   const [descExpanded, setDescExpanded] = useState(false);
   const [genresExpanded, setGenresExpanded] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
@@ -433,6 +434,20 @@ export default function InfoCard({
               >
                 <Users size={18} />
               </Link>
+            )}
+
+            {/* جروب المناقشة الخارجي (تليجرام…) — يظهر فقط عند ضبط رابطه من لوحة الأدمن */}
+            {communityGroupUrl && (
+              <a
+                href={communityGroupUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("انضم لجروب المناقشة", "Join the discussion group")}
+                title={t("انضم لجروب المناقشة", "Join the discussion group")}
+                className="btn-icon !border-[rgba(56,189,248,0.45)] text-[#38bdf8]"
+              >
+                <Send size={18} />
+              </a>
             )}
 
             <ReportDialog
