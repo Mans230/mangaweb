@@ -134,4 +134,20 @@ export const libraryRouter = createRouter({
         totalChapters: m?.chapterCount ?? 0,
       };
     }),
+
+  /** إلغاء تقدم القراءة لمانجا (إلغاء تحديد الكل كمقروء) */
+  clearProgress: authedQuery
+    .input(z.object({ mangaId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      await db
+        .delete(readingProgress)
+        .where(
+          and(
+            eq(readingProgress.userId, ctx.user.id),
+            eq(readingProgress.mangaId, input.mangaId),
+          ),
+        );
+      return { success: true as const, readChapters: 0 };
+    }),
 });

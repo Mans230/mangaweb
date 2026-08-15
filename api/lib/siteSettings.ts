@@ -12,6 +12,8 @@ export const SETTING_COMMUNITY_MANGA_ENABLED = "community.manga_enabled";
 /** إخفاء أقسام كاملة من الواجهة (روابط + صفحات) */
 export const SETTING_UI_HIDE_COMMUNITIES = "ui.hide_communities";
 export const SETTING_UI_HIDE_REELS = "ui.hide_reels";
+/** رابط جروب المناقشة (تليجرام/ديسكورد…) — يظهر زره في صفحة المانجا عند ضبطه */
+export const SETTING_COMMUNITY_GROUP_URL = "ui.community_group_url";
 
 const CACHE_TTL_MS = 30 * 1000;
 

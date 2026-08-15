@@ -38,18 +38,37 @@ export const notificationsRouter = createRouter({
       ]);
       const items = rows.map((n) => {
         const p = n.payload ?? {};
-        const isChapter = n.type === "new_chapter";
+        let title: string;
+        let body: string;
+        switch (n.type) {
+          case "new_chapter":
+            title = `فصل جديد: ${p.mangaTitle ?? "مانهوا"}`;
+            body = `نزل الفصل ${p.chapterNumber ?? ""} — اضغط للقراءة`;
+            break;
+          case "mention":
+            title = `${p.fromUsername ? `@${p.fromUsername} ` : ""}ذكرك في ${p.communityName ?? "مجتمع"}`;
+            body = p.excerpt ?? "";
+            break;
+          case "reel_approved":
+            title = "تم قبول الريل الخاص بك";
+            body = p.excerpt ?? "أصبح ظاهراً الآن في قسم الريلز";
+            break;
+          case "reel_rejected":
+            title = "تم رفض الريل الخاص بك";
+            body = p.excerpt ? `السبب: ${p.excerpt}` : "";
+            break;
+          default:
+            title = p.title ?? "إشعار";
+            body = p.body ?? p.excerpt ?? "";
+        }
         return {
           id: n.id,
           type: n.type,
-          title: isChapter
-            ? `فصل جديد: ${p.mangaTitle ?? "مانهوا"}`
-            : (p.communityName ?? "إشعار"),
-          body: isChapter
-            ? `نزل الفصل ${p.chapterNumber ?? ""} — اضغط للقراءة`
-            : (p.excerpt ?? ""),
+          title,
+          body,
           mangaId: p.mangaId ?? null,
           mangaSlug: p.mangaSlug ?? null,
+          communitySlug: p.communitySlug ?? null,
           chapterId: p.chapterId ?? null,
           chapterNumber: p.chapterNumber ?? null,
           readAt: n.readAt ? n.readAt.toISOString() : null,
