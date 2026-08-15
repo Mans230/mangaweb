@@ -208,7 +208,7 @@ export default function RequestsManager() {
             <button
               key={p}
               onClick={() => setPage(p)}
-              className={`glass-chip !px-3.5 !py-1.5 tabular-nums ${page === p ? "!border-transparent !bg-gradient-to-l !from-[#7C3AED] !to-[#E879F9] !text-white" : ""}`}
+              className={`glass-chip !px-3.5 !py-1.5 tabular-nums ${page === p ? "!border-transparent !bg-[#E0561F] !text-white" : ""}`}
             >
               {p}
             </button>
@@ -259,7 +259,7 @@ export default function RequestsManager() {
             <button
               onClick={confirmReject}
               className="btn-primary !px-5 !py-2.5 text-sm"
-              style={{ background: "linear-gradient(135deg,#FB7185,#F43F5E)" }}
+              style={{ background: "var(--danger)" }}
             >
               <XCircle size={15} /> {t("تأكيد الرفض", "Confirm reject")}
             </button>
