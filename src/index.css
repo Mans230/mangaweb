@@ -55,6 +55,11 @@
 
   html {
     -webkit-tap-highlight-color: transparent;
+    overflow-x: clip;
+  }
+
+  body {
+    overflow-x: clip;
   }
 
   body {
@@ -555,6 +560,7 @@
   /* فهرس آخر الفصول — TOC بنقاط قائدة */
   .ed-toc {
     border-top: 1px solid var(--ed-line);
+    grid-template-columns: minmax(0, 1fr);
   }
   .ed-toc-item {
     display: flex;
@@ -563,6 +569,8 @@
     padding: 14px 4px;
     border-bottom: 1px solid var(--ed-line);
     transition: background 0.12s ease;
+    min-width: 0;
+    max-width: 100%;
   }
   .ed-toc-item:hover {
     background: var(--ed-accent-soft);
@@ -575,6 +583,7 @@
     min-width: 28px;
   }
   .ed-toc-title {
+    min-width: 0;
     font-size: 14.5px;
     font-weight: 700;
     color: var(--ed-paper);
