@@ -167,7 +167,7 @@ function ListCard({ list, index, onOpen }: { list: MyList; index: number; onOpen
       transition={{ duration: 0.4, ease: EASE, delay: index * 0.05 }}
       whileHover={{ y: -4 }}
       onClick={onOpen}
-      className="glass group flex flex-col overflow-hidden !rounded-2xl p-2 text-start transition-shadow hover:shadow-[0_16px_40px_rgba(124,58,237,0.18)]"
+      className="glass group flex flex-col overflow-hidden !rounded-2xl p-2 text-start transition-shadow hover:shadow-[0_16px_40px_rgba(224,86,31,0.18)]"
     >
       {/* شبكة ٢×٢ من الأغلفة */}
       <div className="grid aspect-[4/3] grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-xl bg-black/10 dark:bg-white/5">
@@ -341,7 +341,7 @@ function ListDetail({
               >
                 <Link
                   to={`/manga/${item.manga.slug}`}
-                  className="glass block overflow-hidden !rounded-2xl p-2 transition-shadow hover:shadow-[0_16px_40px_rgba(124,58,237,0.18)]"
+                  className="glass block overflow-hidden !rounded-2xl p-2 transition-shadow hover:shadow-[0_16px_40px_rgba(224,86,31,0.18)]"
                 >
                   <div className="relative aspect-[2/3] overflow-hidden rounded-[14px]">
                     <img
@@ -400,7 +400,7 @@ function ListDetail({
             }}
             disabled={deleteMut.isPending}
             className="btn-primary flex-1 !py-2.5 text-sm !shadow-none"
-            style={{ background: "linear-gradient(135deg,#FB7185,#E879F9)" }}
+            style={{ background: "var(--danger)" }}
           >
             {t("نعم، احذفها", "Yes, delete it")}
           </button>

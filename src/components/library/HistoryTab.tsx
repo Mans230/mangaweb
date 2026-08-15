@@ -163,7 +163,7 @@ export default function HistoryTab({ history }: HistoryTabProps) {
           )}
         </p>
         <div className="mt-5 flex gap-3">
-          <button onClick={clearAll} className="btn-primary flex-1 !py-2.5 text-sm !shadow-none" style={{ background: "linear-gradient(135deg,#FB7185,#E879F9)" }}>
+          <button onClick={clearAll} className="btn-primary flex-1 !py-2.5 text-sm !shadow-none" style={{ background: "var(--danger)" }}>
             {t("نعم، امسح السجل", "Yes, clear it")}
           </button>
           <button onClick={() => setConfirmClear(false)} className="btn-glass flex-1 !py-2.5 text-sm">
