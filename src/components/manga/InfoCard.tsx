@@ -195,7 +195,7 @@ export default function InfoCard({
         >
           <div
             className="sheen relative aspect-[2/3] overflow-hidden rounded-2xl"
-            style={{ boxShadow: "0 16px 48px rgba(124,58,237,0.3)" }}
+            style={{ boxShadow: "0 16px 48px rgba(224,86,31,0.3)" }}
           >
             <img
               src={vm.cover}
@@ -444,7 +444,7 @@ export default function InfoCard({
                 rel="noopener noreferrer"
                 aria-label={t("انضم لجروب المناقشة", "Join the discussion group")}
                 title={t("انضم لجروب المناقشة", "Join the discussion group")}
-                className="btn-icon !border-[rgba(56,189,248,0.45)] text-[#38bdf8]"
+                className="btn-icon !border-[var(--border-glow)] text-primary"
               >
                 <Send size={18} />
               </a>

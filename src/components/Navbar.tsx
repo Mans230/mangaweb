@@ -116,7 +116,7 @@ function NotificationsBell() {
                 <DropdownMenuItem
                   key={n.id}
                   onClick={() => openItem(n)}
-                  className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(167,139,250,0.16)]"
+                  className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(224,86,31,0.16)]"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
                     <Bell size={15} />
@@ -202,7 +202,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link to="/" className="flex shrink-0 items-center gap-2.5">
             <img src="/logo.svg" alt="zeko-manga" className="h-9 w-9 rounded-xl" />
-            <span className="font-display gradient-text text-lg font-bold md:text-xl">
+            <span className="font-display text-lg font-bold text-primary md:text-xl">
               {t("زيكو مانجا", "zeko-manga")}
             </span>
           </Link>
@@ -393,7 +393,7 @@ export default function Navbar() {
                 <motion.span
                   layoutId="bottom-nav-pill"
                   className="absolute inset-0 rounded-xl"
-                  style={{ background: "rgba(167,139,250,0.18)", border: "1px solid var(--border-glow)" }}
+                  style={{ background: "rgba(224,86,31,0.18)", border: "1px solid var(--border-glow)" }}
                   transition={{ type: "spring", stiffness: 380, damping: 32 }}
                 />
               )}
