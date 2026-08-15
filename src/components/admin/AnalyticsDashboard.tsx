@@ -117,8 +117,8 @@ export default function AnalyticsDashboard() {
   const lineConfig = useMemo(
     () =>
       ({
-        visits: { label: t("الزيارات", "Visits"), color: "#A78BFA" },
-        newUsers: { label: t("أعضاء جدد", "New users"), color: "#E879F9" },
+        visits: { label: t("الزيارات", "Visits"), color: "#EA6A38" },
+        newUsers: { label: t("أعضاء جدد", "New users"), color: "#D9A441" },
       }) satisfies ChartConfig,
     [t],
   );
@@ -126,7 +126,7 @@ export default function AnalyticsDashboard() {
   const hoursConfig = useMemo(
     () =>
       ({
-        visits: { label: t("الزيارات", "Visits"), color: "#7C3AED" },
+        visits: { label: t("الزيارات", "Visits"), color: "#E0561F" },
       }) satisfies ChartConfig,
     [t],
   );
@@ -243,20 +243,20 @@ export default function AnalyticsDashboard() {
               <AreaChart data={tsData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#A78BFA" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="#A78BFA" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="#EA6A38" stopOpacity={0.45} />
+                    <stop offset="100%" stopColor="#EA6A38" stopOpacity={0.02} />
                   </linearGradient>
                   <linearGradient id="gu" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#E879F9" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#E879F9" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="#D9A441" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#D9A441" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(167,139,250,0.12)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(224,86,31,0.12)" vertical={false} />
                 <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} interval={4} />
                 <YAxis tickLine={false} axisLine={false} fontSize={10} width={36} allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Area type="monotone" dataKey="visits" stroke="#A78BFA" strokeWidth={2} fill="url(#gv)" />
-                <Area type="monotone" dataKey="newUsers" stroke="#E879F9" strokeWidth={2} fill="url(#gu)" />
+                <Area type="monotone" dataKey="visits" stroke="#EA6A38" strokeWidth={2} fill="url(#gv)" />
+                <Area type="monotone" dataKey="newUsers" stroke="#D9A441" strokeWidth={2} fill="url(#gu)" />
               </AreaChart>
             </ChartContainer>
           )}
@@ -268,11 +268,11 @@ export default function AnalyticsDashboard() {
           ) : (
             <ChartContainer config={hoursConfig} className="!aspect-auto h-64 w-full">
               <BarChart data={peakHours.data ?? []} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(167,139,250,0.12)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(224,86,31,0.12)" vertical={false} />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} fontSize={10} interval={2} />
                 <YAxis tickLine={false} axisLine={false} fontSize={10} width={36} allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="visits" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="visits" fill="#E0561F" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           )}

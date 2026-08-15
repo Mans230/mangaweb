@@ -235,7 +235,7 @@ export default function AddByLink() {
                   scale: step === i ? 1.15 : 1,
                   background:
                     step >= i
-                      ? "linear-gradient(135deg,#7C3AED,#E879F9)"
+                      ? "var(--primary)"
                       : "var(--surface)",
                 }}
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-app text-sm font-bold text-app"

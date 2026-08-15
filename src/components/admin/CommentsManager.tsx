@@ -159,7 +159,7 @@ export default function CommentsManager() {
               key={p}
               onClick={() => setOffset((p - 1) * PAGE_SIZE)}
               className={`glass-chip !px-3.5 !py-1.5 tabular-nums ${
-                page === p ? "!border-transparent !bg-gradient-to-l !from-[#7C3AED] !to-[#E879F9] !text-white" : ""
+                page === p ? "!border-transparent !bg-[#E0561F] !text-white" : ""
               }`}
             >
               {p}
