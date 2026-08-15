@@ -471,7 +471,7 @@ export default function MangaManager() {
               key={p}
               onClick={() => setPage(p)}
               className={`glass-chip !px-3.5 !py-1.5 tabular-nums ${
-                page === p ? "!border-transparent !bg-gradient-to-l !from-[#7C3AED] !to-[#E879F9] !text-white" : ""
+                page === p ? "!border-transparent !bg-[#E0561F] !text-white" : ""
               }`}
             >
               {p}
@@ -533,7 +533,7 @@ export default function MangaManager() {
                         onClick={() => toggleDraftGenre(g.name)}
                         className={`glass-chip !px-3 !py-1 !text-xs ${
                           draft.genres.includes(g.name)
-                            ? "!border-transparent !bg-gradient-to-l !from-[#7C3AED] !to-[#E879F9] !text-white"
+                            ? "!border-transparent !bg-[#E0561F] !text-white"
                             : ""
                         }`}
                       >
@@ -606,7 +606,7 @@ export default function MangaManager() {
               onClick={confirmDelete}
               disabled={deleteMutation.isPending}
               className="btn-primary !border-none !bg-none !px-5 !py-2.5 text-sm disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg,#FB7185,#F43F5E)" }}
+              style={{ background: "var(--danger)" }}
             >
               <Trash2 size={15} /> {t("حذف نهائي", "Delete permanently")}
             </button>

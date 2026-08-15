@@ -177,7 +177,7 @@ export default function ReelsModeration() {
                         <button
                           onClick={() => approve.mutate({ id: reel.id })}
                           className="btn-primary flex-1 !border-none !bg-none !py-2.5 text-xs"
-                          style={{ background: "linear-gradient(135deg,#34D399,#10B981)" }}
+                          style={{ background: "var(--success)" }}
                         >
                           <CheckCircle2 size={14} /> {t("موافقة", "Approve")}
                         </button>
@@ -246,7 +246,7 @@ export default function ReelsModeration() {
                 rejectTarget && reject.mutate({ id: rejectTarget.id, reason: rejectReason.trim() })
               }
               className="btn-primary flex-1 !border-none !bg-none !py-2.5 text-sm disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg,#FBBF24,#F59E0B)" }}
+              style={{ background: "var(--warning)" }}
             >
               {reject.isPending ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
               {t("تأكيد الرفض", "Confirm reject")}
@@ -272,7 +272,7 @@ export default function ReelsModeration() {
               disabled={remove.isPending}
               onClick={() => removeTarget && remove.mutate({ id: removeTarget.id })}
               className="btn-primary flex-1 !border-none !bg-none !py-2.5 text-sm disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg,#FB7185,#F43F5E)" }}
+              style={{ background: "var(--danger)" }}
             >
               {remove.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
               {t("حذف نهائي", "Delete")}
