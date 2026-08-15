@@ -6,6 +6,7 @@ import { BookOpen } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
+import { proxyImg } from "@/lib/manga";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import ReaderChrome from "@/components/reader/ReaderChrome";
 import WebtoonView from "@/components/reader/WebtoonView";
@@ -53,7 +54,7 @@ export default function Reader() {
       id: d.id,
       slug: d.slug,
       title: d.title,
-      cover: d.coverUrl ?? "/cover-01.png",
+      cover: proxyImg(d.coverUrl) || "/cover-01.png",
       isAdult: d.isAdult,
       fromApi: true,
       chapters: d.chapters.map((c) => ({
