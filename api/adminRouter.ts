@@ -26,6 +26,8 @@ import {
   setSetting,
   SETTING_COMMUNITY_MANGA_ENABLED,
   SETTING_COMMUNITY_USER_ENABLED,
+  SETTING_UI_HIDE_COMMUNITIES,
+  SETTING_UI_HIDE_REELS,
 } from "./lib/siteSettings";
 import { generateInviteCode, uniqueSlug } from "./communitiesRouter";
 import { enabledScrapers } from "./scrapers";
@@ -709,6 +711,37 @@ export const adminRouter = createRouter({
     ]);
     return { user: user === "1", manga: mangaEnabled === "1" };
   }),
+
+  /** مفاتيح إخفاء أقسام الواجهة (المجتمعات/الريلز) — قراءة */
+  getUiToggles: adminQuery.query(async () => {
+    const [hideCommunities, hideReels] = await Promise.all([
+      getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
+      getSetting(SETTING_UI_HIDE_REELS, "0"),
+    ]);
+    return {
+      hideCommunities: hideCommunities === "1",
+      hideReels: hideReels === "1",
+    };
+  }),
+
+  /** تعديل مفاتيح إخفاء أقسام الواجهة — يُخفي الروابط والصفحات فوراً */
+  setUiToggles: adminQuery
+    .input(
+      z.object({
+        hideCommunities: z.boolean().optional(),
+        hideReels: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.hideCommunities !== undefined) {
+        await setSetting(SETTING_UI_HIDE_COMMUNITIES, input.hideCommunities ? "1" : "0");
+      }
+      if (input.hideReels !== undefined) {
+        await setSetting(SETTING_UI_HIDE_REELS, input.hideReels ? "1" : "0");
+      }
+      await logAdminAction(ctx.user.id, "settings.ui_toggles", { meta: input });
+      return { success: true };
+    }),
 
   /** أرشفة/إلغاء أرشفة مجتمع — الأرشفة تجعله للقراءة فقط */
   setCommunityArchived: adminQuery
