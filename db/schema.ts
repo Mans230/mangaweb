@@ -695,6 +695,9 @@ export type NotificationPayload = {
   mangaSlug?: string;
   chapterId?: number;
   chapterNumber?: number;
+  /** إشعارات عامة (نص حر) */
+  title?: string;
+  body?: string;
 };
 
 export const notifications = mysqlTable(

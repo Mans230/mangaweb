@@ -29,6 +29,7 @@ interface ChaptersTabProps {
   nextChapter: number | null;
   markAllPending: boolean;
   onMarkAllRead: () => void;
+  onMarkAllUnread: () => void;
 }
 
 /** علامة صح تُرسم عند القراءة */
@@ -131,6 +132,16 @@ export default function ChaptersTab({
     }
     setConfirmMark(false);
     onMarkAllRead();
+  };
+
+  const handleUnmarkAll = () => {
+    if (!confirmUnmark) {
+      setConfirmUnmark(true);
+      window.setTimeout(() => setConfirmUnmark(false), 3000);
+      return;
+    }
+    setConfirmUnmark(false);
+    onMarkAllUnread();
   };
 
   const renderRow = (c: ChapterVM, index: number) => {
