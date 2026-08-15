@@ -200,6 +200,7 @@ export default function MangaDetail() {
 
   /* ================= تحديد الكل كمقروء ================= */
   const progressMutation = trpc.library.updateProgress.useMutation();
+  const clearProgressMutation = trpc.library.clearProgress.useMutation();
   const markAllRead = () => {
     if (!vm) return;
     if (!isAuthenticated) return requireAuth();
@@ -207,6 +208,12 @@ export default function MangaDetail() {
     if (!latest) return;
     setLastReadOverride(latest.number);
     progressMutation.mutate({ mangaId: vm.id, chapterId: latest.id, lastPage: 0 });
+  };
+  const markAllUnread = () => {
+    if (!vm) return;
+    if (!isAuthenticated) return requireAuth();
+    setLastReadOverride(0);
+    clearProgressMutation.mutate({ mangaId: vm.id });
   };
 
   /* ================= +18 ================= */
@@ -374,8 +381,9 @@ export default function MangaDetail() {
                 chapters={vm.chapters}
                 lastReadNumber={lastRead}
                 nextChapter={nextChapter}
-                markAllPending={progressMutation.isPending}
+                markAllPending={progressMutation.isPending || clearProgressMutation.isPending}
                 onMarkAllRead={markAllRead}
+                onMarkAllUnread={markAllUnread}
               />
             )}
             {activeTab === "comments" && (

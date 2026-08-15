@@ -167,6 +167,9 @@ function UiSectionsCard() {
   const toggle = (key: "hideCommunities" | "hideReels", value: boolean) =>
     save.mutate({ [key]: value });
 
+  const [groupUrl, setGroupUrl] = useState<string | null>(null);
+  const groupUrlValue = groupUrl ?? query.data?.communityGroupUrl ?? "";
+
   const rows: {
     key: "hideCommunities" | "hideReels";
     title: string;
@@ -239,6 +242,36 @@ function UiSectionsCard() {
               </div>
             );
           })}
+
+          {/* رابط جروب المناقشة — زر "انضم للمناقشة" في صفحات المانجا */}
+          <div className="glass !rounded-2xl p-3.5">
+            <div className="text-sm font-semibold text-app">
+              {t("جروب المناقشة", "Discussion group")}
+            </div>
+            <div className="mt-0.5 text-[11px] leading-relaxed text-app-3">
+              {t(
+                "رابط جروب تليجرام/ديسكورد — يظهر زر «انضم لجروب المناقشة» في صفحة كل مانجا. اتركه فارغاً لإخفاء الزر.",
+                "Telegram/Discord group link — shows a join button on every manga page. Leave empty to hide it.",
+              )}
+            </div>
+            <div className="mt-2.5 flex items-center gap-2">
+              <input
+                dir="ltr"
+                value={groupUrlValue}
+                onChange={(e) => setGroupUrl(e.target.value)}
+                placeholder="https://t.me/your_group"
+                className="input-glass flex-1 !py-2 text-xs"
+              />
+              <button
+                type="button"
+                disabled={save.isPending}
+                onClick={() => save.mutate({ communityGroupUrl: groupUrlValue.trim() })}
+                className="btn-primary shrink-0 !px-4 !py-2 text-xs"
+              >
+                {t("حفظ", "Save")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </motion.section>
