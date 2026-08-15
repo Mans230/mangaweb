@@ -28,6 +28,7 @@ import {
   SETTING_COMMUNITY_USER_ENABLED,
   SETTING_UI_HIDE_COMMUNITIES,
   SETTING_UI_HIDE_REELS,
+  SETTING_COMMUNITY_GROUP_URL,
 } from "./lib/siteSettings";
 import { generateInviteCode, uniqueSlug } from "./communitiesRouter";
 import { enabledScrapers } from "./scrapers";
@@ -714,13 +715,15 @@ export const adminRouter = createRouter({
 
   /** مفاتيح إخفاء أقسام الواجهة (المجتمعات/الريلز) — قراءة */
   getUiToggles: adminQuery.query(async () => {
-    const [hideCommunities, hideReels] = await Promise.all([
+    const [hideCommunities, hideReels, communityGroupUrl] = await Promise.all([
       getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
       getSetting(SETTING_UI_HIDE_REELS, "0"),
+      getSetting(SETTING_COMMUNITY_GROUP_URL, ""),
     ]);
     return {
       hideCommunities: hideCommunities === "1",
       hideReels: hideReels === "1",
+      communityGroupUrl: communityGroupUrl ?? "",
     };
   }),
 
@@ -730,6 +733,7 @@ export const adminRouter = createRouter({
       z.object({
         hideCommunities: z.boolean().optional(),
         hideReels: z.boolean().optional(),
+        communityGroupUrl: z.string().trim().max(500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -738,6 +742,9 @@ export const adminRouter = createRouter({
       }
       if (input.hideReels !== undefined) {
         await setSetting(SETTING_UI_HIDE_REELS, input.hideReels ? "1" : "0");
+      }
+      if (input.communityGroupUrl !== undefined) {
+        await setSetting(SETTING_COMMUNITY_GROUP_URL, input.communityGroupUrl);
       }
       await logAdminAction(ctx.user.id, "settings.ui_toggles", { meta: input });
       return { success: true };
