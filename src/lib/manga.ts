@@ -6,6 +6,16 @@
 
 export type Lang = "ar" | "en";
 
+/**
+ * لفّ رابط صورة خارجي عبر بروكسي /api/img (مصادر كثيرة تمنع التحميل المباشر
+ * hotlink protection فتظهر الأغلفة مكسورة). الروابط المحلية تمر كما هي.
+ */
+export function proxyImg(url?: string | null): string {
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) return url;
+  return `/api/img?u=${encodeURIComponent(url)}`;
+}
+
 export type MangaType = "مانهوا" | "مانجا" | "مانها";
 export type MangaStatus = "مستمر" | "مكتمل" | "متوقف";
 
@@ -196,7 +206,7 @@ export function adaptMangaRow(m: ApiMangaRow, lang: Lang = "ar"): MangaCardData 
     slug: m.slug,
     title: m.title,
     altTitle: m.altTitles?.[0],
-    cover: m.coverUrl || "/cover-01.png",
+    cover: proxyImg(m.coverUrl) || "/cover-01.png",
     type: TYPE_AR[m.type] ?? "مانهوا",
     status: STATUS_AR[m.status] ?? "مستمر",
     rating: m.rating ?? 0,
@@ -229,7 +239,7 @@ export function adaptLatestChapter(
     id: Number(c.id),
     mangaSlug: c.manga.slug,
     mangaTitle: c.manga.title,
-    cover: c.manga.coverUrl || "/cover-01.png",
+    cover: proxyImg(c.manga.coverUrl) || "/cover-01.png",
     chapter: c.number,
     timeAgo: timeAgo(when, lang),
     source: c.manga.source?.name ?? "",

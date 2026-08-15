@@ -3,7 +3,7 @@
  * البيانات تأتي حصرياً من tRPC (صفوف قاعدة البيانات) — لا بدائل وهمية.
  */
 import type { Lang, MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
-import { STATUS_AR, TYPE_AR, formatViews, timeAgo } from "@/lib/manga";
+import { STATUS_AR, TYPE_AR, formatViews, proxyImg, timeAgo } from "@/lib/manga";
 
 /** نافذة اعتبار الفصل "جديداً" — ٤٨ ساعة من نزوله */
 const NEW_CHAPTER_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -107,7 +107,7 @@ export function dbMangaToCard(m: DbMangaLike, lang: Lang): MangaCardData {
     slug: m.slug,
     title: m.title,
     altTitle: m.altTitles?.[0],
-    cover: m.coverUrl || "/cover-01.png",
+    cover: proxyImg(m.coverUrl) || "/cover-01.png",
     type: TYPE_AR[m.type] ?? "مانهوا",
     status: STATUS_AR[m.status] ?? "مستمر",
     rating: m.rating ?? 0,
