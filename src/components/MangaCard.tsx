@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { motion } from "framer-motion";
 import { Lock, Star } from "lucide-react";
 import type { MangaCardData } from "@/lib/manga";
 import AgeGateModal, { isAgeConfirmed } from "./AgeGateModal";
@@ -12,12 +11,6 @@ interface MangaCardProps {
   className?: string;
 }
 
-const typeColors: Record<string, string> = {
-  مانهوا: "var(--primary-soft)",
-  مانجا: "var(--accent-2)",
-  مانها: "var(--accent)",
-};
-
 export default function MangaCard({ manga, rank, className = "" }: MangaCardProps) {
   const { t } = useLanguage();
   const [gateOpen, setGateOpen] = useState(false);
@@ -25,79 +18,56 @@ export default function MangaCard({ manga, rank, className = "" }: MangaCardProp
   const blurCover = manga.isAdult && !allowed;
 
   const card = (
-    <motion.div
-      whileHover={{ y: -6 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className={`glass group relative overflow-hidden !rounded-2xl p-2 transition-shadow hover:shadow-[0_16px_40px_rgba(124,58,237,0.18)] ${className}`}
-    >
+    <div className={`ed-card group ${className}`}>
       {/* Cover */}
-      <div className="sheen relative aspect-[2/3] overflow-hidden rounded-[14px]">
+      <div className="ed-card-cover">
         <img
           src={manga.cover}
           alt={manga.title}
           loading="lazy"
           decoding="async"
-          className={`h-full w-full object-cover transition-transform duration-500 ease-expo-out group-hover:scale-[1.06] ${
-            blurCover ? "scale-110 blur-lg" : ""
-          }`}
+          className={`h-full w-full object-cover ${blurCover ? "scale-110 blur-lg" : ""}`}
         />
         {blurCover && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/30">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40">
             <Lock size={26} className="text-white" />
-            <span className="glass-chip !text-[11px] font-bold text-white">+18</span>
+            <span className="ed-tag">+18</span>
           </div>
         )}
-        {/* gradient overlay + title on hover */}
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         {/* type badge */}
+        <span className="ed-type-badge">{manga.type}</span>
+        {/* status square */}
         <span
-          className="absolute end-2 top-2 rounded-full px-2.5 py-1 text-[10.5px] font-bold text-white shadow-md"
-          style={{ background: typeColors[manga.type] ?? "var(--primary-soft)" }}
-        >
-          {manga.type}
-        </span>
-        {/* status dot */}
-        <span className="absolute start-2.5 top-2.5 flex h-2.5 w-2.5">
-          <span
-            className={`h-full w-full rounded-full ${
-              manga.status === "مستمر" ? "animate-pulse-soft bg-warning" : "bg-success"
-            }`}
-          />
-        </span>
+          className={`absolute start-2 top-2 h-2 w-2 rounded-[2px] border border-black/20 ${
+            manga.status === "مستمر" ? "bg-warning" : "bg-success"
+          }`}
+        />
         {manga.isAdult && !blurCover && (
-          <span className="absolute bottom-2 start-2 rounded-md bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white">
+          <span className="absolute bottom-2 start-2 rounded-[2px] bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white">
             +18
           </span>
         )}
         {/* rank digit */}
-        {rank !== undefined && (
-          <span
-            className="absolute bottom-1 end-2 font-display text-5xl font-extrabold leading-none text-transparent opacity-90"
-            style={{ WebkitTextStroke: "1.5px rgba(255,255,255,0.75)" }}
-          >
-            {rank}
-          </span>
-        )}
+        {rank !== undefined && <span className="ed-rank">{rank}</span>}
       </div>
 
       {/* Meta */}
-      <div className="px-1.5 pb-1.5 pt-2.5">
-        <h3 className="truncate text-sm font-bold text-app">{manga.title}</h3>
+      <div className="px-1 pb-1 pt-2.5">
+        <h3 className="truncate text-sm font-bold text-app transition-colors group-hover:text-[var(--ed-accent)]">
+          {manga.title}
+        </h3>
         <div className="mt-1.5 flex items-center gap-2 text-[11.5px] text-app-3">
-          <span className="flex items-center gap-1 font-semibold text-warning">
+          <span className="flex items-center gap-1 font-semibold" style={{ color: "var(--ed-accent)" }}>
             <Star size={12} fill="currentColor" />
             {manga.rating.toFixed(1)}
           </span>
-          <span className="glass-chip !border-0 !px-2 !py-0.5 !text-[10.5px]">
+          <span className="ed-tag-outline !text-[10.5px]">
             {t("فصل", "Ch.")} {manga.chapters}
           </span>
-          <span className="ms-auto flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" />
-            <span className="max-w-[72px] truncate">{manga.source}</span>
-          </span>
+          <span className="ms-auto max-w-[72px] truncate">{manga.source}</span>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 
   if (manga.isAdult && !allowed) {
