@@ -427,3 +427,388 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   Editorial "مِداد" system — فهرس مجلة مطبوعة:
+   حبر + ورق دافئ + لون واحد صارخ، حدود صلبة، ظلال منزاحة قاسية،
+   بلا تدرجات وبلا زجاجيات.
+   ============================================================ */
+@layer components {
+  /* متغيرات عامة حتى تعمل مكونات ed-* خارج الصفحة الرئيسية أيضاً */
+  :root {
+    --ed-bg: #efe8d8;
+    --ed-bg2: #e6ddc9;
+    --ed-line: #c6baa0;
+    --ed-paper: #211b12;
+    --ed-paper2: #4a4130;
+    --ed-dim: #7d7360;
+    --ed-accent: #c2471a;
+    --ed-accent-soft: rgba(194, 71, 26, 0.12);
+  }
+  [data-theme="dark"] {
+    --ed-bg: #151210;
+    --ed-bg2: #1d1a16;
+    --ed-line: #3c352c;
+    --ed-paper: #ece4d4;
+    --ed-paper2: #cfc6b4;
+    --ed-dim: #9a917f;
+    --ed-accent: #e0561f;
+    --ed-accent-soft: rgba(224, 86, 31, 0.14);
+  }
+
+  .font-ed {
+    font-family: "Changa", "Noto Kufi Arabic", sans-serif;
+  }
+  .font-ednum {
+    font-family: "Barlow Condensed", "Space Grotesk", sans-serif;
+  }
+
+  /* نطاق الصفحة الرئيسية: خلفية حبر مسطّحة + نمط هافتون خفيف جداً */
+  .ed-home {
+    background-color: var(--ed-bg);
+    color: var(--ed-paper);
+  }
+  .ed-halftone {
+    background-image: radial-gradient(circle, var(--ed-line) 1.1px, transparent 1.2px);
+    background-size: 7px 7px;
+  }
+
+  /* أزرار صلبة */
+  .ed-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--ed-accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 13px 26px;
+    border: 1px solid var(--ed-accent);
+    border-radius: 4px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .ed-btn-primary:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 5px 5px 0 var(--ed-paper);
+  }
+  .ed-btn-primary:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+  .ed-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--ed-paper);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 13px 22px;
+    border: 1px solid var(--ed-line);
+    border-radius: 4px;
+    transition: transform 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .ed-btn-ghost:hover {
+    border-color: var(--ed-accent);
+    color: var(--ed-accent);
+    transform: translate(-2px, -2px);
+  }
+  .ed-btn-ghost-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--ed-line);
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ed-paper2);
+    transition: border-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+  .ed-btn-ghost-sm:hover {
+    border-color: var(--ed-accent);
+    color: var(--ed-accent);
+  }
+
+  /* رأس قسم: عنوان Changa + خط قاعدة + عداد */
+  .ed-sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .ed-sec-head h2 {
+    font-family: "Changa", "Noto Kufi Arabic", sans-serif;
+    font-weight: 800;
+    font-size: clamp(22px, 3vw, 30px);
+    line-height: 1.2;
+    color: var(--ed-paper);
+    white-space: nowrap;
+  }
+  .ed-rule {
+    flex: 1;
+    height: 1px;
+    background: var(--ed-line);
+    min-width: 20px;
+  }
+  .ed-count {
+    font-family: "Barlow Condensed", sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    color: var(--ed-dim);
+    white-space: nowrap;
+  }
+
+  /* وسم صلب صغير */
+  .ed-tag {
+    display: inline-flex;
+    align-items: center;
+    background: var(--ed-accent);
+    color: #fff;
+    font-family: "Barlow Condensed", "IBM Plex Sans Arabic", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .ed-tag-outline {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--ed-line);
+    color: var(--ed-paper2);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  /* فهرس آخر الفصول — TOC بنقاط قائدة */
+  .ed-toc {
+    border-top: 1px solid var(--ed-line);
+  }
+  .ed-toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--ed-line);
+    transition: background 0.12s ease;
+  }
+  .ed-toc-item:hover {
+    background: var(--ed-accent-soft);
+  }
+  .ed-toc-num {
+    font-family: "Barlow Condensed", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ed-dim);
+    min-width: 28px;
+  }
+  .ed-toc-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ed-paper);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.12s ease;
+  }
+  .ed-toc-item:hover .ed-toc-title {
+    color: var(--ed-accent);
+  }
+  .ed-toc-dots {
+    flex: 1;
+    min-width: 16px;
+    border-bottom: 2px dotted var(--ed-line);
+    transform: translateY(-4px);
+  }
+  .ed-toc-ch {
+    font-family: "Barlow Condensed", sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--ed-paper2);
+    white-space: nowrap;
+  }
+  .ed-toc-time {
+    font-size: 11px;
+    color: var(--ed-dim);
+    min-width: 64px;
+    text-align: end;
+    white-space: nowrap;
+  }
+
+  /* بطاقة مانجا إفتتاحية — حدود صلبة + ظل منزاح */
+  .ed-card {
+    position: relative;
+    background: var(--ed-bg2);
+    border: 1px solid var(--ed-line);
+    border-radius: 4px;
+    padding: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .ed-card:hover {
+    transform: translate(-4px, -4px);
+    box-shadow: 6px 6px 0 var(--ed-accent);
+    border-color: var(--ed-accent);
+  }
+  .ed-card-cover {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border: 1px solid var(--ed-line);
+    border-radius: 2px;
+  }
+  .ed-type-badge {
+    position: absolute;
+    top: 8px;
+    inset-inline-end: 8px;
+    background: var(--ed-bg);
+    border: 1px solid var(--ed-line);
+    color: var(--ed-paper2);
+    font-family: "Barlow Condensed", "IBM Plex Sans Arabic", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 2px;
+  }
+  .ed-rank {
+    position: absolute;
+    bottom: 4px;
+    inset-inline-end: 10px;
+    font-family: "Barlow Condensed", sans-serif;
+    font-size: 54px;
+    font-weight: 700;
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(236, 228, 212, 0.85);
+  }
+  :root:not([data-theme="dark"]) .ed-rank {
+    -webkit-text-stroke: 1.5px rgba(33, 27, 18, 0.55);
+  }
+
+  /* شريط إحصاءات مقسّم بحدود */
+  .ed-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    border: 1px solid var(--ed-line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  @media (min-width: 768px) {
+    .ed-stats {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .ed-stat {
+    padding: 18px 20px;
+    border-inline-end: 1px solid var(--ed-line);
+    border-bottom: 1px solid var(--ed-line);
+    background: var(--ed-bg2);
+  }
+  .ed-stat:last-child {
+    border-inline-end: none;
+  }
+  @media (min-width: 768px) {
+    .ed-stat {
+      border-bottom: none;
+    }
+  }
+  .ed-stat-num {
+    font-family: "Barlow Condensed", sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ed-paper);
+  }
+  .ed-stat-label {
+    font-size: 12px;
+    color: var(--ed-dim);
+    margin-top: 4px;
+  }
+
+  /* رقائق التصنيفات — مربعة صلبة */
+  .ed-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--ed-line);
+    border-radius: 3px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ed-paper2);
+    background: transparent;
+    transition: all 0.13s ease;
+    cursor: pointer;
+  }
+  .ed-chip:hover {
+    border-color: var(--ed-accent);
+    color: var(--ed-accent);
+    transform: translate(-2px, -2px);
+    box-shadow: 3px 3px 0 var(--ed-accent-soft);
+  }
+  .ed-chip-popular {
+    background: var(--ed-accent);
+    border-color: var(--ed-accent);
+    color: #fff;
+    padding: 10px 22px;
+    font-size: 14px;
+  }
+  .ed-chip-popular:hover {
+    color: #fff;
+    box-shadow: 3px 3px 0 var(--ed-line);
+  }
+  .ed-chip-adult {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* شريط المصادر المتحرك */
+  .ed-marquee {
+    border-top: 1px solid var(--ed-line);
+    border-bottom: 1px solid var(--ed-line);
+    background: var(--ed-bg2);
+    overflow: hidden;
+    padding: 16px 0;
+  }
+
+  /* مربعات مؤشر السلايدر */
+  .ed-dot {
+    width: 22px;
+    height: 6px;
+    border: 1px solid var(--ed-line);
+    background: transparent;
+    border-radius: 2px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .ed-dot-active {
+    background: var(--ed-accent);
+    border-color: var(--ed-accent);
+  }
+
+  /* أسهم مربعة */
+  .ed-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--ed-line);
+    border-radius: 3px;
+    color: var(--ed-paper2);
+    background: var(--ed-bg2);
+    transition: all 0.15s ease;
+  }
+  .ed-arrow:hover {
+    background: var(--ed-accent);
+    border-color: var(--ed-accent);
+    color: #fff;
+  }
+}
