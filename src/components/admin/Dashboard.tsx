@@ -70,14 +70,14 @@ function KpiCard({
 }
 
 const DONUT_COLORS = [
-  "#7C3AED",
-  "#A78BFA",
-  "#C4B5FD",
-  "#E879F9",
-  "#38BDF8",
-  "#F0ABFC",
-  "#818CF8",
-  "#67E8F9",
+  "#E0561F",
+  "#EA6A38",
+  "#8A7F68",
+  "#D9A441",
+  "#7FA6A3",
+  "#B0563A",
+  "#8A7F68",
+  "#A8552F",
 ];
 
 export default function AdminDashboard() {

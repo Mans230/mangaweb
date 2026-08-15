@@ -119,7 +119,7 @@ function EditMangaDialog({
                   onClick={() => toggleGenre(g.name)}
                   className={`glass-chip !px-3 !py-1 !text-xs ${
                     genres.includes(g.name)
-                      ? "!border-transparent !bg-gradient-to-l !from-[#7C3AED] !to-[#E879F9] !text-white"
+                      ? "!border-transparent !bg-[#E0561F] !text-white"
                       : ""
                   }`}
                 >
@@ -557,7 +557,7 @@ function ChaptersSheet({
                 disabled={del.isPending}
                 onClick={() => deleteTarget && del.mutate({ id: deleteTarget.id })}
                 className="btn-primary flex-1 !border-none !bg-none !py-2.5 text-sm disabled:opacity-50"
-                style={{ background: "linear-gradient(135deg,#FB7185,#F43F5E)" }}
+                style={{ background: "var(--danger)" }}
               >
                 <Trash2 size={14} /> {t("حذف نهائي", "Delete")}
               </button>
