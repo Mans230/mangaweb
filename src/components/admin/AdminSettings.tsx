@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Construction,
+  EyeOff,
   Loader2,
   RefreshCw,
   Save,
@@ -145,6 +146,101 @@ function ScrapeTriggerCard() {
             : t("افحص الآن", "Scan now")}
         </button>
       </div>
+    </motion.section>
+  );
+}
+
+/* ================= أقسام الواجهة (إخفاء المجتمعات/الريلز) ================= */
+function UiSectionsCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const query = trpc.admin.getUiToggles.useQuery(undefined, { retry: false });
+
+  const save = trpc.admin.setUiToggles.useMutation({
+    onSuccess: () => {
+      toast(t("تم حفظ إعدادات الأقسام", "Section settings saved"));
+      query.refetch();
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+
+  const toggle = (key: "hideCommunities" | "hideReels", value: boolean) =>
+    save.mutate({ [key]: value });
+
+  const rows: {
+    key: "hideCommunities" | "hideReels";
+    title: string;
+    desc: string;
+  }[] = [
+    {
+      key: "hideCommunities",
+      title: t("إخفاء المجتمعات", "Hide communities"),
+      desc: t(
+        "يُخفي صفحات المجتمعات والشات وروابطها من كل الموقع فوراً.",
+        "Hides community pages, chats and all their links site-wide.",
+      ),
+    },
+    {
+      key: "hideReels",
+      title: t("إخفاء الريلز", "Hide reels"),
+      desc: t(
+        "يُخفي ريلز Fun (الفيديوهات القصيرة) وروابطها من الموقع.",
+        "Hides Fun reels (short videos) and their links.",
+      ),
+    },
+  ];
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.06 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-1 flex items-center gap-2 text-sm font-bold text-app">
+        <EyeOff size={16} className="text-primary" />
+        {t("أقسام الواجهة", "Site sections")}
+      </h3>
+      <p className="mb-3 text-xs text-app-3">
+        {t(
+          "تحكّم في ظهور الأقسام الكبيرة. الإخفاء يطبَّق فوراً على كل الزوار.",
+          "Control visibility of major sections. Hiding applies instantly to all visitors.",
+        )}
+      </p>
+      {query.isLoading ? (
+        <div className="skeleton h-28" />
+      ) : query.isError ? (
+        <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+      ) : (
+        <div className="space-y-2.5">
+          {rows.map((row) => {
+            const hidden = query.data?.[row.key] ?? false;
+            return (
+              <div
+                key={row.key}
+                className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-app">
+                    {row.title}
+                    {hidden && (
+                      <span className="ms-2 rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">
+                        {t("مخفي", "Hidden")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[11px] leading-relaxed text-app-3">{row.desc}</div>
+                </div>
+                <Switch
+                  checked={hidden}
+                  disabled={save.isPending}
+                  onCheckedChange={(v) => toggle(row.key, v)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </motion.section>
   );
 }
@@ -333,6 +429,7 @@ export default function AdminSettings() {
     <div className="space-y-4">
       <BannedWordsCard />
       <ScrapeTriggerCard />
+      <UiSectionsCard />
       <MaintenanceCard />
       <AdminLogsCard />
     </div>
