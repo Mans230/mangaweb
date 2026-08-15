@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, count, desc, eq, gte, like, lte, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNotNull, isNull, like, lte, ne, sql } from "drizzle-orm";
 import {
   chapters,
   favorites,
@@ -11,6 +11,11 @@ import {
 import { getDb } from "./queries/connection";
 import { createRouter, publicQuery } from "./middleware";
 import { getScraper } from "./scrapers";
+import {
+  getSetting,
+  SETTING_UI_HIDE_COMMUNITIES,
+  SETTING_UI_HIDE_REELS,
+} from "./lib/siteSettings";
 import { TRPCError } from "@trpc/server";
 
 /** كاش صفحات الفصول في الذاكرة — روابط بعض المصادر موقّعة وتنتهي (TTL 20 دقيقة) */
@@ -251,6 +256,32 @@ export const mangaRouter = createRouter({
         .limit(input.limit);
       return rows.map((r) => ({ ...r.manga, source: r.source }));
     }),
+
+  /** المانجا المثبّتة من الأدمن (featuredAt) — سلايدر الواجهة يعرضها أولاً */
+  featured: publicQuery
+    .input(z.object({ limit: z.number().int().min(1).max(20).default(10) }))
+    .query(async ({ input }) => {
+      const rows = await getDb()
+        .select({ manga: manga, source: sources })
+        .from(manga)
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(and(isNotNull(manga.featuredAt), isNull(manga.hiddenAt)))
+        .orderBy(desc(manga.featuredAt))
+        .limit(input.limit);
+      return rows.map((r) => ({ ...r.manga, source: r.source }));
+    }),
+
+  /** مفاتيح إظهار/إخفاء أقسام الواجهة — عامة (بلا حساسية) حتى تخفي الواجهة الروابط */
+  uiToggles: publicQuery.query(async () => {
+    const [hideCommunities, hideReels] = await Promise.all([
+      getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
+      getSetting(SETTING_UI_HIDE_REELS, "0"),
+    ]);
+    return {
+      hideCommunities: hideCommunities === "1",
+      hideReels: hideReels === "1",
+    };
+  }),
 
   /** الأكثر مشاهدة — ترتيب viewCount تنازلياً، حقول البطاقات الأساسية */
   mostViewed: publicQuery
