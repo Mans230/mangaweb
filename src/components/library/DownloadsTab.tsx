@@ -141,7 +141,7 @@ export default function DownloadsTab() {
           <button
             onClick={clearAll}
             className="btn-primary flex-1 !py-2.5 text-sm !shadow-none"
-            style={{ background: "linear-gradient(135deg,#FB7185,#E879F9)" }}
+            style={{ background: "var(--danger)" }}
           >
             {t("نعم، امسح السجل", "Yes, clear it")}
           </button>

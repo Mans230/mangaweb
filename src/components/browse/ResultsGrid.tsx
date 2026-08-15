@@ -183,7 +183,7 @@ export function Pagination({ page, totalPages, onChange }: PaginationProps) {
           aria-current={p === page ? "page" : undefined}
           className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
             p === page
-              ? "gradient-primary text-white shadow-[0_6px_18px_rgba(124,58,237,0.4)]"
+              ? "gradient-primary text-white shadow-[0_6px_18px_rgba(224,86,31,0.4)]"
               : "glass-chip !justify-center !p-0 text-app-2"
           }`}
         >

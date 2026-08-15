@@ -51,7 +51,7 @@ function RankRow({ manga, rank }: { manga: MangaCardData; rank: number }) {
     >
       <Link
         to={`/manga/${manga.slug}`}
-        className="group flex items-center gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-[rgba(167,139,250,0.12)]"
+        className="group flex items-center gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-[rgba(224,86,31,0.12)]"
       >
         <span
           className={`font-display w-5 shrink-0 text-center text-sm font-extrabold ${
@@ -86,7 +86,7 @@ function FreshRow({ item }: { item: LatestChapterData }) {
   return (
     <Link
       to={`/manga/${item.mangaSlug}/chapter/${item.chapter}`}
-      className="group flex items-center gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-[rgba(167,139,250,0.12)]"
+      className="group flex items-center gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-[rgba(224,86,31,0.12)]"
     >
       <img
         src={item.cover}
