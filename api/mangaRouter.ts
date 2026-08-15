@@ -15,6 +15,7 @@ import {
   getSetting,
   SETTING_UI_HIDE_COMMUNITIES,
   SETTING_UI_HIDE_REELS,
+  SETTING_COMMUNITY_GROUP_URL,
 } from "./lib/siteSettings";
 import { TRPCError } from "@trpc/server";
 
@@ -277,13 +278,15 @@ export const mangaRouter = createRouter({
 
   /** مفاتيح إظهار/إخفاء أقسام الواجهة — عامة (بلا حساسية) حتى تخفي الواجهة الروابط */
   uiToggles: publicQuery.query(async () => {
-    const [hideCommunities, hideReels] = await Promise.all([
+    const [hideCommunities, hideReels, communityGroupUrl] = await Promise.all([
       getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
       getSetting(SETTING_UI_HIDE_REELS, "0"),
+      getSetting(SETTING_COMMUNITY_GROUP_URL, ""),
     ]);
     return {
       hideCommunities: hideCommunities === "1",
       hideReels: hideReels === "1",
+      communityGroupUrl: communityGroupUrl ?? "",
     };
   }),
 
