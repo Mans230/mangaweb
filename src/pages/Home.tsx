@@ -101,12 +101,16 @@ function SectionHeader({ title, moreTo, extra }: { title: string; moreTo?: strin
   );
 }
 
-/* ================= 1. Hero slider — أعلى 5 شعبية ببيانات حقيقية ================= */
+/* ================= 1. Hero slider — المثبّتة من الأدمن أولاً، وإلا الأعلى شعبية ================= */
 function HeroSlider() {
   const { t } = useLanguage();
   // على الموبايل لا تُرسم نسخ الديسكتوب المكررة من الغلاف إطلاقاً (توفير تحميل)
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const query = trpc.manga.popular.useQuery({ limit: 5 }, { retry: false });
+  // الأدمن يثبّت ما يعجبه (إدارة المحتوى → تمييز) — تظهر هنا فوراً
+  const featuredQuery = trpc.manga.featured.useQuery({ limit: 5 }, { retry: false });
+  const popularQuery = trpc.manga.popular.useQuery({ limit: 5 }, { retry: false });
+  const useFeatured = (featuredQuery.data?.length ?? 0) > 0;
+  const query = useFeatured ? featuredQuery : popularQuery;
   const slides = (query.data ?? []).map((m) => adaptMangaRow(m));
 
   const [index, setIndex] = useState(0);
