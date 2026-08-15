@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   BookOpen,
@@ -282,76 +282,6 @@ function HeroSlider() {
   );
 }
 
-/* ================= Quick stats — شريط مقسّم بحدود ================= */
-function useCountUp(target: number, active: boolean, duration = 1200) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let raf = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setValue(Math.round(target * eased));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active, target, duration]);
-  return value;
-}
-
-function StatCell({ label, value, suffix }: { label: string; value: number | null; suffix?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-20% 0px" });
-  const display = useCountUp(value ?? 0, inView && value !== null);
-  return (
-    <div ref={ref} className="ed-stat">
-      <div className="ed-stat-num" dir="ltr">
-        {value === null ? "—" : display.toLocaleString("en-US")}
-        {suffix && <span className="ms-1 text-[16px] text-[var(--ed-dim)]">{suffix}</span>}
-      </div>
-      <div className="ed-stat-label">{label}</div>
-    </div>
-  );
-}
-
-function QuickStats() {
-  const { t } = useLanguage();
-  const query = trpc.manga.publicStats.useQuery(undefined, { retry: false });
-
-  if (query.isLoading) {
-    return (
-      <section className="mx-auto max-w-6xl px-4 pt-10 md:px-6">
-        <div className="ed-stats">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="skeleton h-[86px] !rounded-none" />
-          ))}
-        </div>
-      </section>
-    );
-  }
-  // عند الفشل يُخفى الشريط بدل أرقام مزيفة
-  if (query.isError || !query.data) return null;
-
-  const { sourceCount, mangaCount, chapterCount } = query.data;
-  return (
-    <section className="mx-auto max-w-6xl px-4 pt-10 md:px-6">
-      <div className="ed-stats">
-        <StatCell label={t("مصادر نشطة", "Active sources")} value={sourceCount} />
-        <StatCell label={t("سلسلة متاحة", "Series available")} value={mangaCount} />
-        <StatCell label={t("فصل مفهرس", "Indexed chapters")} value={chapterCount} />
-        <div className="ed-stat">
-          <div className="ed-stat-num" dir="ltr">
-            15<span className="ms-1 text-[16px] text-[var(--ed-dim)]">{t("دقيقة", "min")}</span>
-          </div>
-          <div className="ed-stat-label">{t("تحديث تلقائي للفصول", "Auto chapter refresh")}</div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ================= آخر الفصول — فهرس TOC ================= */
 function LatestChapters() {
   const { t } = useLanguage();
@@ -395,6 +325,13 @@ function LatestChapters() {
             transition={{ duration: 0.4, ease: EASE, delay: (i % 4) * 0.05 }}
           >
             <Link to={`/manga/${item.mangaSlug}/chapter/${item.chapter}`} className="ed-toc-item group">
+              <img
+                src={item.cover}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-16 w-11 shrink-0 self-center rounded-[3px] border border-[var(--ed-line)] bg-[var(--ed-bg2)] object-cover"
+              />
               <span className="ed-toc-num">{String(i + 1).padStart(2, "0")}</span>
               <span className="ed-toc-title">{item.mangaTitle}</span>
               {item.isNew && <span className="ed-tag">{t("جديد", "NEW")}</span>}
@@ -766,7 +703,6 @@ export default function Home() {
       <div className="relative">
         <ReleaseTicker />
         <HeroSlider />
-        <QuickStats />
         <LatestChapters />
         <PopularCarousel />
         <MostViewed />
