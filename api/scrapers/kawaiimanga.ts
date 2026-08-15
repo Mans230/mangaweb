@@ -21,6 +21,7 @@ export class KawaiiMangaScraper extends BaseScraper {
       "kawaiimanga.org",
       "kawaii-anime.com",
       "cdn.kawaii-anime.com",
+      "manga-cdn.kawaii-anime.com",
       "img.kawaii-anime.com",
     ];
     this.imageReferer = `${SITE}/`;
@@ -85,6 +86,7 @@ export class KawaiiMangaScraper extends BaseScraper {
       slug,
       chaptersCount:
         it.chaptersCount ??
+        it.chapterCount ??
         it.chapters_count ??
         (Array.isArray(it.chapters) ? it.chapters.length : undefined),
     };
@@ -135,8 +137,12 @@ export class KawaiiMangaScraper extends BaseScraper {
       date: c.date || c.createdAt || null,
     }));
     return {
-      title: info.title || info.name || slug,
-      cover: this.abs(info.cover || info.image || "") ?? "",
+      title: info.titleAr || info.title || info.name || slug,
+      altTitles: [info.titleEn, info.title, ...(info.altTitles || [])].filter(
+        (t: any): t is string => typeof t === "string" && !!t,
+      ),
+      cover:
+        this.abs(info.coverUrl || info.cover || info.image || info.thumbnail || "") ?? "",
       url: `${this.siteBase}/manga/${slug}`,
       slug,
       description: info.description || info.synopsis || undefined,
