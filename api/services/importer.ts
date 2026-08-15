@@ -634,7 +634,7 @@ export async function fixMissingCovers(
 }
 
 /**
- * تحديث دوري للمانجا — دفعة واحدة لكل دورة (الافتراضي 200، REFRESH_BATCH_SIZE)
+ * تحديث دوري للمانجا — دفعة واحدة لكل دورة (الافتراضي 40، REFRESH_BATCH_SIZE)
  * بالتناوب: الأقدم تحديثاً أولاً، حتى لا نُحمّل المصادر بمئات الطلبات دفعة واحدة.
  */
 export async function refreshAll(): Promise<{
