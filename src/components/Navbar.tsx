@@ -19,6 +19,7 @@ import { useLanguage } from "./LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
 import { timeAgo } from "@/lib/manga";
+import { useUiToggles } from "@/lib/uiToggles";
 import {
   useMarkNotificationRead,
   useNotificationsList,
@@ -162,9 +163,11 @@ export default function Navbar() {
   }, [location.pathname]);
 
   const accountPath = isAuthenticated ? "/profile" : LOGIN_PATH;
+  const { hideCommunities, hideReels } = useUiToggles();
+  const showFun = !(hideCommunities && hideReels);
   const bottomNav = [
     { to: "/", ar: "الرئيسية", en: "Home", icon: Home },
-    { to: "/fun", ar: "Fun", en: "Fun", icon: Sparkles },
+    ...(showFun ? [{ to: "/fun", ar: "Fun", en: "Fun", icon: Sparkles }] : []),
     { to: "/library", ar: "مكتبتي", en: "Library", icon: Library },
     { to: accountPath, ar: "حسابي", en: "Account", icon: User },
     ...(user?.role === "admin"

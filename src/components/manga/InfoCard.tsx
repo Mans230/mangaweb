@@ -20,6 +20,7 @@ import {
 import StarRating from "@/components/StarRating";
 import ReportDialog from "@/components/ReportDialog";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useUiToggles } from "@/lib/uiToggles";
 import AddToListModal from "./AddToListModal";
 import ProgressRing from "./ProgressRing";
 import type { DetailVM } from "./types";
@@ -98,6 +99,7 @@ export default function InfoCard({
   onAuthRequired,
 }: InfoCardProps) {
   const { t } = useLanguage();
+  const { hideCommunities } = useUiToggles();
   const [descExpanded, setDescExpanded] = useState(false);
   const [genresExpanded, setGenresExpanded] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
@@ -421,15 +423,17 @@ export default function InfoCard({
               <ListPlus size={18} />
             </motion.button>
 
-            {/* رابط مجتمع العمل */}
-            <Link
-              to={`/manga/${vm.slug}/community`}
-              aria-label={t("المجتمع", "Community")}
-              title={t("المجتمع", "Community")}
-              className="btn-icon"
-            >
-              <Users size={18} />
-            </Link>
+            {/* رابط مجتمع العمل — يُخفى عند إيقاف المجتمعات من إعدادات الأدمن */}
+            {!hideCommunities && (
+              <Link
+                to={`/manga/${vm.slug}/community`}
+                aria-label={t("المجتمع", "Community")}
+                title={t("المجتمع", "Community")}
+                className="btn-icon"
+              >
+                <Users size={18} />
+              </Link>
+            )}
 
             <ReportDialog
               mangaId={vm.id}
