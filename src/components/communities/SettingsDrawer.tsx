@@ -29,7 +29,7 @@ export default function SettingsDrawer({
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description ?? "");
   const [imageUrl, setImageUrl] = useState(community.imageUrl ?? "");
-  const [color, setColor] = useState(community.color ?? "#7C3AED");
+  const [color, setColor] = useState(community.color ?? "#E0561F");
   const [isPrivate, setIsPrivate] = useState(community.isPrivate);
   const [slowMode, setSlowMode] = useState(String(community.slowModeSeconds));
   const [mangaSlug, setMangaSlug] = useState("");
@@ -43,7 +43,7 @@ export default function SettingsDrawer({
       setName(community.name);
       setDescription(community.description ?? "");
       setImageUrl(community.imageUrl ?? "");
-      setColor(community.color ?? "#7C3AED");
+      setColor(community.color ?? "#E0561F");
       setIsPrivate(community.isPrivate);
       setSlowMode(String(community.slowModeSeconds));
       setMangaSlug("");

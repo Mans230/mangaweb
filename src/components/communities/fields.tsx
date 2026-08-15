@@ -6,16 +6,16 @@ import { Check, ImagePlus, Link2, Loader2 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useImageUpload, IMAGE_ACCEPT } from "@/lib/upload";
 
-/** لوحة ألوان جاهزة متناسقة مع الثيم البنفسجي الداكن */
+/** لوحة ألوان جاهزة متناسقة مع ثيم الحبر والورق الدافئ */
 export const COMMUNITY_COLOR_PALETTE = [
-  "#7C3AED",
-  "#8B5CF6",
-  "#A855F7",
-  "#C026D3",
-  "#E879F9",
-  "#6366F1",
-  "#3B82F6",
-  "#14B8A6",
+  "#E0561F",
+  "#B0563A",
+  "#D9A441",
+  "#A8552F",
+  "#8A7F68",
+  "#7FA6A3",
+  "#5E8C6A",
+  "#C26A4A",
   "#F59E0B",
   "#F43F5E",
 ] as const;

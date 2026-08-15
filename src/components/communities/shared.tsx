@@ -23,7 +23,7 @@ export type MyNotificationRow =
 
 /** لون المجتمع أو البديل البنفسجي الافتراضي */
 export function communityColor(color: string | null | undefined): string {
-  return color ?? "#7C3AED";
+  return color ?? "#E0561F";
 }
 
 /** أفاتار المجتمع: صورة إن وُجدت وإلا كتلة ملونة بأول حرف من الاسم */
@@ -60,7 +60,7 @@ export function CommunityAvatar({
       aria-hidden
       className={`${cls} flex shrink-0 select-none items-center justify-center border border-app font-display font-extrabold text-white shadow-md`}
       style={{
-        background: `linear-gradient(135deg, ${communityColor(color)}, #E879F9)`,
+        background: communityColor(color),
       }}
     >
       {name.trim().charAt(0) || "م"}

@@ -24,7 +24,7 @@ export default function CreateCommunityModal({ open, onClose }: CreateCommunityM
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [color, setColor] = useState("#7C3AED");
+  const [color, setColor] = useState("#E0561F");
   const [isPrivate, setIsPrivate] = useState(false);
   const [mangaSlug, setMangaSlug] = useState("");
   const [debouncedSlug, setDebouncedSlug] = useState("");
@@ -45,7 +45,7 @@ export default function CreateCommunityModal({ open, onClose }: CreateCommunityM
     setName("");
     setDescription("");
     setImageUrl("");
-    setColor("#7C3AED");
+    setColor("#E0561F");
     setIsPrivate(false);
     setMangaSlug("");
     setDebouncedSlug("");
