@@ -534,6 +534,15 @@ export async function refreshChapters(mangaId: number): Promise<{ chaptersAdded:
   }
 
   const info = await scraper.getSeries(m.sourceUrl);
+
+  // عالج الغلاف الناقص/المحلي: الغلاف الافتراضي "/cover-01.png" ليس غلافاً حقيقياً
+  if (info.cover && (!m.coverUrl || m.coverUrl.startsWith("/"))) {
+    await db
+      .update(manga)
+      .set({ coverUrl: info.cover })
+      .where(eq(manga.id, m.id));
+  }
+
   const { count: chaptersAdded, numbers } = await upsertChapters(
     m.id,
     info.chapters,
@@ -625,7 +634,7 @@ export async function fixMissingCovers(
 }
 
 /**
- * تحديث دوري للمانجا — دفعة واحدة لكل دورة (الافتراضي 40، REFRESH_BATCH_SIZE)
+ * تحديث دوري للمانجا — دفعة واحدة لكل دورة (الافتراضي 200، REFRESH_BATCH_SIZE)
  * بالتناوب: الأقدم تحديثاً أولاً، حتى لا نُحمّل المصادر بمئات الطلبات دفعة واحدة.
  */
 export async function refreshAll(): Promise<{
@@ -636,7 +645,7 @@ export async function refreshAll(): Promise<{
 }> {
   const batchSize = Math.max(
     1,
-    parseInt(process.env.REFRESH_BATCH_SIZE || "40", 10) || 40,
+    parseInt(process.env.REFRESH_BATCH_SIZE || "200", 10) || 200,
   );
   const db = getDb();
   const all = await db
