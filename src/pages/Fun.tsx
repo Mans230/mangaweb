@@ -1,24 +1,34 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { motion } from "framer-motion";
 import { Clapperboard, Eye, Heart, UsersRound } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
+import { useUiToggles } from "@/lib/uiToggles";
 import { formatCount, type ReelFeedItem } from "@/components/reels/ReelItem";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 type FunTab = "communities" | "reels";
 
-/** صفحة Fun — تبويبان: المجتمعات (رابط لصفحة المجتمعات) والريلز (قريبًا) */
+/** صفحة Fun — تبويبان: المجتمعات والريلز (كل تبويب يُخفى من إعدادات الأدمن) */
 export default function Fun() {
   const { t } = useLanguage();
+  const { hideCommunities, hideReels } = useUiToggles();
   const [tab, setTab] = useState<FunTab>("communities");
 
   const tabs: { key: FunTab; label: string; icon: typeof UsersRound }[] = [
-    { key: "communities", label: t("المجتمعات", "Communities"), icon: UsersRound },
-    { key: "reels", label: t("الريلز", "Reels"), icon: Clapperboard },
+    ...(hideCommunities
+      ? []
+      : [{ key: "communities" as FunTab, label: t("المجتمعات", "Communities"), icon: UsersRound }]),
+    ...(hideReels
+      ? []
+      : [{ key: "reels" as FunTab, label: t("الريلز", "Reels"), icon: Clapperboard }]),
   ];
+
+  // كلا القسمين مخفي → لا معنى للصفحة
+  if (tabs.length === 0) return <Navigate to="/" replace />;
+  const activeTab = tabs.some((x) => x.key === tab) ? tab : tabs[0].key;
 
   return (
     <div className="relative mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14">
@@ -41,7 +51,7 @@ export default function Fun() {
         {/* tab bar */}
         <div className="glass flex !rounded-full p-1.5" role="tablist">
           {tabs.map((item) => {
-            const active = tab === item.key;
+            const active = activeTab === item.key;
             return (
               <button
                 key={item.key}
@@ -68,12 +78,12 @@ export default function Fun() {
 
         {/* tab content */}
         <motion.div
-          key={tab}
+          key={activeTab}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: EASE }}
         >
-          {tab === "communities" ? (
+          {activeTab === "communities" ? (
             <div className="glass flex flex-col items-center gap-4 !rounded-3xl p-8 text-center">
               <span className="gradient-primary flex h-14 w-14 items-center justify-center rounded-2xl text-white">
                 <UsersRound size={24} />

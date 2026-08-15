@@ -85,9 +85,13 @@ export default function ReportDialog({ mangaId, chapterId, label, className }: R
         onClick={openDialog}
         aria-label={label ?? t("تبليغ", "Report")}
         title={label ?? t("تبليغ", "Report")}
-        className={className ?? "btn-icon"}
+        className={
+          className ??
+          "flex items-center gap-1.5 rounded-full border border-danger/40 bg-danger/10 px-3.5 py-2 text-xs font-bold text-danger transition-colors hover:bg-danger/20"
+        }
       >
-        <Flag size={18} />
+        <Flag size={className ? 18 : 14} />
+        {!className && <span>{t("تبليغ", "Report")}</span>}
       </button>
 
       <AnimatePresence>
