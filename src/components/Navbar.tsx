@@ -19,7 +19,7 @@ import {
 import { useLanguage } from "./LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
-import { timeAgo } from "@/lib/manga";
+import { proxyImg, timeAgo } from "@/lib/manga";
 import { useUiToggles } from "@/lib/uiToggles";
 import {
   useMarkNotificationRead,
@@ -171,6 +171,7 @@ export default function Navbar() {
     { to: "/", ar: "الرئيسية", en: "Home", icon: Home },
     ...(showFun ? [{ to: "/fun", ar: "Fun", en: "Fun", icon: Sparkles }] : []),
     { to: "/library", ar: "مكتبتي", en: "Library", icon: Library },
+    { to: "/support", ar: "الدعم", en: "Support", icon: LifeBuoy },
     { to: accountPath, ar: "حسابي", en: "Account", icon: User },
     ...(user?.role === "admin"
       ? [{ to: "/admin", ar: "الإدارة", en: "Admin", icon: LayoutDashboard }]
@@ -276,7 +277,7 @@ export default function Navbar() {
               <DropdownMenu>
                 <DropdownMenuTrigger className="hidden items-center gap-2 sm:inline-flex">
                   <Avatar className="h-9 w-9 border border-app">
-                    <AvatarImage src={user?.avatarUrl ?? undefined} alt={user?.name ?? ""} />
+                    <AvatarImage src={proxyImg(user?.avatarUrl) || undefined} alt={user?.name ?? ""} />
                     <AvatarFallback>
                       <User size={16} />
                     </AvatarFallback>

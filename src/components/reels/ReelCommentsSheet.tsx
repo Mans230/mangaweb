@@ -2,6 +2,7 @@
  * شيت تعليقات الريل — ينزلق من الأسفل: قائمة بتمرير لا نهائي + حقل إدخال.
  */
 import { useEffect, useRef, useState } from "react";
+import { proxyImg } from "@/lib/manga";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, LogIn, Send, X } from "lucide-react";
 import { Link } from "react-router";
@@ -117,7 +118,7 @@ export default function ReelCommentsSheet({ reelId, onClose }: ReelCommentsSheet
                   {items.map((c) => (
                     <li key={c.id} className="flex items-start gap-2.5">
                       <img
-                        src={c.user.avatarUrl ?? "/avatar-1.png"}
+                        src={proxyImg(c.user.avatarUrl) || "/avatar-1.png"}
                         alt=""
                         className="h-8 w-8 shrink-0 rounded-full border border-app object-cover"
                       />
@@ -144,7 +145,7 @@ export default function ReelCommentsSheet({ reelId, onClose }: ReelCommentsSheet
               {isAuthenticated ? (
                 <div className="flex items-end gap-2">
                   <img
-                    src={user?.avatarUrl ?? "/avatar-1.png"}
+                    src={proxyImg(user?.avatarUrl) || "/avatar-1.png"}
                     alt=""
                     className="mb-0.5 h-8 w-8 shrink-0 rounded-full border border-app object-cover"
                   />

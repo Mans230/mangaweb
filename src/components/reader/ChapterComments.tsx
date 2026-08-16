@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { proxyImg } from "@/lib/manga";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, MessageSquareText, Send } from "lucide-react";
 import { Link } from "react-router";
@@ -89,7 +90,7 @@ export default function ChapterComments({
     return listQuery.data.items.map((c) => ({
       id: c.id,
       userName: c.user.name ?? t("قارئ", "Reader"),
-      avatar: c.user.avatar ?? "/avatar-1.png",
+      avatar: proxyImg(c.user.avatar) || "/avatar-1.png",
       content: c.content,
       isSpoiler: c.isSpoiler,
       timeAgo: new Date(c.createdAt).toLocaleDateString("ar"),
@@ -129,7 +130,7 @@ export default function ChapterComments({
               {
                 id: `local-${Date.now()}`,
                 userName: user?.name ?? t("أنا", "Me"),
-                avatar: user?.avatarUrl ?? "/avatar-1.png",
+                avatar: proxyImg(user?.avatarUrl) || "/avatar-1.png",
                 content,
                 isSpoiler,
                 timeAgo: t("الآن", "now"),
@@ -145,7 +146,7 @@ export default function ChapterComments({
         {
           id: `local-${Date.now()}`,
           userName: user?.name ?? t("زائر", "Guest"),
-          avatar: user?.avatarUrl ?? "/avatar-1.png",
+          avatar: proxyImg(user?.avatarUrl) || "/avatar-1.png",
           content,
           isSpoiler,
           timeAgo: t("الآن", "now"),

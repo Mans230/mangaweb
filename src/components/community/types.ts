@@ -25,7 +25,7 @@ export function displayName(u: CommunityUser): string {
 }
 
 export function avatarSrc(u: CommunityUser): string {
-  return u.avatarUrl ?? `/avatar-${(Math.abs(u.id) % 4) + 1}.png`;
+  return proxyImg(u.avatarUrl) || `/avatar-${(Math.abs(u.id) % 4) + 1}.png`;
 }
 
 /** يبني نص ردّ يقتبس الرسالة المطلوبة في سطر أول. */
@@ -41,3 +41,4 @@ export function parseBody(body: string): { quote: string | null; text: string } 
   if (nl <= 2) return { quote: null, text: body };
   return { quote: body.slice(2, nl), text: body.slice(nl + 1) };
 }
+import { proxyImg } from "@/lib/manga";

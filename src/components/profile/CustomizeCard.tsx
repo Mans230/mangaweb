@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { proxyImg } from "@/lib/manga";
 import { motion } from "framer-motion";
 import {
   AtSign,
@@ -229,9 +230,9 @@ function ImageRow({
         <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-soft/15 text-primary">
           {value ? (
             kind === "avatar" ? (
-              <img src={value} alt="" className="h-full w-full rounded-full object-cover" />
+              <img src={proxyImg(value)} alt="" className="h-full w-full rounded-full object-cover" />
             ) : (
-              <img src={value} alt="" className="h-full w-full object-cover" />
+              <img src={proxyImg(value)} alt="" className="h-full w-full object-cover" />
             )
           ) : kind === "avatar" ? (
             <User size={17} />

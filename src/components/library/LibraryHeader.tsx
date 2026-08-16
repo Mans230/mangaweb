@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { proxyImg } from "@/lib/manga";
 import { animate, motion, useInView } from "framer-motion";
 import { Heart, Bell, History } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -85,7 +86,7 @@ export default function LibraryHeader({
             />
           </svg>
           <img
-            src={avatar}
+            src={proxyImg(avatar)}
             alt={name}
             className="absolute inset-2 h-20 w-20 rounded-full border-2 border-app object-cover"
           />

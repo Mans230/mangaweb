@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { proxyImg } from "@/lib/manga";
 import { AtSign, BadgeCheck, CalendarDays, Mail, Pencil } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -47,7 +48,7 @@ export default function IdentityCard({
       {banner && (
         <>
           <img
-            src={banner}
+            src={proxyImg(banner)}
             alt=""
             aria-hidden
             className="absolute inset-x-0 top-0 h-40 w-full object-cover"
@@ -68,7 +69,7 @@ export default function IdentityCard({
           />
           <span className="absolute inset-1.5 rounded-full border border-app" aria-hidden />
           <img
-            src={avatar ?? "/avatar-1.png"}
+            src={proxyImg(avatar) || "/avatar-1.png"}
             alt={name}
             className="absolute inset-2.5 h-[92px] w-[92px] rounded-full border-2 border-app object-cover"
           />

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { proxyImg } from "@/lib/manga";
 import { useParams } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { trpc } from "@/providers/trpc";
@@ -151,7 +152,7 @@ export default function MangaDetail() {
     return (commentsQuery.data?.items ?? []).map((c) => ({
       id: c.id,
       author: c.user.name ?? t("مستخدم", "User"),
-      avatar: c.user.avatar ?? `/avatar-${(c.id % 4) + 1}.png`,
+      avatar: proxyImg(c.user.avatar) || `/avatar-${(c.id % 4) + 1}.png`,
       badge: "عضو",
       timeAgo: timeAgo(c.createdAt, lang),
       content: c.content,
@@ -170,7 +171,7 @@ export default function MangaDetail() {
         {
           id: row.id,
           author: row.user.name ?? t("مستخدم", "User"),
-          avatar: row.user.avatar ?? "/avatar-4.png",
+          avatar: proxyImg(row.user.avatar) || "/avatar-4.png",
           badge: "عضو",
           timeAgo: t("الآن", "now"),
           content: row.content,
