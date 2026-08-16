@@ -193,6 +193,8 @@ export interface ApiMangaRow {
   rating: number;
   ratingCount: number;
   viewCount?: number;
+  /** مشاهدات الموقع الحقيقية — تُستخدم للعرض بدلاً من viewCount المجلوب من المصدر */
+  siteViewCount?: number;
   chapterCount: number;
   isAdult: boolean;
   source?: { name: string } | null;
@@ -212,7 +214,7 @@ export function adaptMangaRow(m: ApiMangaRow, lang: Lang = "ar"): MangaCardData 
     rating: m.rating ?? 0,
     ratingCount: m.ratingCount ?? 0,
     chapters: m.chapterCount ?? 0,
-    views: formatViews(m.viewCount ?? 0),
+    views: formatViews(m.siteViewCount ?? 0),
     genres: m.genres ?? [],
     synopsis: m.description ?? "",
     source: m.source?.name ?? "",
@@ -245,4 +247,61 @@ export function adaptLatestChapter(
     source: c.manga.source?.name ?? "",
     isNew: isWithin24h(when),
   };
+}
+
+/* ================= آخر الفصول مجمّعة لكل مانجا ================= */
+
+/** صف فصل داخل مجموعة latestGrouped */
+export interface GroupedChapterData {
+  id: number;
+  number: number;
+  timeAgo: string;
+  isNew: boolean;
+}
+
+/** بطاقة مانجا واحدة في قسم "آخر الفصول" */
+export interface LatestGroupedMangaData {
+  mangaId: number;
+  slug: string;
+  title: string;
+  cover: string;
+  rating: number;
+  status: MangaStatus;
+  type: MangaType;
+  chapters: GroupedChapterData[];
+}
+
+export interface ApiLatestGroupedRow {
+  manga: ApiMangaRow;
+  chapters: {
+    id: number;
+    number: number;
+    publishedAt?: Date | string | null;
+    createdAt: Date | string;
+  }[];
+}
+
+/** ناتج manga.latestGrouped → بطاقات جاهزة للعرض */
+export function adaptLatestGrouped(
+  rows: ApiLatestGroupedRow[],
+  lang: Lang = "ar",
+): LatestGroupedMangaData[] {
+  return rows.map((r) => ({
+    mangaId: Number(r.manga.id),
+    slug: r.manga.slug,
+    title: r.manga.title,
+    cover: proxyImg(r.manga.coverUrl) || "/cover-01.png",
+    rating: r.manga.rating ?? 0,
+    status: STATUS_AR[r.manga.status] ?? "مستمر",
+    type: TYPE_AR[r.manga.type] ?? "مانهوا",
+    chapters: r.chapters.map((c) => {
+      const when = c.publishedAt ?? c.createdAt;
+      return {
+        id: Number(c.id),
+        number: c.number,
+        timeAgo: timeAgo(when, lang),
+        isNew: isWithin24h(when),
+      };
+    }),
+  }));
 }

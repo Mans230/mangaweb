@@ -15,6 +15,7 @@ import Reader from "@/pages/Reader";
 import Library from "@/pages/Library";
 import Profile from "@/pages/Profile";
 import Request from "@/pages/Request";
+import Support from "@/pages/Support";
 import Fun from "@/pages/Fun";
 import Reels from "@/pages/Reels";
 import Today from "@/pages/Today";
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="library" element={<Library />} />
           <Route path="profile" element={<Profile />} />
           <Route path="request" element={<Request />} />
+          <Route path="support" element={<Support />} />
           <Route
             path="fun"
             element={hideCommunities && hideReels ? <Navigate to="/" replace /> : <Fun />}
