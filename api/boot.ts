@@ -17,6 +17,119 @@ import { BROWSER_UA, imageHostPolicy, getScraper } from "./scrapers";
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB
 
+/* ===== كاش صور في الذاكرة — شبكات البطاقات تولّد عشرات الطلبات المتوازية فتخنق المصادر ===== */
+const IMG_CACHE_MAX_ENTRIES = 500;
+const IMG_CACHE_MAX_BYTES = 150 * 1024 * 1024; // 150MB
+const IMG_CACHE_ITEM_MAX = 4 * 1024 * 1024; // لا تُخزَّن الصور الضخمة
+const IMG_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 ساعات
+type ImgCacheEntry = { buf: Uint8Array; ct: string; exp: number; size: number };
+const imgCache = new Map<string, ImgCacheEntry>();
+let imgCacheBytes = 0;
+const imgInflight = new Map<string, Promise<UpstreamImg>>();
+
+type UpstreamImg =
+  | { ok: true; buf: Uint8Array; ct: string }
+  | { ok: false; status: number; msg: string };
+
+/** جلب الصورة من المصدر مع إعادة محاولة واحدة عند 429/5xx */
+async function fetchUpstreamImage(target: URL, referer?: string): Promise<UpstreamImg> {
+  const headers: Record<string, string> = {
+    "User-Agent": BROWSER_UA,
+    Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+  };
+  if (referer) headers.Referer = referer;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 700));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      let upstream = await fetch(target.href, {
+        headers,
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      // dilar.tube: توكن الصور (?t=) ينتهي خلال دقائق — جدّده وأعد المحاولة مرة واحدة
+      if (
+        !upstream.ok &&
+        (upstream.status === 401 || upstream.status === 403) &&
+        target.hostname.toLowerCase() === "dilar.tube" &&
+        target.pathname.startsWith("/uploads/releases/")
+      ) {
+        const dilar = getScraper("dilar") as unknown as {
+          getFreshMediaToken?: () => Promise<string | null>;
+        };
+        const fresh = await dilar?.getFreshMediaToken?.().catch(() => null);
+        if (fresh) {
+          target.searchParams.set("t", fresh);
+          upstream = await fetch(target.href, {
+            headers,
+            signal: controller.signal,
+            redirect: "follow",
+          });
+        }
+      }
+      if (!upstream.ok || !upstream.body) {
+        if (upstream.status === 429 || upstream.status >= 500) continue; // أعد المحاولة
+        return { ok: false, status: 502, msg: `Upstream error ${upstream.status}` };
+      }
+      const contentType = (upstream.headers.get("content-type") ?? "").split(";")[0].trim();
+      if (!contentType.startsWith("image/")) {
+        return { ok: false, status: 415, msg: "Not an image" };
+      }
+      const declared = Number(upstream.headers.get("content-length") ?? 0);
+      if (declared > MAX_IMAGE_BYTES) return { ok: false, status: 413, msg: "Image too large" };
+
+      const reader = upstream.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MAX_IMAGE_BYTES) {
+          await reader.cancel().catch(() => {});
+          return { ok: false, status: 413, msg: "Image too large" };
+        }
+        chunks.push(value);
+      }
+      const out = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        out.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return { ok: true, buf: out, ct: contentType };
+    } catch (e) {
+      const isAbort = (e as Error).name === "AbortError";
+      if (attempt === 0) continue; // أعد المحاولة مرة
+      return { ok: false, status: 502, msg: isAbort ? "Upstream timeout" : "Fetch failed" };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return { ok: false, status: 502, msg: "Upstream rate-limited" };
+}
+
+function imgCacheStore(key: string, buf: Uint8Array, ct: string) {
+  if (buf.byteLength > IMG_CACHE_ITEM_MAX) return;
+  const old = imgCache.get(key);
+  if (old) {
+    imgCache.delete(key);
+    imgCacheBytes -= old.size;
+  }
+  imgCache.set(key, { buf, ct, exp: Date.now() + IMG_CACHE_TTL_MS, size: buf.byteLength });
+  imgCacheBytes += buf.byteLength;
+  // إخلاء الأقدم (ترتيب الإدراج = الأقدم أولاً)
+  while (imgCacheBytes > IMG_CACHE_MAX_BYTES || imgCache.size > IMG_CACHE_MAX_ENTRIES) {
+    const oldestKey = imgCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    const oldest = imgCache.get(oldestKey);
+    imgCache.delete(oldestKey);
+    if (oldest) imgCacheBytes -= oldest.size;
+  }
+}
+
 /** بروكسي صور فصول المصادر — whitelist صارمة ضد SSRF */
 async function imageProxyHandler(c: Context) {
   const raw = c.req.query("u") ?? "";
@@ -42,81 +155,44 @@ async function imageProxyHandler(c: Context) {
   }
   if (!allowed) return c.json({ error: "Forbidden host" }, 403);
 
-  const headers: Record<string, string> = {
-    "User-Agent": BROWSER_UA,
-    Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-  };
-  if (referer) headers.Referer = referer;
+  // s=1 = صفحة فصل داخل القارئ — لا تُخزَّن (تتراكم بسرعة لمئات الميغا)
+  const cacheable = c.req.query("s") !== "1";
+  const key = target.href;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  try {
-    let upstream = await fetch(target.href, {
-      headers,
-      signal: controller.signal,
-      redirect: "follow",
-    });
-    // dilar.tube: توكن الصور (?t=) ينتهي خلال دقائق — جدّده وأعد المحاولة مرة واحدة
-    if (
-      !upstream.ok &&
-      (upstream.status === 401 || upstream.status === 403) &&
-      host === "dilar.tube" &&
-      target.pathname.startsWith("/uploads/releases/")
-    ) {
-      const dilar = getScraper("dilar") as unknown as {
-        getFreshMediaToken?: () => Promise<string | null>;
-      };
-      const fresh = await dilar?.getFreshMediaToken?.().catch(() => null);
-      if (fresh) {
-        target.searchParams.set("t", fresh);
-        upstream = await fetch(target.href, {
-          headers,
-          signal: controller.signal,
-          redirect: "follow",
+  if (cacheable) {
+    const hit = imgCache.get(key);
+    if (hit) {
+      if (hit.exp > Date.now()) {
+        imgCache.delete(key);
+        imgCache.set(key, hit); // LRU
+        return c.body(hit.buf, 200, {
+          "Content-Type": hit.ct,
+          "Cache-Control": "public, max-age=86400, immutable",
+          "X-Img-Cache": "hit",
         });
       }
+      imgCache.delete(key);
+      imgCacheBytes -= hit.size;
     }
-    if (!upstream.ok || !upstream.body) {
-      return c.json({ error: `Upstream error ${upstream.status}` }, 502);
-    }
-    const contentType = (upstream.headers.get("content-type") ?? "").split(";")[0].trim();
-    if (!contentType.startsWith("image/")) {
-      return c.json({ error: "Not an image" }, 415);
-    }
-    const declared = Number(upstream.headers.get("content-length") ?? 0);
-    if (declared > MAX_IMAGE_BYTES) return c.json({ error: "Image too large" }, 413);
-
-    const reader = upstream.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_IMAGE_BYTES) {
-        await reader.cancel().catch(() => {});
-        return c.json({ error: "Image too large" }, 413);
-      }
-      chunks.push(value);
-    }
-    const out = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-      out.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return c.body(out, 200, {
-      "Content-Type": contentType,
-      // s=1 = صفحة فصل داخل القارئ — لا تُخزَّن في كاش المتصفح (يتراكم بسرعة لمئات الميغا)
-      "Cache-Control":
-        c.req.query("s") === "1" ? "no-store" : "public, max-age=86400, immutable",
-    });
-  } catch (e) {
-    const isAbort = (e as Error).name === "AbortError";
-    return c.json({ error: isAbort ? "Upstream timeout" : "Fetch failed" }, 502);
-  } finally {
-    clearTimeout(timer);
   }
+
+  // دمج الطلبات المتزامنة لنفس الصورة — طلب واحد للمصدر مهما تزامنت البطاقات
+  let pending = cacheable ? imgInflight.get(key) : undefined;
+  if (!pending) {
+    pending = fetchUpstreamImage(target, referer);
+    if (cacheable) {
+      imgInflight.set(key, pending);
+      void pending.finally(() => imgInflight.delete(key));
+    }
+  }
+  const res = await pending;
+  if (!res.ok) return c.json({ error: res.msg }, res.status as 502 | 415 | 413);
+
+  if (cacheable) imgCacheStore(key, res.buf, res.ct);
+  return c.body(res.buf, 200, {
+    "Content-Type": res.ct,
+    "Cache-Control": cacheable ? "public, max-age=86400, immutable" : "no-store",
+  });
 }
 
 const UPLOAD_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif"];

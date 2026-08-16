@@ -121,5 +121,10 @@ export function imageHostPolicy(): Map<string, string> {
   if (getScraper("kawaiimanga")?.enabled) {
     map.set("kawaiimanga.org", "https://kawaiimanga.org/");
   }
+  // صور حسابات المستخدمين (أفاتار/بانر) — تُمرَّر عبر البروكسي لتفادي حجب بعض الشبكات لها
+  map.set("files.catbox.moe", "");
+  map.set("lh3.googleusercontent.com", "");
+  map.set("cdn4.telegram-cdn.org", "");
+  map.set("t.me", "");
   return map;
 }
