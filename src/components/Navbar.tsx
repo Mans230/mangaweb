@@ -7,6 +7,7 @@ import {
   Home,
   LayoutDashboard,
   Library,
+  LifeBuoy,
   LogOut,
   Menu,
   Search,
@@ -52,14 +53,15 @@ function NotificationsBell() {
   /** ضغطة إشعار: تعليمه مقروءاً ثم فتح صفحة المانجا (slug لو توفر وإلا id) */
   const openItem = (n: NotificationItem) => {
     if (!n.readAt) markReadMut.mutate({ id: n.id });
-    if (n.mangaSlug) navigate(`/manga/${n.mangaSlug}`);
+    if (n.type === "ticket_reply") navigate("/support");
+    else if (n.mangaSlug) navigate(`/manga/${n.mangaSlug}`);
     else if (n.mangaId != null) navigate(`/manga/${n.mangaId}`);
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="btn-icon relative hidden sm:inline-flex"
+        className="btn-icon relative"
         aria-label={t("الإشعارات", "Notifications")}
       >
         <Bell size={18} />
@@ -370,6 +372,18 @@ export default function Navbar() {
                     </Link>
                   );
                 })}
+                <Link
+                  to="/support"
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    location.pathname.startsWith("/support")
+                      ? "bg-primary/15 text-primary"
+                      : "text-app-2 hover:bg-primary/10 hover:text-app"
+                  }`}
+                >
+                  <LifeBuoy size={16} />
+                  {t("الدعم", "Support")}
+                </Link>
               </div>
             </motion.nav>
           )}

@@ -371,7 +371,9 @@ export default function InfoCard({
               className={`!py-3 text-sm ${isFollowing ? "btn-primary" : "btn-glass"}`}
             >
               {isFollowing ? <BellRing size={16} /> : <Bell size={16} />}
-              {isFollowing ? t("تتم المتابعة", "Following") : t("متابعة", "Follow")}
+              {isFollowing
+                ? t("الإشعارات مفعّلة", "Notifications on")
+                : t("فعّل الإشعارات", "Enable notifications")}
             </motion.button>
 
             <motion.button
