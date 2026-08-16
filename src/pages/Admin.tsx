@@ -9,6 +9,7 @@ import {
   GitMerge,
   Inbox,
   LayoutDashboard,
+  LifeBuoy,
   Link2,
   ListMusic,
   MessageSquare,
@@ -30,6 +31,7 @@ import AdminSources from "@/components/admin/Sources";
 import MergeDuplicates from "@/components/admin/MergeDuplicates";
 import UsersManager from "@/components/admin/UsersManager";
 import RequestsManager from "@/components/admin/RequestsManager";
+import TicketsManager from "@/components/admin/TicketsManager";
 import ReportsManager from "@/components/admin/ReportsManager";
 import CommentsManager from "@/components/admin/CommentsManager";
 import CommunitiesManager from "@/components/admin/CommunitiesManager";
@@ -39,7 +41,7 @@ import ReelsModeration from "@/components/admin/ReelsModeration";
 import AdminSettings from "@/components/admin/AdminSettings";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "reports" | "comments" | "communities";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -53,6 +55,7 @@ const shortcutKeys: Record<string, AdminView> = {
   g: "merge",
   u: "users",
   r: "requests",
+  t: "tickets",
   p: "reports",
   c: "comments",
   m: "communities",
@@ -64,6 +67,7 @@ function AdminShell() {
 
   const statsQuery = trpc.admin.stats.useQuery(undefined, { retry: false });
   const pendingCount = statsQuery.data?.pendingRequests ?? 0;
+  const openTickets = statsQuery.data?.openTickets ?? 0;
   const pendingReelsQuery = trpc.analytics.overview.useQuery(undefined, { retry: false });
   const pendingReels = pendingReelsQuery.data?.pendingReels ?? 0;
 
@@ -81,11 +85,12 @@ function AdminShell() {
         { id: "merge", label: t("دمج المكرر", "Merge duplicates"), icon: GitMerge },
         { id: "users", label: t("المستخدمون", "Users"), icon: Users },
         { id: "requests", label: t("الطلبات", "Requests"), icon: Inbox, badge: pendingCount },
+        { id: "tickets", label: t("تذاكر الدعم", "Support tickets"), icon: LifeBuoy, badge: openTickets },
         { id: "reports", label: t("التبليغات", "Reports"), icon: Flag },
         { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
         { id: "communities", label: t("المجتمعات", "Communities"), icon: UsersRound },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
-    [t, pendingCount, pendingReels],
+    [t, pendingCount, pendingReels, openTickets],
   );
 
   // اختصارات لوحة المفاتيح: g ثم حرف
@@ -227,6 +232,7 @@ function AdminShell() {
             {view === "merge" && <MergeDuplicates />}
             {view === "users" && <UsersManager />}
             {view === "requests" && <RequestsManager />}
+            {view === "tickets" && <TicketsManager />}
             {view === "reports" && <ReportsManager />}
             {view === "comments" && <CommentsManager />}
             {view === "communities" && <CommunitiesManager />}

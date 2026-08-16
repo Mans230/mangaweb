@@ -11,6 +11,7 @@ export default function Footer() {
       items: [
         { to: "/browse", label: t("البحث المتقدم", "Advanced search") },
         { to: "/request", label: t("اطلب مانجا", "Request a manga") },
+        { to: "/support", label: t("الدعم", "Support") },
         { to: "/browse?sources=1", label: t("المصادر", "Sources") },
         { to: "/browse?adult=1", label: t("سياسة +18", "+18 policy") },
       ],
