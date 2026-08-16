@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, Check, Copy, KeyRound, Link2, Loader2, Mail, RefreshCw, Send, Unlink, Zap } from "lucide-react";
+import { BadgeCheck, KeyRound, Link2, Loader2, Mail, RefreshCw, Send, Unlink, Zap } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/library/toast";
 import GlassModal from "@/components/library/GlassModal";
@@ -116,7 +116,7 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
   /** زر ربط تليجرام: المودال يعرض الودجت الفوري إن كان اسم البوت متاحًا وإلا تدفق رمز الربط */
   const onTelegramLink = () => {
     if (!providersQ.isLoading && !tgBot) {
-      toast(t("الربط الفوري بالودجت غير متاح حالياً — استخدم رمز الربط", "Instant widget linking is unavailable — use the link code"), { kind: "info" });
+      toast(t("الربط الفوري بالودجت غير متاح حالياً — حاول لاحقاً", "Instant widget linking is unavailable — try again later"), { kind: "info" });
     }
     setTgModal(true);
   };
@@ -245,33 +245,13 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
   );
 }
 
-/** مودال ربط تليجرام: ربط فوري عبر Telegram Login Widget أو رمز ربط يُرسله المستخدم للبوت. */
+/** مودال ربط تليجرام — ربط فوري فقط عبر Telegram Login Widget (لا رموز بوت). */
 function TelegramModal({ open, onClose, botUsername: tgBot }: { open: boolean; onClose: () => void; botUsername: string | null }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const [code, setCode] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
   const [widgetError, setWidgetError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const copyCode = async () => {
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      toast(t("نُسخ الرمز", "Code copied"));
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast(t("تعذر النسخ — انسخ الرمز يدويًا", "Copy failed — copy the code manually"), { kind: "info" });
-    }
-  };
-
-  const linkCodeMutation = trpc.auth.createLinkCode.useMutation({
-    onSuccess: (data) => setCode(data.code),
-    onError: () =>
-      toast(t("تعذر توليد رمز الربط — حاول مجدداً", "Could not generate a link code — try again"), { kind: "info" }),
-  });
+  const [widgetFailed, setWidgetFailed] = useState(false);
 
   // الودجت الرسمي عبر auth.telegramLogin — الباكند يربط تلقائياً عند وجود جلسة
   const linkWidgetMutation = trpc.auth.telegramLogin.useMutation({
@@ -288,143 +268,53 @@ function TelegramModal({ open, onClose, botUsername: tgBot }: { open: boolean; o
   useEffect(() => {
     if (open) {
       setWidgetError(null);
-      if (!code && !linkCodeMutation.isPending) {
-        linkCodeMutation.mutate();
-      }
+      setWidgetFailed(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  // Telegram Login Widget — ربط فوري بالحساب الحالي (المكوّن المشترك)
-
-  const checkLinked = async () => {
-    setChecking(true);
-    try {
-      // تجاوز كاش auth.me (staleTime 5 دقائق) بقراءة مباشرة من الخادم
-      await utils.auth.me.invalidate();
-      const me = await utils.client.auth.me.query();
-      if (me?.telegramId) {
-        toast(t("تم ربط تليجرام بنجاح", "Telegram linked successfully"));
-        onClose();
-      } else {
-        toast(t("لم يكتمل الربط بعد — أرسل الرمز للبوت ثم أعد التحقق", "Not linked yet — send the code to the bot, then re-check"), { kind: "info" });
-      }
-    } finally {
-      setChecking(false);
-    }
-  };
 
   return (
     <GlassModal open={open} onClose={onClose} title={t("ربط حساب تليجرام", "Link Telegram account")}>
-      {/* الطريقة الأولى: ربط فوري عبر ودجت تليجرام — يتطلب اسم البوت من الخادم */}
-      {tgBot && (
-        <div className="mb-5">
-          <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-app">
-            <Zap size={14} className="text-accent" />
-            {t("ربط فوري بحساب تليجرام", "Instant link with your Telegram account")}
-          </p>
-          <div className="flex justify-center">
-            {linkWidgetMutation.isPending ? (
-              <Loader2 size={24} className="animate-spin text-app-3" />
-            ) : (
-              <TelegramLoginButton
-                botUsername={tgBot}
-                onAuth={(u) => {
-                  setWidgetError(null);
-                  linkWidgetMutation.mutate(u);
-                }}
-              />
-            )}
-          </div>
-          {widgetError && (
-            <motion.p
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-medium text-danger"
-            >
-              {widgetError}
-            </motion.p>
-          )}
-          <div className="mt-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-[var(--border)]" />
-            <span className="text-xs text-app-3">{t("أو عبر رمز الربط", "or via link code")}</span>
-            <span className="h-px flex-1 bg-[var(--border)]" />
-          </div>
-        </div>
-      )}
-
-      {/* الطريقة الثانية: رمز الربط عبر البوت */}
-      <ol className="flex list-none flex-col gap-3 text-sm text-app-2">
-        <li className="flex gap-2.5">
-          <span className="gradient-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white">1</span>
-          <span>
-            {t("افتح بوت زيكو مانجا على تليجرام وأرسل", "Open the zeko-manga bot on Telegram and send")}{" "}
-            <code className="glass-chip !px-2 !py-0.5 text-xs font-bold" dir="ltr">/start</code>
-          </span>
-        </li>
-        <li className="flex gap-2.5">
-          <span className="gradient-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white">2</span>
-          <span>
-            {t("أرسل رمز الربط هذا للبوت:", "Send this linking code to the bot:")}
-          </span>
-        </li>
-      </ol>
-
-      <div className="my-4 flex flex-col items-center gap-2">
-        {code ? (
-          <>
-            <motion.span
-            key={code}
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.3, ease: EASE }}
-            className="glass-strong gradient-text rounded-2xl px-6 py-3 font-display text-3xl font-extrabold tracking-[0.3em]"
-            dir="ltr"
-          >
-            {code}
-          </motion.span>
-            <button
-              onClick={copyCode}
-              className="btn-glass !px-3 !py-1.5 text-xs"
-              aria-label={t("نسخ الرمز", "Copy code")}
-            >
-              {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
-              {copied ? t("نُسخ!", "Copied!") : t("نسخ الرمز", "Copy code")}
-            </button>
-          </>
-        ) : (
+      <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-app">
+        <Zap size={14} className="text-accent" />
+        {t("ربط فوري بحساب تليجرام", "Instant link with your Telegram account")}
+      </p>
+      <p className="mb-4 text-xs leading-relaxed text-app-3">
+        {t(
+          "اضغط الزر ووافق داخل تليجرام — يتم الربط تلقائياً فوراً.",
+          "Press the button and confirm in Telegram — linking completes instantly.",
+        )}
+      </p>
+      <div className="flex justify-center">
+        {linkWidgetMutation.isPending ? (
           <Loader2 size={24} className="animate-spin text-app-3" />
+        ) : tgBot && !widgetFailed ? (
+          <TelegramLoginButton
+            botUsername={tgBot}
+            onAuth={(u) => {
+              setWidgetError(null);
+              linkWidgetMutation.mutate(u);
+            }}
+            onWidgetFailed={() => setWidgetFailed(true)}
+          />
+        ) : (
+          <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-center text-xs font-medium text-warning">
+            {t(
+              "تعذّر تحميل ودجت تليجرام — جرّب متصفحاً آخر أو عطّل مانع الإعلانات.",
+              "Could not load the Telegram widget — try another browser or disable your ad blocker.",
+            )}
+          </p>
         )}
       </div>
-
-      {tgBot && (
-        <a
-          href={code ? `https://t.me/${tgBot}?start=${code}` : `https://t.me/${tgBot}`}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-glass w-full !py-2.5 text-sm"
+      {widgetError && (
+        <motion.p
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-medium text-danger"
         >
-          <Send size={15} />
-          {t("فتح البوت في تليجرام", "Open bot in Telegram")}
-        </a>
+          {widgetError}
+        </motion.p>
       )}
-
-      <p className="glass mt-3 !rounded-xl px-3 py-2 text-[11.5px] leading-relaxed text-app-3">
-        {t(
-          "الكود صالح 10 دقائق ويُستخدم مرة واحدة. إذا رد البوت «غير موجود»: ولّد كودًا جديدًا وأرسله فورًا.",
-          "The code is valid for 10 minutes and can be used once. If the bot replies “not found”: generate a new code and send it immediately.",
-        )}
-      </p>
-
-      <p className="mt-4 text-center text-xs font-medium text-app-3">
-        {t("بعد إرسال الرمز للبوت، اضغط زر التحقق:", "After sending the code to the bot, press verify:")}
-      </p>
-
-      <button onClick={checkLinked} disabled={checking} className="btn-primary mt-2 w-full !py-2.5 text-sm disabled:opacity-60">
-        {checking ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-        {t("تحقق من الربط", "Check linking status")}
-      </button>
-        </GlassModal>
+    </GlassModal>
   );
 }
 
