@@ -144,7 +144,7 @@ export default function CommunitiesManager() {
             disabled={togglesQ.isLoading || togglesMut.isPending}
             onCheckedChange={(v) => togglesMut.mutate({ user: v })}
           />
-          {t("تعطيل مجتمعات المستخدمين", "Disable user communities")}
+          {t("مجتمعات المستخدمين", "User communities")}
           <span className={`text-[10px] font-bold ${toggles?.user ? "text-success" : "text-danger"}`}>
             {toggles?.user ? t("مفعّلة", "on") : t("معطّلة", "off")}
           </span>
@@ -155,7 +155,7 @@ export default function CommunitiesManager() {
             disabled={togglesQ.isLoading || togglesMut.isPending}
             onCheckedChange={(v) => togglesMut.mutate({ manga: v })}
           />
-          {t("تعطيل مجتمعات المانهوا", "Disable manga communities")}
+          {t("مجتمعات المانهوا", "Manga communities")}
           <span className={`text-[10px] font-bold ${toggles?.manga ? "text-success" : "text-danger"}`}>
             {toggles?.manga ? t("مفعّلة", "on") : t("معطّلة", "off")}
           </span>
