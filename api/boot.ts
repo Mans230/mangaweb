@@ -31,8 +31,37 @@ type UpstreamImg =
   | { ok: true; buf: Uint8Array; ct: string }
   | { ok: false; status: number; msg: string };
 
+/** حد تزامن لكل مصدر — صفحة واحدة فيها عشرات الأغلفة، وفتح الطلبات دفعة واحدة
+ *  يجعل المصدر يخنقنا (429/5xx) فتظهر الأغلفة مكسورة رغم أنها سليمة */
+const IMG_HOST_CONCURRENCY = 3;
+const imgHostSem = new Map<string, { active: number; queue: (() => void)[] }>();
+
+function acquireImgHost(host: string): Promise<() => void> {
+  let sem = imgHostSem.get(host);
+  if (!sem) {
+    sem = { active: 0, queue: [] };
+    imgHostSem.set(host, sem);
+  }
+  const s = sem;
+  return new Promise((resolve) => {
+    const tryAcquire = () => {
+      if (s.active < IMG_HOST_CONCURRENCY) {
+        s.active++;
+        resolve(() => {
+          s.active--;
+          const next = s.queue.shift();
+          if (next) next();
+        });
+      } else {
+        s.queue.push(tryAcquire);
+      }
+    };
+    tryAcquire();
+  });
+}
+
 /** جلب الصورة من المصدر مع إعادة محاولة واحدة عند 429/5xx */
-async function fetchUpstreamImage(target: URL, referer?: string): Promise<UpstreamImg> {
+async function fetchUpstreamImageRaw(target: URL, referer?: string): Promise<UpstreamImg> {
   const headers: Record<string, string> = {
     "User-Agent": BROWSER_UA,
     Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -111,6 +140,16 @@ async function fetchUpstreamImage(target: URL, referer?: string): Promise<Upstre
   return { ok: false, status: 502, msg: "Upstream rate-limited" };
 }
 
+/** غلاف يقيّد التزامن لكل مصدر قبل الجلب الفعلي */
+async function fetchUpstreamImage(target: URL, referer?: string): Promise<UpstreamImg> {
+  const release = await acquireImgHost(target.hostname.toLowerCase());
+  try {
+    return await fetchUpstreamImageRaw(target, referer);
+  } finally {
+    release();
+  }
+}
+
 function imgCacheStore(key: string, buf: Uint8Array, ct: string) {
   if (buf.byteLength > IMG_CACHE_ITEM_MAX) return;
   const old = imgCache.get(key);
@@ -153,7 +192,10 @@ async function imageProxyHandler(c: Context) {
       break;
     }
   }
-  if (!allowed) return c.json({ error: "Forbidden host" }, 403);
+  if (!allowed) {
+    console.warn(`[img] مضيف مرفوض (أضفه للقائمة البيضاء لو شرعي): ${host}`);
+    return c.json({ error: "Forbidden host" }, 403);
+  }
 
   // s=1 = صفحة فصل داخل القارئ — لا تُخزَّن (تتراكم بسرعة لمئات الميغا)
   const cacheable = c.req.query("s") !== "1";
@@ -186,7 +228,10 @@ async function imageProxyHandler(c: Context) {
     }
   }
   const res = await pending;
-  if (!res.ok) return c.json({ error: res.msg }, res.status as 502 | 415 | 413);
+  if (!res.ok) {
+    console.warn(`[img] فشل جلب ${target.href.slice(0, 140)} — ${res.msg}`);
+    return c.json({ error: res.msg }, res.status as 502 | 415 | 413);
+  }
 
   if (cacheable) imgCacheStore(key, res.buf, res.ct);
   return c.body(res.buf, 200, {

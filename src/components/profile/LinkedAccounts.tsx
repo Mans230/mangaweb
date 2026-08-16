@@ -223,13 +223,19 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
                   {t("توثيق", "Verify")}
                 </button>
               )}
-              <button
-                onClick={() => setPwOpen(true)}
-                className="btn-glass !px-4 !py-2 text-xs"
-              >
-                <KeyRound size={13} />
-                {t("تغيير كلمة المرور", "Change password")}
-              </button>
+              {email ? (
+                <button
+                  onClick={() => setPwOpen(true)}
+                  className="btn-glass !px-4 !py-2 text-xs"
+                >
+                  <KeyRound size={13} />
+                  {t("تغيير كلمة المرور", "Change password")}
+                </button>
+              ) : (
+                <span className="glass-chip !py-1.5 text-[11px] font-bold text-app-3">
+                  {t("تغيير كلمة المرور يتطلب بريداً مرتبطاً", "Password change requires a linked email")}
+                </span>
+              )}
             </div>
           }
         />

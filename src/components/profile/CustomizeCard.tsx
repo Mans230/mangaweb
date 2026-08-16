@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { proxyImg } from "@/lib/manga";
 import { motion } from "framer-motion";
 import {
@@ -179,7 +179,10 @@ function ImageRow({
   const utils = trpc.useUtils();
   const [urlDraft, setUrlDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // فشل تحميل المعاينة (مضيف محجوب/بروكسي) — اعرض الأيقونة بدل صورة مكسورة
+  const [previewBroken, setPreviewBroken] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => setPreviewBroken(false), [value]);
   const { upload, uploading } = useImageUpload();
 
   const updateMut = trpc.auth.updateProfile.useMutation({
@@ -228,11 +231,11 @@ function ImageRow({
       <div className="flex flex-wrap items-center gap-4">
         {/* معاينة */}
         <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-soft/15 text-primary">
-          {value ? (
+          {value && !previewBroken ? (
             kind === "avatar" ? (
-              <img src={proxyImg(value)} alt="" className="h-full w-full rounded-full object-cover" />
+              <img src={proxyImg(value)} alt="" onError={() => setPreviewBroken(true)} className="h-full w-full rounded-full object-cover" />
             ) : (
-              <img src={proxyImg(value)} alt="" className="h-full w-full object-cover" />
+              <img src={proxyImg(value)} alt="" onError={() => setPreviewBroken(true)} className="h-full w-full object-cover" />
             )
           ) : kind === "avatar" ? (
             <User size={17} />

@@ -71,6 +71,12 @@ export default function IdentityCard({
           <img
             src={proxyImg(avatar) || "/avatar-1.png"}
             alt={name}
+            onError={(e) => {
+              // لو فشل البروكسي لأي سبب اعرض الصورة المحلية بدل الأيقونة المكسورة
+              if (!e.currentTarget.src.endsWith("/avatar-1.png")) {
+                e.currentTarget.src = "/avatar-1.png";
+              }
+            }}
             className="absolute inset-2.5 h-[92px] w-[92px] rounded-full border-2 border-app object-cover"
           />
           <a
