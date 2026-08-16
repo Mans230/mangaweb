@@ -17,6 +17,7 @@ import {
   readingProgress,
   requests,
   sources,
+  supportTickets,
   users,
 } from "@db/schema";
 import { getDb } from "./queries/connection";
@@ -58,7 +59,7 @@ const requestStatusEnum = z.enum(["pending", "added", "rejected"]);
 export const adminRouter = createRouter({
   stats: adminQuery.query(async () => {
     const db = getDb();
-    const [[m], [c], [u], [r], [rp]] = await Promise.all([
+    const [[m], [c], [u], [r], [rp], [ot]] = await Promise.all([
       db.select({ total: count() }).from(manga),
       db.select({ total: count() }).from(chapters),
       db.select({ total: count() }).from(users),
@@ -67,6 +68,10 @@ export const adminRouter = createRouter({
         .select({ total: count() })
         .from(requests)
         .where(eq(requests.status, "pending")),
+      db
+        .select({ total: count() })
+        .from(supportTickets)
+        .where(eq(supportTickets.status, "open")),
     ]);
     return {
       manga: m.total,
@@ -74,6 +79,7 @@ export const adminRouter = createRouter({
       users: u.total,
       requests: r.total,
       pendingRequests: rp.total,
+      openTickets: ot.total,
     };
   }),
 
