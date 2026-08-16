@@ -18,7 +18,11 @@ import { emailCodes, users } from "@db/schema";
 import { and, eq, gt } from "drizzle-orm";
 import { getDb } from "./queries/connection";
 import { createLinkCode } from "./lib/linkCodes";
-import { verifyTelegramAuth } from "./lib/telegram";
+import {
+  telegramDisplayName,
+  telegramWidgetSchema,
+  verifyTelegramWidget,
+} from "./lib/telegram";
 import {
   createUser,
   findUserByEmail,
@@ -71,16 +75,6 @@ const updateProfileSchema = z.object({
   bannerUrl: z.string().trim().url().max(2000).nullable().optional(),
   notificationsTelegram: z.boolean().optional(),
   dnd: z.boolean().optional(),
-});
-
-const telegramAuthSchema = z.object({
-  id: z.number(),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
-  username: z.string().optional(),
-  photo_url: z.string().optional(),
-  auth_date: z.number(),
-  hash: z.string(),
 });
 
 function isDuplicateEntry(err: unknown): boolean {
@@ -322,53 +316,59 @@ export const authRouter = createRouter({
       return { success: true, user: { ...user, passwordHash: null } };
     }),
 
+  /**
+   * تسجيل الدخول/الربط عبر Telegram Login Widget — بناء جديد.
+   * - مستخدم مسجّل: ربط تليجرام بحسابه (مع فحوص التعارض).
+   * - زائر: دخول بحساب مربوط أو إنشاء حساب جديد تلقائياً.
+   */
   telegramLogin: publicQuery
-    .input(telegramAuthSchema)
+    .input(telegramWidgetSchema)
     .mutation(async ({ ctx, input }) => {
       assertAuthRateLimit("telegramLogin", ctx.req);
       if (!env.telegramBotToken) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Telegram login is not configured on this server",
+          message: "تسجيل الدخول عبر تليجرام غير مفعّل على هذا الخادم",
         });
       }
-      if (!verifyTelegramAuth(input, env.telegramBotToken)) {
+
+      const verdict = verifyTelegramWidget(input, env.telegramBotToken);
+      if (!verdict.ok) {
+        console.warn(`[auth] telegramLogin رفض (${verdict.reason}) للمعرّف ${input.id}`);
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message: "Invalid Telegram authentication data",
+          message:
+            verdict.reason === "stale"
+              ? "انتهت صلاحية بيانات تليجرام — أعد المحاولة"
+              : "بيانات تليجرام غير صالحة",
         });
       }
 
       const telegramId = String(input.id);
 
-      // لو فيه مستخدم مسجّل دخوله حالياً: ربط الحساب بدل إنشاء/تسجيل دخول جديد
+      /* ===== حالة الربط: مستخدم مسجّل دخوله بالفعل ===== */
       if (ctx.user) {
         const userId = Number(ctx.user.id);
         if (ctx.user.telegramId && ctx.user.telegramId !== telegramId) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "هذا الحساب مربوط بحساب تيليجرام آخر، ألغِ الربط الحالي أولاً",
+            message: "حسابك مربوط بتليجرام آخر — افصل الربط الحالي أولاً",
           });
         }
         const takenBy = await findUserByTelegramId(telegramId);
         if (takenBy && Number(takenBy.id) !== userId) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "حساب تيليجرام هذا مربوط بحساب آخر",
+            message: "حساب تليجرام هذا مربوط بحساب آخر",
           });
         }
         try {
-          await linkTelegramToUser(
-            userId,
-            telegramId,
-            input.username,
-            input.photo_url,
-          );
+          await linkTelegramToUser(userId, telegramId, input.username, input.photo_url);
         } catch (err) {
           if (isDuplicateEntry(err)) {
             throw new TRPCError({
               code: "CONFLICT",
-              message: "حساب تيليجرام هذا مربوط بحساب آخر",
+              message: "حساب تليجرام هذا مربوط بحساب آخر",
             });
           }
           throw err;
@@ -379,22 +379,18 @@ export const authRouter = createRouter({
         return { success: true, linked: true };
       }
 
+      /* ===== حالة الدخول: زائر ===== */
       let user = await findUserByTelegramId(telegramId);
       if (user?.bannedAt) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "هذا الحساب محظور",
-        });
+        throw new TRPCError({ code: "FORBIDDEN", message: "هذا الحساب محظور" });
       }
+
       if (!user) {
         try {
           user = await createUser({
             telegramId,
             telegramUsername: input.username ?? null,
-            name:
-              [input.first_name, input.last_name].filter(Boolean).join(" ") ||
-              input.username ||
-              `tg_${telegramId}`,
+            name: telegramDisplayName(input),
             avatarUrl: input.photo_url ?? null,
             lastSignInAt: new Date(),
           });
@@ -406,29 +402,23 @@ export const authRouter = createRouter({
         }
       } else {
         await touchLastSignIn(Number(user.id));
-        // املأ الصورة تلقائياً من تيليجرام لو كانت فارغة
+        // حدّث بيانات تليجرام المخزنة (الصورة/اليوزرنيم قد يتغيران)
+        await getDb()
+          .update(users)
+          .set({
+            telegramPhotoUrl: input.photo_url ?? user.telegramPhotoUrl,
+            telegramUsername: input.username ?? user.telegramUsername,
+          })
+          .where(eq(users.id, user.id));
+        // املأ الصورة الشخصية من تليجرام لو فارغة
         if (!user.avatarUrl && input.photo_url) {
-          await updateUserProfile(Number(user.id), {
-            avatarUrl: input.photo_url,
-          });
+          await updateUserProfile(Number(user.id), { avatarUrl: input.photo_url });
           user = { ...user, avatarUrl: input.photo_url };
-        }
-        if (input.photo_url && user.telegramPhotoUrl !== input.photo_url) {
-          await getDb()
-            .update(users)
-            .set({
-              telegramPhotoUrl: input.photo_url,
-              telegramUsername: input.username ?? user.telegramUsername,
-            })
-            .where(eq(users.id, user.id));
         }
       }
 
-      // Grant admin role on every login when the Telegram id is allow-listed
-      if (
-        user.role !== "admin" &&
-        env.adminTelegramIds.includes(String(input.id))
-      ) {
+      // ترقية لأدمن تلقائياً لو المعرّف ضمن القائمة البيضاء
+      if (user.role !== "admin" && env.adminTelegramIds.includes(telegramId)) {
         await setUserRole(Number(user.id), "admin");
         user = { ...user, role: "admin" };
       }
@@ -456,7 +446,7 @@ export const authRouter = createRouter({
   }),
 
   linkTelegramViaWidget: authedQuery
-    .input(telegramAuthSchema)
+    .input(telegramWidgetSchema)
     .mutation(async ({ ctx, input }) => {
       assertAuthRateLimit("linkTelegramViaWidget", ctx.req);
       if (!env.telegramBotToken) {
@@ -465,10 +455,15 @@ export const authRouter = createRouter({
           message: "ربط تيليجرام غير مفعّل على هذا الخادم",
         });
       }
-      if (!verifyTelegramAuth(input, env.telegramBotToken)) {
+      const verdict = verifyTelegramWidget(input, env.telegramBotToken);
+      if (!verdict.ok) {
+        console.warn(`[auth] linkTelegramViaWidget رفض (${verdict.reason}) للمعرّف ${input.id}`);
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message: "بيانات تيليجرام غير صالحة",
+          message:
+            verdict.reason === "stale"
+              ? "انتهت صلاحية بيانات تليجرام — أعد المحاولة"
+              : "بيانات تيليجرام غير صالحة",
         });
       }
 

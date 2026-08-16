@@ -1,10 +1,11 @@
 /**
- * زر Telegram Login Widget الرسمي — يحمّل telegram-widget.js ويستدعي
- * auth.telegramLogin عند نجاح المصادقة. لا يظهر إطلاقاً بدون
- * VITE_TELEGRAM_BOT_USERNAME (أو botUsername ممرّر).
+ * زر Telegram Login Widget الرسمي — بناء جديد من الصفر.
+ *
+ * يحمّل telegram-widget.js مرة واحدة، ويربط callback عالمي فريد،
+ * ويكشف الفشل الصامت (حجب المتصفح/الشبكة) خلال 4 ثوانٍ عبر onWidgetFailed.
+ * لا يُعرض شيء بدون botUsername.
  */
-import { useEffect, useRef, useState } from "react";
-import { trpc } from "@/providers/trpc";
+import { useEffect, useRef } from "react";
 
 export type TelegramAuthPayload = {
   id: number;
@@ -16,84 +17,78 @@ export type TelegramAuthPayload = {
   hash: string;
 };
 
-type CallbackStore = Record<string, ((user: TelegramAuthPayload) => void) | undefined>;
+const WIDGET_SRC = "https://telegram.org/js/telegram-widget.js?22";
+const WIDGET_FAIL_MS = 4000;
 
-let callbackSeq = 0;
+let seq = 0;
 
 interface TelegramLoginButtonProps {
-  /** اسم البوت — من auth.providers (الخادم) */
+  /** اسم البوت (بدون @) — من auth.providers */
   botUsername?: string | null;
-  /** معالج مخصص — الافتراضي: auth.telegramLogin ثم إبطال الكاش */
-  onAuth?: (user: TelegramAuthPayload) => void;
-  onError?: (message: string) => void;
-  /** يُستدعى عند فشل تحميل الودجت (محجوب/شبكة) */
+  /** يُستدعى بحمولة تليجرام الموقّعة عند نجاح المصادقة */
+  onAuth: (user: TelegramAuthPayload) => void;
+  /** يُستدعى عند فشل تحميل الودجت (محجوب/شبكة) لعرض بديل */
   onWidgetFailed?: () => void;
   size?: "large" | "medium" | "small";
+  /** إظهار صورة المستخدم داخل الزر */
+  userpic?: boolean;
   className?: string;
 }
 
 export default function TelegramLoginButton({
   botUsername,
   onAuth,
-  onError,
   onWidgetFailed,
   size = "large",
+  userpic = true,
   className,
 }: TelegramLoginButtonProps) {
-  const bot = botUsername ?? null;
   const containerRef = useRef<HTMLDivElement>(null);
-  const [callbackName] = useState(() => `onTelegramAuth_${++callbackSeq}`);
-  const utils = trpc.useUtils();
-
-  const loginMut = trpc.auth.telegramLogin.useMutation({
-    onSuccess: () => {
-      void utils.invalidate();
-    },
-    onError: (e) => onError?.(e.message),
-  });
-
-  // مرجع ثابت لأحدث معالج حتى لا يعاد تحميل الودجت مع كل render
-  const handlerRef = useRef<(u: TelegramAuthPayload) => void>(() => {});
-  handlerRef.current = (u) => (onAuth ? onAuth(u) : loginMut.mutate(u));
-  const failedRef = useRef<(() => void) | undefined>(undefined);
-  failedRef.current = onWidgetFailed;
+  // مراجع ثابتة لأحدث المعالجات — لا إعادة تحميل للودجت مع كل render
+  const onAuthRef = useRef(onAuth);
+  onAuthRef.current = onAuth;
+  const onFailRef = useRef(onWidgetFailed);
+  onFailRef.current = onWidgetFailed;
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!bot || !container) return;
-    const store = window as unknown as CallbackStore;
-    store[callbackName] = (user) => handlerRef.current(user);
+    if (!botUsername || !container) return;
+
+    const callbackName = `telegramWidgetAuth_${++seq}`;
+    const store = window as unknown as Record<string, ((u: TelegramAuthPayload) => void) | undefined>;
+    store[callbackName] = (user) => onAuthRef.current(user);
+
     const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.src = WIDGET_SRC;
     script.async = true;
-    script.setAttribute("data-telegram-login", bot);
+    script.setAttribute("data-telegram-login", botUsername);
     script.setAttribute("data-size", size);
-    script.setAttribute("data-radius", "14");
+    script.setAttribute("data-radius", "12");
     script.setAttribute("data-onauth", `${callbackName}(user)`);
     script.setAttribute("data-request-access", "write");
-    script.onerror = () => failedRef.current?.();
+    if (!userpic) script.setAttribute("data-userpic", "false");
+    script.onerror = () => onFailRef.current?.();
+
     container.innerHTML = "";
     container.appendChild(script);
-    // بعد 5 ثوانٍ: إن لم يُنشأ iframe فالودجت فشل silently
-    const timeout = window.setTimeout(() => {
-      if (!container.querySelector("iframe")) failedRef.current?.();
-    }, 5000);
-    return () => {
-      window.clearTimeout(timeout);
-      delete store[callbackName];
-    };
-  }, [bot, size, callbackName]);
 
-  if (!bot) return null;
+    // كشف الفشل الصامت: لو مفيش iframe اتبنى خلال المهلة يبقى الودجت محجوب
+    const watchdog = window.setTimeout(() => {
+      if (!container.querySelector("iframe")) onFailRef.current?.();
+    }, WIDGET_FAIL_MS);
+
+    return () => {
+      window.clearTimeout(watchdog);
+      delete store[callbackName];
+      container.innerHTML = "";
+    };
+  }, [botUsername, size, userpic]);
+
+  if (!botUsername) return null;
 
   return (
-    <div className={className ?? "flex justify-center"}>
-      <div ref={containerRef} className="flex justify-center" />
-      {loginMut.isPending && (
-        <span className="sr-only" role="status">
-          جارٍ تسجيل الدخول عبر تليجرام…
-        </span>
-      )}
+    <div className={className ?? "flex justify-center"} dir="ltr">
+      <div ref={containerRef} className="flex min-h-10 items-center justify-center" />
     </div>
   );
 }
