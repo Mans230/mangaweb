@@ -45,14 +45,14 @@
 
 ## 4) أوامر البناء والتشغيل
 
-الخيار الأسهل: استخدم **Dockerfile** الموجود (Railway يكتشفه تلقائياً) — هو يبني الواجهة والسيرفر ويطبّق المايغريشن عند الإقلاع.
+الخيار الأسهل: استخدم **Dockerfile** الموجود (Railway يكتشفه تلقائياً) — يبني الواجهة والسيرفر ثم يشغّل `npm start` فقط.
+
+> **لا يوجد migrate عند الإقلاع**: `drizzle-kit migrate` أُزيل من أمر التشغيل لأن `ALTER TABLE` كان يعلّق على metadata lock أثناء تبديل الحاويات ويسبب crash loop. بدلاً منه يعمل `ensureBootSchema()` بعد بدء الاستماع مباشرة (fire-and-forget، idempotent) ويطبّق أي أعمدة/جداول جديدة. ملفات `db/migrations/` تبقى المرجع الرسمي ويمكن تشغيلها يدوياً عند الحاجة.
 
 أو بدون Docker (Nixpacks) اضبط في **Settings ← Deploy**:
 
 - **Build Command**: `npm ci && npm run build`
-- **Start Command**: `npm run migrate && npm start`
-
-ملفات المايغريشن في `db/migrations/` **ملتزم بها في المستودع** (أزلنا تجاهلها من `.gitignore`) — `npm run migrate` يشغّل `drizzle-kit migrate` وهي عملية idempotent وآمنة عند إعادة التشغيل.
+- **Start Command**: `npm start`
 
 ## 5) ربط الدومين المخصص (zekospace.com)
 
@@ -117,7 +117,6 @@ npm run build && npm start
 | العَرَض | السبب المحتمل |
 |---|---|
 | `Missing required environment variable` | متغير ناقص في Railway Variables |
-| فشل `npm run migrate` | `DATABASE_URL` خاطئ أو القاعدة غير جاهزة — أعد المحاولة |
 | زر تليجرام لا يظهر | `VITE_TELEGRAM_BOT_USERNAME` غير مضبوط وقت البناء — أعد النشر |
 | Widget تليجرام يرفض الدومين | لم تنفّذ `/setdomain` في BotFather |
 | الكوكي لا يُحفظ | تأكد أن الموقع يعمل عبر HTTPS (الكوكي `Secure` في الإنتاج) |
