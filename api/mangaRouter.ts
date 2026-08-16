@@ -237,12 +237,54 @@ export const mangaRouter = createRouter({
         .from(chapters)
         .innerJoin(manga, eq(chapters.mangaId, manga.id))
         .innerJoin(sources, eq(manga.sourceId, sources.id))
-        .orderBy(desc(chapters.publishedAt), desc(chapters.createdAt))
+        .orderBy(
+          desc(sql`COALESCE(${chapters.publishedAt}, ${chapters.createdAt})`),
+          desc(chapters.id),
+        )
         .limit(input.limit);
       return rows.map((r) => ({
         ...r.chapter,
         manga: { ...r.manga, source: r.source },
       }));
+    }),
+
+  /**
+   * آخر الفصول مجمّعة لكل مانجا — بطاقة واحدة لكل مانجا مع أحدث 4 فصول لها.
+   * يجلب ~80 فصلاً حديثاً ثم يجمّعها في JS مع الحفاظ على الترتيب الزمني.
+   */
+  latestGrouped: publicQuery
+    .input(
+      z.object({ limit: z.number().int().min(1).max(20).default(8) }).optional(),
+    )
+    .query(async ({ input }) => {
+      const limit = input?.limit ?? 8;
+      const rows = await getDb()
+        .select({ chapter: chapters, manga: manga, source: sources })
+        .from(chapters)
+        .innerJoin(manga, eq(chapters.mangaId, manga.id))
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .orderBy(
+          desc(sql`COALESCE(${chapters.publishedAt}, ${chapters.createdAt})`),
+          desc(chapters.id),
+        )
+        .limit(80);
+
+      const grouped = new Map<
+        number,
+        {
+          manga: typeof manga.$inferSelect & { source: typeof sources.$inferSelect };
+          chapters: (typeof chapters.$inferSelect)[];
+        }
+      >();
+      for (const r of rows) {
+        let g = grouped.get(r.manga.id);
+        if (!g) {
+          g = { manga: { ...r.manga, source: r.source }, chapters: [] };
+          grouped.set(r.manga.id, g);
+        }
+        if (g.chapters.length < 4) g.chapters.push(r.chapter);
+      }
+      return [...grouped.values()].slice(0, limit);
     }),
 
   popular: publicQuery
@@ -307,12 +349,13 @@ export const mangaRouter = createRouter({
           genres: manga.genres,
           rating: manga.rating,
           viewCount: manga.viewCount,
+          siteViewCount: manga.siteViewCount,
           chapterCount: manga.chapterCount,
           source: { id: sources.id, name: sources.name },
         })
         .from(manga)
         .innerJoin(sources, eq(manga.sourceId, sources.id))
-        .orderBy(desc(manga.viewCount), desc(manga.id))
+        .orderBy(desc(manga.siteViewCount), desc(manga.id))
         .limit(input.limit);
       return rows;
     }),

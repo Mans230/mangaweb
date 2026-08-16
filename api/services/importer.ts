@@ -142,15 +142,25 @@ async function upsertChapters(
     .where(eq(chapters.mangaId, mangaId));
   const existingNums = new Set(existing.map((r) => Number(r.number)));
 
+  // استيراد أولي (المانجا بلا فصول سابقة): لا تُغرق خلاصة "آخر الفصول" —
+  // createdAt = publishedAt إن عُرف، وإلا نُرجعه 7 أيام للخلف.
+  // الفصول المضافة لاحقاً عبر refresh (جديدة فعلاً) تحتفظ بـ createdAt=now.
+  const isInitial = existingNums.size === 0;
+  const backdated = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
   const rows = list
     .filter((c) => Number.isFinite(c.number))
-    .map((c) => ({
-      mangaId,
-      number: c.number,
-      title: c.title || null,
-      url: c.url || null,
-      publishedAt: parseDate(c.date),
-    }));
+    .map((c) => {
+      const publishedAt = parseDate(c.date);
+      return {
+        mangaId,
+        number: c.number,
+        title: c.title || null,
+        url: c.url || null,
+        publishedAt,
+        ...(isInitial ? { createdAt: publishedAt ?? backdated } : {}),
+      };
+    });
 
   // أزل التكرار داخل الدفعة نفسها (نفس الرقم)
   const seen = new Set<number>();
