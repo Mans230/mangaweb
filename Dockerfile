@@ -34,5 +34,6 @@ COPY db ./db
 EXPOSE 3000
 ENV PORT=3000
 
-# طبّق المايغريشن ثم شغّل السيرفر
-CMD ["sh", "-c", "npm run migrate && npm start"]
+# نشغّل السيرفر مباشرة — تغييرات السكيمة تُطبَّق من ensureBootSchema عند الإقلاع
+# (تشغيل drizzle-kit migrate هنا كان يعلّق على قفل جدول manga أثناء تبديل الكونتينرات)
+CMD ["sh", "-c", "npm start"]
