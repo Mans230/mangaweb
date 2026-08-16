@@ -275,7 +275,8 @@ const app = new Hono<{ Bindings: HttpBindings }>();
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' https://telegram.org",
+  // 'unsafe-eval' مطلوب لودجت تليجرام (telegram-widget.js يستخدم eval داخلياً)
+  "script-src 'self' 'unsafe-eval' https://telegram.org",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src * data: blob:",
