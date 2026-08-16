@@ -53,6 +53,10 @@ export const notificationsRouter = createRouter({
             title = "تم قبول الريل الخاص بك";
             body = p.excerpt ?? "أصبح ظاهراً الآن في قسم الريلز";
             break;
+          case "ticket_reply":
+            title = `رد على تذكرتك: ${p.subject ?? "تذكرة دعم"}`;
+            body = p.excerpt ?? "";
+            break;
           case "reel_rejected":
             title = "تم رفض الريل الخاص بك";
             body = p.excerpt ? `السبب: ${p.excerpt}` : "";
@@ -71,6 +75,7 @@ export const notificationsRouter = createRouter({
           communitySlug: p.communitySlug ?? null,
           chapterId: p.chapterId ?? null,
           chapterNumber: p.chapterNumber ?? null,
+          ticketId: p.ticketId ?? null,
           readAt: n.readAt ? n.readAt.toISOString() : null,
           createdAt: n.createdAt.toISOString(),
         };

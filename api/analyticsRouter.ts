@@ -41,13 +41,50 @@ export const analyticsRouter = createRouter({
         });
       }
       const ipHash = createHash("sha256").update(ip).digest("hex");
-      await getDb()
-        .insert(pageViews)
-        .values({
-          path: input.path.slice(0, 300),
-          userId: ctx.user ? Number(ctx.user.id) : null,
-          ipHash,
-        });
+      const db = getDb();
+
+      // عدّاد مشاهدات حقيقي لكل مانجا: صفحة /manga/:slug فقط (بلا فصول/مجتمع)،
+      // وبحد أقصى مرة كل 6 ساعات لنفس (ipHash + المانجا).
+      const mangaMatch = /^\/manga\/([^/]+)\/?$/.exec(input.path);
+      let mangaIdForView: number | null = null;
+      if (mangaMatch) {
+        const slug = decodeURIComponent(mangaMatch[1]);
+        const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+        const [mRow, recent] = await Promise.all([
+          db
+            .select({ id: manga.id })
+            .from(manga)
+            .where(eq(manga.slug, slug))
+            .limit(1),
+          db
+            .select({ id: pageViews.id })
+            .from(pageViews)
+            .where(
+              and(
+                eq(pageViews.ipHash, ipHash),
+                eq(pageViews.path, input.path.slice(0, 300)),
+                gte(pageViews.createdAt, sixHoursAgo),
+              ),
+            )
+            .limit(1),
+        ]);
+        if (mRow.length && recent.length === 0) {
+          mangaIdForView = mRow[0].id;
+        }
+      }
+
+      await db.insert(pageViews).values({
+        path: input.path.slice(0, 300),
+        userId: ctx.user ? Number(ctx.user.id) : null,
+        ipHash,
+      });
+
+      if (mangaIdForView !== null) {
+        await db
+          .update(manga)
+          .set({ siteViewCount: sql`${manga.siteViewCount} + 1` })
+          .where(eq(manga.id, mangaIdForView));
+      }
       return { success: true };
     }),
 
