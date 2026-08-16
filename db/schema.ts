@@ -143,6 +143,10 @@ export const manga = mysqlTable(
     viewCount: bigint("viewCount", { mode: "number", unsigned: true })
       .default(0)
       .notNull(),
+    /** مشاهدات صفحة المانجا على موقعنا (تُزيدها analytics.track) — مستقلة عن viewCount المجلوب من المصدر */
+    siteViewCount: bigint("siteViewCount", { mode: "number", unsigned: true })
+      .default(0)
+      .notNull(),
     chapterCount: int("chapterCount").default(0).notNull(),
     isAdult: boolean("isAdult").default(false).notNull(),
     isTrending: boolean("is_trending").default(false).notNull(),
@@ -698,6 +702,9 @@ export type NotificationPayload = {
   /** إشعارات عامة (نص حر) */
   title?: string;
   body?: string;
+  /** ticket_reply: رد الإدارة على تذكرة دعم */
+  ticketId?: number;
+  subject?: string;
 };
 
 export const notifications = mysqlTable(
@@ -868,3 +875,56 @@ export const updateRequests = mysqlTable(
 );
 
 export type UpdateRequest = typeof updateRequests.$inferSelect;
+
+// ================= تذاكر الدعم =================
+
+export const supportTickets = mysqlTable(
+  "support_tickets",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subject: varchar("subject", { length: 200 }).notNull(),
+    category: varchar("category", { length: 40 }).default("general").notNull(),
+    status: varchar("status", { length: 20 }).default("open").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdx: index("support_tickets_user_idx").on(table.userId),
+    statusIdx: index("support_tickets_status_idx").on(table.status),
+  }),
+);
+
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = typeof supportTickets.$inferInsert;
+
+export const supportTicketMessages = mysqlTable(
+  "support_ticket_messages",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    ticketId: bigint("ticketId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    authorId: bigint("authorId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    isAdmin: boolean("isAdmin").default(false).notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    ticketIdx: index("support_ticket_messages_ticket_idx").on(table.ticketId),
+  }),
+);
+
+export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
+export type InsertSupportTicketMessage = typeof supportTicketMessages.$inferInsert;

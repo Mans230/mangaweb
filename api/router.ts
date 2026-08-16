@@ -13,6 +13,7 @@ import { uploadRouter } from "./uploadRouter";
 import { reelsRouter } from "./reelsRouter";
 import { analyticsRouter } from "./analyticsRouter";
 import { notificationsRouter } from "./notificationsRouter";
+import { supportRouter } from "./supportRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -32,6 +33,7 @@ export const appRouter = createRouter({
   reels: reelsRouter,
   analytics: analyticsRouter,
   notifications: notificationsRouter,
+  support: supportRouter,
 });
 
 export type AppRouter = typeof appRouter;
