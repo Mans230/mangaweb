@@ -297,6 +297,14 @@ if (env.isProduction) {
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
 
+  // تغييرات السكيمة idempotent — لا migrate تلقائي على Railway
+  try {
+    const { ensureBootSchema } = await import("./lib/ensureSchema");
+    await ensureBootSchema();
+  } catch (e) {
+    console.warn(`[boot] ensureBootSchema: ${(e as Error).message}`);
+  }
+
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {
     console.log(`Server running on http://localhost:${port}/`);
