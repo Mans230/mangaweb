@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
-  Play,
   Send,
   Star,
 } from "lucide-react";
@@ -16,13 +15,14 @@ import { trpc } from "@/providers/trpc";
 import {
   GENRES,
   adaptLatestChapter,
+  adaptLatestGrouped,
   adaptMangaRow,
   formatNum,
   formatViews,
   mangaStatusLabel,
   typeLabel,
 } from "@/lib/manga";
-import type { MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
+import type { LatestGroupedMangaData, MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import LazySection from "@/components/LazySection";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
@@ -283,18 +283,87 @@ function HeroSlider() {
 }
 
 /* ================= آخر الفصول — فهرس TOC ================= */
+function LatestMangaCard({ item, index }: { item: LatestGroupedMangaData; index: number }) {
+  const { t } = useLanguage();
+  return (
+    <motion.article
+      initial={{ y: 24, opacity: 0 }}
+      whileInView={{ y: 0, opacity: 1 }}
+      viewport={{ once: true, margin: "-10%" }}
+      transition={{ duration: 0.45, ease: EASE, delay: (index % 2) * 0.07 }}
+      className="ed-card group flex h-full gap-3.5 p-3.5"
+    >
+      {/* الغلاف */}
+      <Link
+        to={`/manga/${item.slug}`}
+        className="block w-20 shrink-0 self-start overflow-hidden rounded-[3px] border border-[var(--ed-line)] bg-[var(--ed-bg2)]"
+        aria-label={item.title}
+      >
+        <img
+          src={item.cover}
+          alt={item.title}
+          loading="lazy"
+          decoding="async"
+          className="h-28 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </Link>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* العنوان + الحالة */}
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            to={`/manga/${item.slug}`}
+            className="min-w-0 truncate font-display text-[15px] font-bold text-[var(--ed-ink)] transition-colors hover:text-[var(--ed-accent)]"
+          >
+            {item.title}
+          </Link>
+          <span className="ed-tag shrink-0">{t(item.status, item.status)}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--ed-ink3)]">
+          <Star size={11} className="fill-[var(--ed-accent)] text-[var(--ed-accent)]" />
+          <span className="font-ednum font-semibold tabular-nums text-[var(--ed-ink2)]">{item.rating.toFixed(1)}</span>
+          <span>· {t(item.type, item.type)}</span>
+        </div>
+
+        {/* صفوف الفصول — الأحدث أولاً */}
+        <ul className="mt-2 flex flex-col border-t border-[var(--ed-line)]">
+          {item.chapters.map((ch, i2) => (
+            <li key={ch.id} className="border-b border-[var(--ed-line)] last:border-b-0">
+              <Link
+                to={`/manga/${item.slug}/chapter/${ch.number}`}
+                className="flex items-baseline gap-2 px-1 py-1.5 text-xs transition-colors hover:bg-[var(--ed-bg2)]"
+              >
+                <span className="font-ednum shrink-0 text-[12px] font-bold tabular-nums text-[var(--ed-accent)]" dir="ltr">
+                  CH.{ch.number}
+                </span>
+                {i2 === 0 && ch.isNew && (
+                  <span className="ed-tag shrink-0 !bg-[var(--ed-accent)] !text-[var(--ed-bg)]">
+                    {t("جديد", "NEW")}
+                  </span>
+                )}
+                <span className="ed-toc-dots" />
+                <span className="shrink-0 text-[10px] text-[var(--ed-ink3)]">{ch.timeAgo}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.article>
+  );
+}
+
 function LatestChapters() {
   const { t } = useLanguage();
-  const query = trpc.manga.latest.useQuery({ limit: 8 }, { retry: false });
-  const items = (query.data ?? []).map((c) => adaptLatestChapter(c));
+  const query = trpc.manga.latestGrouped.useQuery({ limit: 8 }, { retry: false });
+  const items = adaptLatestGrouped(query.data ?? []);
 
   if (query.isLoading) {
     return (
       <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
         <SectionHeader title={t("آخر الفصول", "Latest chapters")} />
-        <div className="ed-toc">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="skeleton my-2 h-[44px] !rounded" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton h-44 !rounded" />
           ))}
         </div>
       </section>
@@ -315,36 +384,9 @@ function LatestChapters() {
           </Link>
         }
       />
-      <div className="ed-toc grid gap-x-10 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {items.map((item, i) => (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, y: 14 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-10%" }}
-            transition={{ duration: 0.4, ease: EASE, delay: (i % 4) * 0.05 }}
-            className="min-w-0"
-          >
-            <Link to={`/manga/${item.mangaSlug}/chapter/${item.chapter}`} className="ed-toc-item group">
-              <img
-                src={item.cover}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="h-16 w-11 shrink-0 self-center rounded-[3px] border border-[var(--ed-line)] bg-[var(--ed-bg2)] object-cover"
-              />
-              <span className="ed-toc-num">{String(i + 1).padStart(2, "0")}</span>
-              <span className="ed-toc-title">{item.mangaTitle}</span>
-              {item.isNew && <span className="ed-tag">{t("جديد", "NEW")}</span>}
-              <span className="ed-toc-dots" />
-              <span className="ed-toc-ch">CH.{item.chapter}</span>
-              <span className="inline-flex items-center gap-1 text-[var(--ed-accent)] opacity-0 transition-opacity group-hover:opacity-100">
-                <Play size={11} fill="currentColor" />
-                <span className="text-[11px] font-bold">{t("اقرأ", "Read")}</span>
-              </span>
-              <span className="ed-toc-time">{item.timeAgo}</span>
-            </Link>
-          </motion.div>
+          <LatestMangaCard key={item.mangaId} item={item} index={i} />
         ))}
       </div>
     </section>
