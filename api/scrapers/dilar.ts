@@ -130,7 +130,12 @@ export class DilarScraper extends BaseScraper {
     const res = await this.request({
       method: "GET",
       url: `/api/chapters/${releaseId}`,
-      headers: { "X-DH-Pub": b64u(pubRaw), ...extraHeaders },
+      // نعلن دعمنا حتى v7 — بدون الهيدر يردّ السيرفر بأحدث نسخة (v8) فتفشل فكّة التشفير
+      headers: {
+        "X-DH-Pub": b64u(pubRaw),
+        "X-Crypto-Caps": "1,2,3,4,5,6,7",
+        ...extraHeaders,
+      },
     });
     const data = res.data;
     if (!data?.ct || !data?.epk) {
@@ -148,12 +153,20 @@ export class DilarScraper extends BaseScraper {
     });
     const shared = crypto.diffieHellman({ privateKey, publicKey: serverKey });
     const version = Number(data.v) || 1;
-    // v1: salt = clientPub||epk — v2: salt = epk||clientPub
-    const salt =
-      version === 1 ? Buffer.concat([pubRaw, epkRaw]) : Buffer.concat([epkRaw, pubRaw]);
-    const key = Buffer.from(
-      crypto.hkdfSync("sha256", shared, salt, `dilar.response.ecies.v${version}|${data.e}`, 32),
-    );
+    let salt: Buffer;
+    let info: string;
+    if (version === 7) {
+      // v7: salt = HKDF(ikm=iv, salt=epk, info="…v7.salt") ثم HKDF(shared, salt, "…v7|e")
+      salt = Buffer.from(
+        crypto.hkdfSync("sha256", fromB64u(data.iv), epkRaw, "dilar.response.ecies.v7.salt", 32),
+      );
+      info = `dilar.response.ecies.v7|${data.e}`;
+    } else {
+      // v1: salt = clientPub||epk — v2: salt = epk||clientPub
+      salt = version === 1 ? Buffer.concat([pubRaw, epkRaw]) : Buffer.concat([epkRaw, pubRaw]);
+      info = `dilar.response.ecies.v${version}|${data.e}`;
+    }
+    const key = Buffer.from(crypto.hkdfSync("sha256", shared, salt, info, 32));
     const decipher = crypto.createDecipheriv("aes-256-gcm", key, fromB64u(data.iv));
     decipher.setAuthTag(fromB64u(data.tag));
     const plain = Buffer.concat([decipher.update(fromB64u(data.ct)), decipher.final()]);
