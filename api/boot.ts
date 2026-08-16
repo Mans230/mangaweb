@@ -15,7 +15,7 @@ import { downloadChapterHandler } from "./lib/download";
 import { Paths } from "@contracts/constants";
 import { BROWSER_UA, imageHostPolicy, getScraper } from "./scrapers";
 
-const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB
 
 /* ===== كاش صور في الذاكرة — شبكات البطاقات تولّد عشرات الطلبات المتوازية فتخنق المصادر ===== */
 const IMG_CACHE_MAX_ENTRIES = 500;
