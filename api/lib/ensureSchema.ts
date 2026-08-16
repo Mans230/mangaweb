@@ -32,23 +32,23 @@ export async function ensureBootSchema(): Promise<void> {
 
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`support_tickets\` (
-	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
-	\`userId\` bigint unsigned NOT NULL,
-	\`subject\` varchar(200) NOT NULL,
-	\`category\` varchar(40) NOT NULL DEFAULT 'general',
-	\`status\` varchar(20) NOT NULL DEFAULT 'open',
-	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
-	\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT \`support_tickets_id\` PRIMARY KEY(\`id\`)
+\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+\`userId\` bigint unsigned NOT NULL,
+\`subject\` varchar(200) NOT NULL,
+\`category\` varchar(40) NOT NULL DEFAULT 'general',
+\`status\` varchar(20) NOT NULL DEFAULT 'open',
+\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
+CONSTRAINT \`support_tickets_id\` PRIMARY KEY(\`id\`)
 )`));
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`support_ticket_messages\` (
-	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
-	\`ticketId\` bigint unsigned NOT NULL,
-	\`authorId\` bigint unsigned NOT NULL,
-	\`isAdmin\` boolean NOT NULL DEFAULT false,
-	\`body\` text NOT NULL,
-	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT \`support_ticket_messages_id\` PRIMARY KEY(\`id\`)
+\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+\`ticketId\` bigint unsigned NOT NULL,
+\`authorId\` bigint unsigned NOT NULL,
+\`isAdmin\` boolean NOT NULL DEFAULT false,
+\`body\` text NOT NULL,
+\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+CONSTRAINT \`support_ticket_messages_id\` PRIMARY KEY(\`id\`)
 )`));
     // CREATE INDEX لا يقبل IF NOT EXISTS في MySQL ≤8 — أنشئه فقط إن لم يوجد
     await ensureIndex(
@@ -68,6 +68,24 @@ export async function ensureBootSchema(): Promise<void> {
     );
   } catch (e) {
     console.warn(`[ensure-schema] support tables: ${(e as Error).message}`);
+  }
+
+  // جدول أكواد تغيير كلمة المرور عبر البريد
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`password_reset_codes\` (
+\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+\`userId\` bigint unsigned NOT NULL,
+\`code\` varchar(6) NOT NULL,
+\`expiresAt\` timestamp NOT NULL,
+CONSTRAINT \`password_reset_codes_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "password_reset_codes",
+      "password_reset_codes_user_idx",
+      "CREATE INDEX `password_reset_codes_user_idx` ON `password_reset_codes` (`userId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] password_reset_codes: ${(e as Error).message}`);
   }
 }
 

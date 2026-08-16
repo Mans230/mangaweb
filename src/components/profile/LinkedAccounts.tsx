@@ -94,6 +94,7 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
   const [tgModal, setTgModal] = useState(false);
   const [resetHelpOpen, setResetHelpOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
 
   // اسم بوت تليجرام من الخادم (auth.providers) — لا متغيرات build-time
   const providersQ = trpc.auth.providers.useQuery(undefined, {
@@ -223,7 +224,7 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
                 </button>
               )}
               <button
-                onClick={() => toast(t("تغيير كلمة المرور يتم عبر بريدك", "Password change happens via email"), { kind: "info" })}
+                onClick={() => setPwOpen(true)}
                 className="btn-glass !px-4 !py-2 text-xs"
               >
                 <KeyRound size={13} />
@@ -236,6 +237,7 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
 
       <TelegramModal open={tgModal} onClose={() => setTgModal(false)} botUsername={tgBot} />
       <EmailVerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
+      <PasswordChangeModal open={pwOpen} onClose={() => setPwOpen(false)} email={email} />
       <PasswordResetHelp
         open={resetHelpOpen}
         onClose={() => setResetHelpOpen(false)}
@@ -388,6 +390,159 @@ function EmailVerifyModal({ open, onClose }: { open: boolean; onClose: () => voi
       >
         {verifyMut.isPending ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
         {t("تأكيد التوثيق", "Confirm verification")}
+      </button>
+      <button
+        onClick={() => sendMut.mutate()}
+        disabled={sendMut.isPending}
+        className="btn-glass mt-2 w-full !py-2 text-xs disabled:opacity-50"
+      >
+        {sendMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+        {t("إعادة إرسال الكود", "Resend code")}
+      </button>
+    </GlassModal>
+  );
+}
+
+/**
+ * مودال تغيير كلمة المرور عبر البريد:
+ * 1) يُرسل كود من 6 أرقام إلى بريد المستخدم
+ * 2) يدخل الكود + كلمة المرور الجديدة مرتين
+ */
+function PasswordChangeModal({
+  open,
+  onClose,
+  email,
+}: {
+  open: boolean;
+  onClose: () => void;
+  email: string | null;
+}) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [sent, setSent] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendMut = trpc.auth.sendPasswordChangeCode.useMutation({
+    onSuccess: (data) => {
+      setSent(true);
+      setError(null);
+      const dev = (data as { devCode?: string }).devCode;
+      if (dev) setDevCode(dev);
+      toast(t("أُرسل الكود إلى بريدك", "Code sent to your email"));
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const changeMut = trpc.auth.changePasswordWithCode.useMutation({
+    onSuccess: () => {
+      toast(t("تم تغيير كلمة المرور بنجاح ✅", "Password changed successfully ✅"));
+      handleClose();
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  // إرسال الكود تلقائياً عند فتح المودال
+  useEffect(() => {
+    if (open && !sent && !sendMut.isPending && email) {
+      sendMut.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const handleClose = () => {
+    setCode("");
+    setPassword("");
+    setConfirm("");
+    setSent(false);
+    setDevCode(null);
+    setError(null);
+    onClose();
+  };
+
+  const submit = () => {
+    if (changeMut.isPending) return;
+    setError(null);
+    if (code.trim().length !== 6) {
+      setError(t("أدخل الكود المكوّن من 6 أرقام", "Enter the 6-digit code"));
+      return;
+    }
+    if (password.length < 8) {
+      setError(t("كلمة المرور 8 أحرف على الأقل", "Password must be at least 8 characters"));
+      return;
+    }
+    if (password !== confirm) {
+      setError(t("كلمتا المرور غير متطابقتين", "Passwords do not match"));
+      return;
+    }
+    changeMut.mutate({ code: code.trim(), password, confirmPassword: confirm });
+  };
+
+  return (
+    <GlassModal open={open} onClose={handleClose} title={t("تغيير كلمة المرور", "Change password")}>
+      <p className="text-sm leading-6 text-app-2">
+        {t(
+          "أرسلنا كوداً من 6 أرقام إلى بريدك — أدخله ثم اكتب كلمة المرور الجديدة مرتين.",
+          "We sent a 6-digit code to your email — enter it, then type your new password twice.",
+        )}
+      </p>
+      {email && (
+        <p className="glass-chip mt-3 !py-1.5 text-center text-[11px] font-bold text-app-2" dir="ltr">
+          {email}
+        </p>
+      )}
+      {devCode && (
+        <p className="glass mt-3 !rounded-xl px-3 py-2 text-center text-xs text-app-3">
+          {t("وضع التطوير — الكود:", "Dev mode — code:")}{" "}
+          <span className="font-bold tracking-[0.3em]" dir="ltr">{devCode}</span>
+        </p>
+      )}
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        dir="ltr"
+        inputMode="numeric"
+        placeholder="••••••"
+        className="input-glass mt-4 w-full text-center text-xl font-bold tracking-[0.4em]"
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        dir="ltr"
+        placeholder={t("كلمة المرور الجديدة", "New password")}
+        className="input-glass mt-3 w-full"
+        autoComplete="new-password"
+      />
+      <input
+        type="password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        dir="ltr"
+        placeholder={t("تأكيد كلمة المرور الجديدة", "Confirm new password")}
+        className="input-glass mt-2 w-full"
+        autoComplete="new-password"
+      />
+      {error && (
+        <motion.p
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-medium text-danger"
+        >
+          {error}
+        </motion.p>
+      )}
+      <button
+        onClick={submit}
+        disabled={changeMut.isPending || !sent}
+        className="btn-primary mt-4 w-full !py-2.5 text-sm disabled:opacity-50"
+      >
+        {changeMut.isPending ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
+        {t("تأكيد التغيير", "Confirm change")}
       </button>
       <button
         onClick={() => sendMut.mutate()}

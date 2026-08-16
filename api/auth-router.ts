@@ -14,8 +14,8 @@ import {
   revokeUserSession,
 } from "./lib/sessions";
 import { sendEmail } from "./lib/email";
-import { emailCodes, users } from "@db/schema";
-import { and, eq, gt } from "drizzle-orm";
+import { emailCodes, passwordResetCodes, sessions, users } from "@db/schema";
+import { and, eq, gt, ne } from "drizzle-orm";
 import { getDb } from "./queries/connection";
 import { createLinkCode } from "./lib/linkCodes";
 import {
@@ -177,6 +177,97 @@ export const authRouter = createRouter({
         .update(users)
         .set({ emailVerifiedAt: new Date() })
         .where(eq(users.id, ctx.user.id));
+      return { success: true };
+    }),
+
+  /**
+   * تغيير كلمة المرور عبر البريد — الخطوة 1:
+   * إرسال كود من 6 أرقام (صالح 10 دقائق) إلى بريد المستخدم الحالي.
+   */
+  sendPasswordChangeCode: authedQuery.mutation(async ({ ctx }) => {
+    assertAuthRateLimit("sendPasswordChangeCode", ctx.req);
+    const email = ctx.user.email;
+    if (!email) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لا يوجد بريد إلكتروني مرتبط بهذا الحساب",
+      });
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const db = getDb();
+    await db
+      .delete(passwordResetCodes)
+      .where(eq(passwordResetCodes.userId, ctx.user.id));
+    await db.insert(passwordResetCodes).values({
+      userId: ctx.user.id,
+      code,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    });
+    const sent = await sendEmail(
+      email,
+      "كود تغيير كلمة المرور — Zeko",
+      `كود تغيير كلمة المرور الخاص بك: ${code}\nصالح لمدة 10 دقائق.\nإن لم تطلب تغيير كلمة المرور تجاهل هذه الرسالة.`,
+    );
+    return {
+      success: true,
+      sent,
+      ...(env.isProduction ? {} : { devCode: sent ? undefined : code }),
+    };
+  }),
+
+  /**
+   * تغيير كلمة المرور عبر البريد — الخطوة 2:
+   * التحقق من الكود ثم تعيين كلمة المرور الجديدة وإلغاء كل الجلسات الأخرى.
+   */
+  changePasswordWithCode: authedQuery
+    .input(
+      z
+        .object({
+          code: z.string().trim().regex(/^\d{6}$/),
+          password: z
+            .string()
+            .min(8, "كلمة المرور 8 أحرف على الأقل")
+            .max(100),
+          confirmPassword: z.string(),
+        })
+        .refine((d) => d.password === d.confirmPassword, {
+          message: "كلمتا المرور غير متطابقتين",
+        }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertAuthRateLimit("changePasswordWithCode", ctx.req);
+      const db = getDb();
+      const row = await db.query.passwordResetCodes.findFirst({
+        where: and(
+          eq(passwordResetCodes.userId, ctx.user.id),
+          eq(passwordResetCodes.code, input.code),
+          gt(passwordResetCodes.expiresAt, new Date()),
+        ),
+      });
+      if (!row) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "الكود غير صحيح أو منتهي الصلاحية",
+        });
+      }
+      // الكود يُستهلك مرة واحدة مهما كانت النتيجة اللاحقة
+      await db
+        .delete(passwordResetCodes)
+        .where(eq(passwordResetCodes.userId, ctx.user.id));
+
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      await db
+        .update(users)
+        .set({ passwordHash })
+        .where(eq(users.id, ctx.user.id));
+
+      // أمان: إلغاء كل الجلسات الأخرى بعد تغيير كلمة المرور (الحالية تبقى)
+      const token = sessionTokenFromHeaders(ctx.req.headers);
+      if (token) {
+        await db
+          .delete(sessions)
+          .where(and(eq(sessions.userId, ctx.user.id), ne(sessions.token, token)));
+      }
       return { success: true };
     }),
 

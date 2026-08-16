@@ -100,6 +100,26 @@ export const emailCodes = mysqlTable(
 
 export type EmailCode = typeof emailCodes.$inferSelect;
 
+/** أكواد تغيير كلمة المرور عبر البريد (6 أرقام، 10 دقائق، تُستهلك مرة واحدة) */
+export const passwordResetCodes = mysqlTable(
+  "password_reset_codes",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 6 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("password_reset_codes_user_idx").on(table.userId),
+  }),
+);
+
+export type PasswordResetCode = typeof passwordResetCodes.$inferSelect;
+
 // ================= zeko-manga tables =================
 
 export const sources = mysqlTable("sources", {
