@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate } from "react-router";
+import { Link } from "react-router";
 import { motion } from "framer-motion";
 import { Clapperboard, Eye, Heart, UsersRound } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -26,8 +26,28 @@ export default function Fun() {
       : [{ key: "reels" as FunTab, label: t("الريلز", "Reels"), icon: Clapperboard }]),
   ];
 
-  // كلا القسمين مخفي → لا معنى للصفحة
-  if (tabs.length === 0) return <Navigate to="/" replace />;
+  // كلا القسمين مخفي → حالة فارغة ودّية بدل صفحة بيضاء
+  if (tabs.length === 0) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+        <span className="glass flex h-16 w-16 items-center justify-center rounded-3xl text-primary">
+          <Clapperboard size={26} />
+        </span>
+        <h1 className="font-display text-xl font-bold text-app">
+          {t("قسم Fun متوقف حالياً", "Fun is currently unavailable")}
+        </h1>
+        <p className="text-sm leading-relaxed text-app-3">
+          {t(
+            "أخفت الإدارة هذا القسم مؤقتاً — تصفّح المانجا أو ارجع للرئيسية.",
+            "The team hid this section for now — browse manga or head back home.",
+          )}
+        </p>
+        <Link to="/" className="btn-primary !px-6 !py-2.5 text-sm">
+          {t("العودة للرئيسية", "Back to home")}
+        </Link>
+      </div>
+    );
+  }
   const activeTab = tabs.some((x) => x.key === tab) ? tab : tabs[0].key;
 
   return (
