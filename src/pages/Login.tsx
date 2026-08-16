@@ -115,8 +115,27 @@ export default function Login() {
 
   // Telegram Login Widget — المكوّن المشترك يكشف الفشل الصامت عبر onWidgetFailed
 
-  // معالجة العودة من OAuth تليجرام (?id=...&hash=...&auth_date=...)
+  // معالجة العودة من OAuth تليجرام — صيغتان:
+  // 1) hash fragment (#tgAuthResult=<base64 JSON>) — صيغة الرجوع الحالية من oauth.telegram.org
+  // 2) query params (?id=...&hash=...&auth_date=...)
   useEffect(() => {
+    const m = /[#&]tgAuthResult=([^&]+)/.exec(window.location.hash);
+    if (m) {
+      try {
+        const decoded = JSON.parse(
+          decodeURIComponent(escape(window.atob(decodeURIComponent(m[1])))),
+        ) as TelegramAuthPayload;
+        if (decoded?.id && decoded?.hash && decoded?.auth_date) {
+          telegramMutation.mutate(decoded);
+        } else {
+          onError("بيانات تليجرام ناقصة — حاول مجدداً");
+        }
+      } catch {
+        onError("تعذّرت قراءة بيانات تليجرام — حاول مجدداً");
+      }
+      window.history.replaceState(null, "", "/login");
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
     const hash = params.get("hash");
