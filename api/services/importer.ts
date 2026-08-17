@@ -96,6 +96,7 @@ const SOURCE_SITE_URLS: Record<string, string> = {
   despair: "https://despair-manga.net",
   mangadar: "https://mangadar.com",
   dilar: "https://dilar.tube",
+  mangadex: "https://mangadex.org",
 };
 
 /** أوجد صف المصدر بالاسم أو أنشئه */
@@ -227,7 +228,7 @@ export async function notifyNewChapters(
       .from(follows)
       .where(eq(follows.mangaId, mangaRow.id)),
     db
-      .select({ userId: userLists.userId })
+      .select({ userId: userListItems.userId })
       .from(userListItems)
       .innerJoin(userLists, eq(userListItems.listId, userLists.id))
       .where(eq(userListItems.mangaId, mangaRow.id)),
