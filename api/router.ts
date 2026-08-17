@@ -18,12 +18,14 @@ import { supportRouter } from "./supportRouter";
 import { coinsRouter } from "./coinsRouter";
 import { shopRouter } from "./shopRouter";
 import { pollsRouter } from "./pollsRouter";
+import { enRouter } from "./enRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
   auth: authRouter,
   manga: mangaRouter,
+  en: enRouter,
   library: libraryRouter,
   engagement: engagementRouter,
   request: requestRouter,

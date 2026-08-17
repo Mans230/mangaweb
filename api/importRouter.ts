@@ -3,6 +3,12 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery } from "./middleware";
 import { scraperForUrl } from "./scrapers";
 import { importLatest, importSeries, refreshAll, refreshChapters } from "./services/importer";
+import {
+  EN_SOURCE_KEYS,
+  enImportStatus,
+  purgeAdultManga,
+  startEnBulkImport,
+} from "./services/enImport";
 
 export const importRouter = createRouter({
   /**
@@ -74,4 +80,52 @@ export const importRouter = createRouter({
     }),
 
   refreshAll: adminQuery.mutation(() => refreshAll()),
+
+  /**
+   * استيراد جماعي لكتالوج مصدر إنجليزي (mangadex/asurascans/vortexscans)
+   * في الخلفية حتى target سلسلة. يرجع فوراً بحالة المهمة.
+   */
+  startEnImport: adminQuery
+    .input(
+      z.object({
+        sourceKey: z.enum(EN_SOURCE_KEYS),
+        target: z.number().int().min(10).max(1200).default(400),
+      }),
+    )
+    .mutation(({ input }) => {
+      const res = startEnBulkImport(input.sourceKey, input.target);
+      if (!res.ok) {
+        const messages = {
+          unknown_source: "مصدر غير معروف",
+          disabled: `المصدر ${input.sourceKey} معطّل حالياً`,
+          already_running: `مهمة استيراد ${input.sourceKey} تعمل حالياً — انتظر اكتمالها`,
+        } as const;
+        throw new TRPCError({
+          code: res.reason === "already_running" ? "CONFLICT" : "BAD_REQUEST",
+          message: messages[res.reason ?? "unknown_source"],
+        });
+      }
+      return { started: true, state: res.state };
+    }),
+
+  /** حالة مهام الاستيراد الجماعي الإنجليزي (تقدّم/عدادات لكل مصدر) */
+  enImportStatus: adminQuery.query(() => enImportStatus()),
+
+  /**
+   * تطهير كل المانجا +18 (كل المصادر — سياسة الموقع آمن للعائلة الآن):
+   * يحذف المانجا مع الفصول وكل الصفوف التابعة ويحدّث عدّادات المصادر.
+   */
+  purgeAdult: adminQuery.mutation(async () => {
+    try {
+      const res = await purgeAdultManga();
+      console.log(`[import] purgeAdult: حُذفت ${res.deleted} مانجا +18`);
+      return res;
+    } catch (e) {
+      console.error(`[import] purgeAdult فشل: ${(e as Error).message}`);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `فشل تطهير المحتوى +18: ${(e as Error).message}`,
+      });
+    }
+  }),
 });
