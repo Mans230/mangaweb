@@ -109,6 +109,27 @@ export const libraryRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
+
+      // المؤشّر تصاعدي: قراءة فصل أقدم لا تُرجِع "آخر فصل مقروء" للخلف
+      // (وإلا انقلبت فصول أحدث إلى غير مقروءة). نحدّث chapterId فقط إذا كان الجديد أحدث.
+      const [newChap, existing] = await Promise.all([
+        db.query.chapters.findFirst({ where: eq(chapters.id, input.chapterId) }),
+        db
+          .select({ num: chapters.number })
+          .from(readingProgress)
+          .leftJoin(chapters, eq(readingProgress.chapterId, chapters.id))
+          .where(
+            and(
+              eq(readingProgress.userId, ctx.user.id),
+              eq(readingProgress.mangaId, input.mangaId),
+            ),
+          )
+          .limit(1),
+      ]);
+      const existingNum = existing[0]?.num ?? null;
+      const goesBackward =
+        existingNum !== null && newChap != null && newChap.number < existingNum;
+
       await db
         .insert(readingProgress)
         .values({
@@ -118,7 +139,10 @@ export const libraryRouter = createRouter({
           lastPage: input.lastPage,
         })
         .onDuplicateKeyUpdate({
-          set: { chapterId: input.chapterId, lastPage: input.lastPage },
+          // إعادة قراءة فصل أقدم: نبقي المؤشّر على الأحدث ونكتفي بحفظ موضع الصفحة
+          set: goesBackward
+            ? { lastPage: input.lastPage }
+            : { chapterId: input.chapterId, lastPage: input.lastPage },
         });
 
       const [chapter, m] = await Promise.all([

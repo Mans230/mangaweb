@@ -114,6 +114,22 @@ function ScrapeTriggerCard() {
         "danger",
       ),
   });
+  const full = trpc.admin.importFullCatalog.useMutation({
+    onSuccess: (d) =>
+      toast(
+        t(
+          `بدأ استيراد الكتالوج الكامل من ${d.sources.length} مصدر — كل الأعمال (القديمة والجديدة) ستُضاف تباعًا`,
+          `Full catalog import started for ${d.sources.length} sources`,
+        ),
+      ),
+    onError: (e) =>
+      toast(
+        e.data?.code === "CONFLICT"
+          ? t("فحص يعمل بالفعل — انتظر حتى ينتهي", "A scrape is already running")
+          : e.message,
+        "danger",
+      ),
+  });
 
   return (
     <motion.section
@@ -126,28 +142,49 @@ function ScrapeTriggerCard() {
         <RefreshCw size={16} className="text-primary" />
         {t("فحص المصادر (سكرابر)", "Sources scraper")}
       </h3>
-      <div className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5">
-        <p className="text-xs leading-relaxed text-muted">
-          {t(
-            "الفحص التلقائي يعمل دوريًا — اضغط هنا لتشغيله فورًا وجلب أحدث الفصول الآن",
-            "Auto-scan runs periodically — press to run it right now",
-          )}
-        </p>
-        <button
-          type="button"
-          onClick={() => trigger.mutate()}
-          disabled={trigger.isPending}
-          className="btn-primary flex shrink-0 items-center gap-2 !rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50"
-        >
-          {trigger.isPending ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <RefreshCw size={14} />
-          )}
-          {trigger.isPending
-            ? t("جارٍ التشغيل…", "Starting…")
-            : t("افحص الآن", "Scan now")}
-        </button>
+      <div className="flex flex-col gap-2.5">
+        <div className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5">
+          <p className="text-xs leading-relaxed text-muted">
+            {t(
+              "أحدث الفصول فقط — الفحص التلقائي يعمل دوريًا، اضغط لتشغيله فورًا",
+              "Latest chapters only — press to run the periodic scan now",
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => trigger.mutate()}
+            disabled={trigger.isPending || full.isPending}
+            className="btn-primary flex shrink-0 items-center gap-2 !rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50"
+          >
+            {trigger.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            {trigger.isPending ? t("جارٍ التشغيل…", "Starting…") : t("افحص الآن", "Scan now")}
+          </button>
+        </div>
+        <div className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5">
+          <p className="text-xs leading-relaxed text-muted">
+            {t(
+              "الكتالوج الكامل — يمرّ على كل صفحات كل المصادر ويضيف كل الأعمال القديمة والجديدة الناقصة (يأخذ وقتًا في الخلفية)",
+              "Full catalog — walks every page of every source and adds all missing old + new titles (runs in background, takes a while)",
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => full.mutate()}
+            disabled={trigger.isPending || full.isPending}
+            className="btn-glass flex shrink-0 items-center gap-2 !rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50"
+          >
+            {full.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            {full.isPending ? t("جارٍ البدء…", "Starting…") : t("استيراد الكتالوج الكامل", "Import full catalog")}
+          </button>
+        </div>
       </div>
     </motion.section>
   );
