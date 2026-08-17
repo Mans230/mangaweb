@@ -3,7 +3,10 @@ import {
   chapterCompletions,
   coinTransactions,
   coinWallets,
+  referrals,
+  userMissionClaims,
 } from "@db/schemaCoins";
+import { comments, favorites, ratings, users } from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getSetting } from "./siteSettings";
 
@@ -25,6 +28,26 @@ export const COIN_SETTING_KEYS = {
   checkinBase: "coins.checkin_base",
   /** أقصى يوم يُحتسب في مضاعف الـ check-in (افتراضي 7 → 70 كوين) */
   checkinMaxDay: "coins.checkin_max_day",
+  /** مكافأة مهمة قراءة الفصول اليومية (افتراضي 30) */
+  missionRead3Reward: "coins.mission_read3_reward",
+  /** عدد الفصول المطلوبة لمهمة القراءة (افتراضي 3) */
+  missionRead3Count: "coins.mission_read3_count",
+  /** مكافأة مهمة التعليق (افتراضي 10) */
+  missionCommentReward: "coins.mission_comment_reward",
+  /** مكافأة مهمة التقييم (افتراضي 10) */
+  missionRateReward: "coins.mission_rate_reward",
+  /** مكافأة مهمة الإضافة للمكتبة (افتراضي 5) */
+  missionLibraryReward: "coins.mission_library_reward",
+  /** أدنى جائزة لعجلة الحظ (افتراضي 5) */
+  spinMin: "coins.spin_min",
+  /** أقصى جائزة لعجلة الحظ (افتراضي 100) */
+  spinMax: "coins.spin_max",
+  /** مكافأة الداعي في الإحالة (افتراضي 100) */
+  referralInviter: "coins.referral_inviter",
+  /** مكافأة المدعو في الإحالة (افتراضي 50) */
+  referralInvitee: "coins.referral_invitee",
+  /** عدد الفصول التي يكملها المدعو لدفع مكافأة الإحالة (افتراضي 5) */
+  referralThreshold: "coins.referral_threshold",
 } as const;
 
 const DEFAULTS: Record<string, number> = {
@@ -34,6 +57,16 @@ const DEFAULTS: Record<string, number> = {
   [COIN_SETTING_KEYS.xpPerLevel]: 100,
   [COIN_SETTING_KEYS.checkinBase]: 10,
   [COIN_SETTING_KEYS.checkinMaxDay]: 7,
+  [COIN_SETTING_KEYS.missionRead3Reward]: 30,
+  [COIN_SETTING_KEYS.missionRead3Count]: 3,
+  [COIN_SETTING_KEYS.missionCommentReward]: 10,
+  [COIN_SETTING_KEYS.missionRateReward]: 10,
+  [COIN_SETTING_KEYS.missionLibraryReward]: 5,
+  [COIN_SETTING_KEYS.spinMin]: 5,
+  [COIN_SETTING_KEYS.spinMax]: 100,
+  [COIN_SETTING_KEYS.referralInviter]: 100,
+  [COIN_SETTING_KEYS.referralInvitee]: 50,
+  [COIN_SETTING_KEYS.referralThreshold]: 5,
 };
 
 export async function coinSettingInt(key: string): Promise<number> {
@@ -143,6 +176,7 @@ export async function addXp(
  * - أول إكمال للفصل فقط يمنح كوينز + XP (إعادة القراءة لا تمنح شيئاً)
  * - كوينز القراءة محدودة يومياً (coins.daily_cap)
  * - يحدّث سلسلة أيام القراءة (streak)
+ * - أفضل جهد: يفحص مكافأة الإحالة بعد كل إكمال
  */
 export async function completeChapter(
   userId: number,
@@ -204,6 +238,13 @@ export async function completeChapter(
     .set({ streakDays, lastReadDate: today })
     .where(eq(coinWallets.userId, userId));
 
+  // أفضل جهد: دفع مكافأة الإحالة عند بلوغ المدعو حد الفصول — لا يُفشل الإكمال أبداً
+  try {
+    await maybeRewardReferral(userId);
+  } catch (e) {
+    console.warn(`[coins] maybeRewardReferral: ${(e as Error).message}`);
+  }
+
   return {
     alreadyCompleted: Boolean(existing),
     coinsAwarded,
@@ -242,4 +283,259 @@ export async function dailyCheckin(userId: number): Promise<
     .where(eq(coinWallets.userId, userId));
   const balance = await awardCoins(userId, reward, "checkin", { checkinDays });
   return { ok: true, reward, checkinDays, balance };
+}
+
+// ================= المهام اليومية =================
+
+export const MISSION_KEYS = ["read", "comment", "rate", "library"] as const;
+export type MissionKey = (typeof MISSION_KEYS)[number];
+
+export type MissionInfo = {
+  key: MissionKey;
+  target: number;
+  progress: number;
+  reward: number;
+  claimed: boolean;
+  claimable: boolean;
+};
+
+/** المهام اليومية الأربع مع تقدّم المستخدم وحالة الاستلام */
+export async function getMissions(userId: number): Promise<MissionInfo[]> {
+  const db = getDb();
+  const today = dateStr();
+  const startOfToday = new Date(today);
+  const [readTarget, readReward, commentReward, rateReward, libraryReward] =
+    await Promise.all([
+      coinSettingInt(COIN_SETTING_KEYS.missionRead3Count),
+      coinSettingInt(COIN_SETTING_KEYS.missionRead3Reward),
+      coinSettingInt(COIN_SETTING_KEYS.missionCommentReward),
+      coinSettingInt(COIN_SETTING_KEYS.missionRateReward),
+      coinSettingInt(COIN_SETTING_KEYS.missionLibraryReward),
+    ]);
+  const [readRow, commentRow, rateRow, libraryRow, claims] = await Promise.all([
+    db
+      .select({ c: sql<number>`COUNT(*)` })
+      .from(chapterCompletions)
+      .where(
+        and(
+          eq(chapterCompletions.userId, userId),
+          gte(chapterCompletions.createdAt, startOfToday),
+        ),
+      ),
+    db
+      .select({ c: sql<number>`COUNT(*)` })
+      .from(comments)
+      .where(
+        and(eq(comments.userId, userId), gte(comments.createdAt, startOfToday)),
+      ),
+    db
+      .select({ c: sql<number>`COUNT(*)` })
+      .from(ratings)
+      .where(
+        and(eq(ratings.userId, userId), gte(ratings.createdAt, startOfToday)),
+      ),
+    db
+      .select({ c: sql<number>`COUNT(*)` })
+      .from(favorites)
+      .where(
+        and(
+          eq(favorites.userId, userId),
+          gte(favorites.createdAt, startOfToday),
+        ),
+      ),
+    db
+      .select({ missionKey: userMissionClaims.missionKey })
+      .from(userMissionClaims)
+      .where(
+        and(
+          eq(userMissionClaims.userId, userId),
+          eq(userMissionClaims.periodKey, today),
+        ),
+      ),
+  ]);
+  const claimedKeys = new Set(claims.map((c) => c.missionKey));
+
+  const defs: { key: MissionKey; target: number; progress: number; reward: number }[] = [
+    {
+      key: "read",
+      target: Math.max(readTarget, 1),
+      progress: Number(readRow[0]?.c ?? 0),
+      reward: readReward,
+    },
+    {
+      key: "comment",
+      target: 1,
+      progress: Number(commentRow[0]?.c ?? 0),
+      reward: commentReward,
+    },
+    {
+      key: "rate",
+      target: 1,
+      progress: Number(rateRow[0]?.c ?? 0),
+      reward: rateReward,
+    },
+    {
+      key: "library",
+      target: 1,
+      progress: Number(libraryRow[0]?.c ?? 0),
+      reward: libraryReward,
+    },
+  ];
+
+  return defs.map((d) => {
+    const claimed = claimedKeys.has(d.key);
+    return {
+      ...d,
+      claimed,
+      claimable: d.progress >= d.target && !claimed,
+    };
+  });
+}
+
+/** استلام مكافأة مهمة — يعيد الحساب ثم يسجّل المطالبة ويمنح الكوينز */
+export async function claimMission(
+  userId: number,
+  key: MissionKey,
+): Promise<{ ok: true; reward: number } | { ok: false }> {
+  const items = await getMissions(userId);
+  const mission = items.find((m) => m.key === key);
+  if (!mission || !mission.claimable) return { ok: false };
+  try {
+    await getDb().insert(userMissionClaims).values({
+      userId,
+      missionKey: key,
+      periodKey: dateStr(),
+    });
+  } catch {
+    // المفتاح المركّب يمنع التكرار — أي خطأ إدراج = سبق الاستلام
+    return { ok: false };
+  }
+  await awardCoins(userId, mission.reward, "mission", { mission: key });
+  return { ok: true, reward: mission.reward };
+}
+
+// ================= عجلة الحظ =================
+
+/** لفة يومية واحدة — جائزة عشوائية بين spin_min و spin_max (شاملة) */
+export async function luckySpin(userId: number): Promise<
+  | { ok: true; reward: number; balance: number }
+  | { ok: false; reason: "already_spun" }
+> {
+  const db = getDb();
+  const w = await getOrCreateWallet(userId);
+  const today = dateStr();
+  if (w.lastSpinDate === today) {
+    return { ok: false, reason: "already_spun" };
+  }
+  const min = await coinSettingInt(COIN_SETTING_KEYS.spinMin);
+  const max = await coinSettingInt(COIN_SETTING_KEYS.spinMax);
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  const reward = lo + Math.floor(Math.random() * (hi - lo + 1));
+  await db
+    .update(coinWallets)
+    .set({ lastSpinDate: today })
+    .where(eq(coinWallets.userId, userId));
+  const balance = await awardCoins(userId, reward, "spin");
+  return { ok: true, reward, balance };
+}
+
+// ================= الإحالات =================
+
+/** تسجيل إحالة عند التسجيل — يتجاهل الإحالة الذاتية/الداعي غير الموجود/المدعو المكرر */
+export async function registerReferral(
+  inviterId: number,
+  inviteeId: number,
+): Promise<boolean> {
+  if (!Number.isFinite(inviterId) || !Number.isFinite(inviteeId)) return false;
+  if (inviterId === inviteeId) return false;
+  const db = getDb();
+  const inviter = await db.query.users.findFirst({
+    where: eq(users.id, inviterId),
+    columns: { id: true },
+  });
+  if (!inviter) return false;
+  try {
+    await db.insert(referrals).values({ inviterId, inviteeId });
+    return true;
+  } catch {
+    // inviteeId فريد — المدعو مُحال مسبقاً
+    return false;
+  }
+}
+
+/**
+ * دفع مكافأة الإحالة (مرة واحدة) عند بلوغ المدعو حد الفصول المكتملة.
+ * تُستدعى من completeChapter — ترجع true إذا دُفعت المكافأة.
+ */
+export async function maybeRewardReferral(inviteeId: number): Promise<boolean> {
+  const db = getDb();
+  const ref = await db.query.referrals.findFirst({
+    where: eq(referrals.inviteeId, inviteeId),
+  });
+  if (!ref || ref.rewardedAt) return false;
+  const threshold = await coinSettingInt(COIN_SETTING_KEYS.referralThreshold);
+  const [row] = await db
+    .select({ c: sql<number>`COUNT(*)` })
+    .from(chapterCompletions)
+    .where(eq(chapterCompletions.userId, inviteeId));
+  if (Number(row?.c ?? 0) < Math.max(threshold, 1)) return false;
+  const inviterReward = await coinSettingInt(COIN_SETTING_KEYS.referralInviter);
+  const inviteeReward = await coinSettingInt(COIN_SETTING_KEYS.referralInvitee);
+  await awardCoins(ref.inviterId, inviterReward, "referral", {
+    role: "inviter",
+    inviteeId,
+  });
+  await awardCoins(inviteeId, inviteeReward, "referral", {
+    role: "invitee",
+    inviterId: ref.inviterId,
+  });
+  await db
+    .update(referrals)
+    .set({ rewardedAt: new Date() })
+    .where(eq(referrals.id, ref.id));
+  return true;
+}
+
+/** معلومات إحالة المستخدم: الكود + العدادات + القيم الحالية */
+export async function referralInfo(userId: number): Promise<{
+  code: string;
+  invited: number;
+  rewarded: number;
+  earned: number;
+  threshold: number;
+  inviterReward: number;
+  inviteeReward: number;
+}> {
+  const db = getDb();
+  const [inviterReward, inviteeReward, threshold, invitedRow, rewardedRow] =
+    await Promise.all([
+      coinSettingInt(COIN_SETTING_KEYS.referralInviter),
+      coinSettingInt(COIN_SETTING_KEYS.referralInvitee),
+      coinSettingInt(COIN_SETTING_KEYS.referralThreshold),
+      db
+        .select({ c: sql<number>`COUNT(*)` })
+        .from(referrals)
+        .where(eq(referrals.inviterId, userId)),
+      db
+        .select({ c: sql<number>`COUNT(*)` })
+        .from(referrals)
+        .where(
+          and(
+            eq(referrals.inviterId, userId),
+            sql`${referrals.rewardedAt} IS NOT NULL`,
+          ),
+        ),
+    ]);
+  const invited = Number(invitedRow[0]?.c ?? 0);
+  const rewarded = Number(rewardedRow[0]?.c ?? 0);
+  return {
+    code: String(userId),
+    invited,
+    rewarded,
+    earned: rewarded * inviterReward,
+    threshold: Math.max(threshold, 1),
+    inviterReward,
+    inviteeReward,
+  };
 }
