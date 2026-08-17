@@ -38,6 +38,7 @@ export default function Reader() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
   const chapterNumber = Number.parseFloat(n) || 1;
   const chapterKey = `${slug}:${chapterNumber}`;
 
@@ -280,6 +281,7 @@ export default function Reader() {
       } else if (res.leveledUp) {
         showToast(t("مستوى جديد! 🎉", "Level up! 🎉"));
       }
+      void utils.coins.wallet.invalidate();
     },
   });
   const completeRef = useRef(completeMut.mutate);
