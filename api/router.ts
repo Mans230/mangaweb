@@ -15,6 +15,8 @@ import { analyticsRouter } from "./analyticsRouter";
 import { notificationsRouter } from "./notificationsRouter";
 import { supportRouter } from "./supportRouter";
 import { coinsRouter } from "./coinsRouter";
+import { shopRouter } from "./shopRouter";
+import { pollsRouter } from "./pollsRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -36,6 +38,8 @@ export const appRouter = createRouter({
   notifications: notificationsRouter,
   support: supportRouter,
   coins: coinsRouter,
+  shop: shopRouter,
+  polls: pollsRouter,
 });
 
 export type AppRouter = typeof appRouter;
