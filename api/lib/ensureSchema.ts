@@ -168,6 +168,76 @@ export async function ensureBootSchema(): Promise<void> {
   } catch (e) {
     console.warn(`[ensure-schema] missions/referrals tables: ${(e as Error).message}`);
   }
+
+  // ===== الكوينز دفعة 4: المتجر + الاستطلاعات =====
+  try {
+    // أعمدة التجهيز على المحافظ الموجودة
+    await ignoreDuplicateColumn(
+      db.execute(
+        sql.raw("ALTER TABLE `coin_wallets` ADD `equippedTheme` varchar(64)"),
+      ),
+      "coin_wallets.equippedTheme",
+    );
+    await ignoreDuplicateColumn(
+      db.execute(
+        sql.raw("ALTER TABLE `coin_wallets` ADD `equippedBadge` varchar(64)"),
+      ),
+      "coin_wallets.equippedBadge",
+    );
+
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`shop_items\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`itemKey\` varchar(64) NOT NULL,
+	\`type\` varchar(16) NOT NULL,
+	\`nameAr\` varchar(128),
+	\`nameEn\` varchar(128),
+	\`price\` int NOT NULL,
+	\`meta\` json,
+	\`active\` boolean NOT NULL DEFAULT true,
+	\`sort\` int NOT NULL DEFAULT 0,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`shop_items_id\` PRIMARY KEY(\`id\`),
+	CONSTRAINT \`shop_items_itemKey_unique\` UNIQUE(\`itemKey\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`user_purchases\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`itemKey\` varchar(64) NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`user_purchases_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "user_purchases",
+      "user_purchases_user_item_unique",
+      "CREATE UNIQUE INDEX `user_purchases_user_item_unique` ON `user_purchases` (`userId`, `itemKey`)",
+    );
+
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`polls\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`questionAr\` varchar(255),
+	\`questionEn\` varchar(255),
+	\`active\` boolean NOT NULL DEFAULT true,
+	\`weekKey\` varchar(16),
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`polls_id\` PRIMARY KEY(\`id\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`poll_options\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`pollId\` int NOT NULL,
+	\`textAr\` varchar(255),
+	\`textEn\` varchar(255),
+	CONSTRAINT \`poll_options_id\` PRIMARY KEY(\`id\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`poll_votes\` (
+	\`pollId\` int NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`optionId\` int NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`poll_votes_pk\` PRIMARY KEY(\`pollId\`, \`userId\`)
+)`));
+  } catch (e) {
+    console.warn(`[ensure-schema] shop/polls tables: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {
