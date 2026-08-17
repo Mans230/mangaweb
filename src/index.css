@@ -785,3 +785,66 @@
     color: #fff;
   }
 }
+
+/* ============================================================
+   ثيمات المتجر المشتراة — تراكبات إضافية فقط (batch 4).
+   تُفعَّل عبر data-shop-theme على <html> بواسطة src/lib/shopThemes.ts.
+   ============================================================ */
+@layer base {
+  /* AMOLED — نسخة أغمق من الوضع الداكن (يعمل فقط مع تفعيل الداكن) */
+  [data-theme="dark"][data-shop-theme="amoled"] {
+    --bg: #000000;
+    --bg-end: #050505;
+    --bg-2: #0b0b0c;
+    --surface: #0b0b0c;
+    --surface-strong: #131315;
+    --border: #26262a;
+    --ed-bg: #000000;
+    --ed-bg2: #0b0b0c;
+    --ed-line: #26262a;
+  }
+
+  /* Light — يفرض القيم الفاتحة حتى لو كان الوضع الداكن مفعّلاً */
+  [data-theme="dark"][data-shop-theme="light"] {
+    color-scheme: light;
+    --bg: #f2efe9;
+    --bg-end: #f2efe9;
+    --bg-2: #e8e4da;
+    --surface: rgba(250, 248, 242, 0.9);
+    --surface-strong: #fdfcf8;
+    --border: #d3cbb8;
+    --border-glow: rgba(194, 71, 26, 0.45);
+    --text: #211b12;
+    --text-2: #5c5443;
+    --text-3: #8a7f68;
+    --glass-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+    --ed-bg: #f2efe9;
+    --ed-bg2: #e8e4da;
+    --ed-line: #d3cbb8;
+    --ed-paper: #211b12;
+    --ed-paper2: #4a4130;
+    --ed-dim: #7d7360;
+  }
+
+  /* Ocean — درجات أزرق/تركواز للون الأساسي (الوضعان الفاتح والداكن) */
+  [data-shop-theme="ocean"] {
+    --primary: #0284c7;
+    --primary-soft: #0ea5e9;
+    --accent: #0d9488;
+    --accent-2: #06b6d4;
+    --border-glow: rgba(14, 165, 233, 0.5);
+    --ed-accent: #0284c7;
+    --ed-accent-soft: rgba(2, 132, 199, 0.12);
+  }
+
+  /* Sakura — درجات وردي/زهري للون الأساسي (الوضعان الفاتح والداكن) */
+  [data-shop-theme="sakura"] {
+    --primary: #db2777;
+    --primary-soft: #ec4899;
+    --accent: #e11d48;
+    --accent-2: #f472b6;
+    --border-glow: rgba(236, 72, 153, 0.5);
+    --ed-accent: #db2777;
+    --ed-accent-soft: rgba(219, 39, 119, 0.12);
+  }
+}
