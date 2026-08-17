@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell,
   CheckCheck,
+  Coins,
   Home,
   LayoutDashboard,
   Library,
@@ -21,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
 import { proxyImg, timeAgo } from "@/lib/manga";
 import { useUiToggles } from "@/lib/uiToggles";
+import { trpc } from "@/providers/trpc";
 import {
   useMarkNotificationRead,
   useNotificationsList,
@@ -166,6 +168,11 @@ export default function Navbar() {
 
   const accountPath = isAuthenticated ? "/profile" : LOGIN_PATH;
   const { hideCommunities, hideReels } = useUiToggles();
+  const walletQ = trpc.coins.wallet.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+    staleTime: 60_000,
+  });
   const showFun = !(hideCommunities && hideReels);
   const bottomNav = [
     { to: "/", ar: "الرئيسية", en: "Home", icon: Home },
@@ -258,6 +265,16 @@ export default function Navbar() {
               {searchOpen ? <X size={18} /> : <Search size={18} />}
             </button>
 
+            {isAuthenticated && (
+              <Link
+                to="/coins"
+                className="glass-chip !py-1.5 text-xs font-bold text-primary tabular-nums"
+                aria-label={t("كوينز", "Coins")}
+              >
+                <Coins size={13} />
+                {(walletQ.data?.coins ?? 0).toLocaleString("en-US")}
+              </Link>
+            )}
             <NotificationsBell />
 
             {/* AUTH-SLOT: wired to useAuth() */}
@@ -298,6 +315,10 @@ export default function Navbar() {
                   <DropdownMenuItem onClick={() => navigate("/library")}>
                     <Library size={16} />
                     {t("مكتبتي", "My Library")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/coins")}>
+                    <Coins size={16} />
+                    {t("كوينز", "Coins")}
                   </DropdownMenuItem>
                   {user?.role === "admin" && (
                     <DropdownMenuItem onClick={() => navigate("/admin")}>

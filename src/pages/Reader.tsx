@@ -270,6 +270,30 @@ export default function Reader() {
     toastTimerRef.current = window.setTimeout(() => setToast(null), 3200);
   }, []);
 
+  /* ===== Coins: إكمال الفصل يمنح كوينز/XP (أول إكمال فقط — السيرفر يخصم التكرار) ===== */
+  const completeMut = trpc.coins.completeChapter.useMutation({
+    onSuccess: (res) => {
+      if (res.coinsAwarded > 0 && res.leveledUp) {
+        showToast(t(`+${res.coinsAwarded} كوين — مستوى جديد! 🎉`, `+${res.coinsAwarded} coins — level up! 🎉`));
+      } else if (res.coinsAwarded > 0) {
+        showToast(t(`+${res.coinsAwarded} كوين`, `+${res.coinsAwarded} coins`));
+      } else if (res.leveledUp) {
+        showToast(t("مستوى جديد! 🎉", "Level up! 🎉"));
+      }
+    },
+  });
+  const completeRef = useRef(completeMut.mutate);
+  completeRef.current = completeMut.mutate;
+  const completionSentRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!manga || !current || !isAuthenticated || !manga.fromApi) return;
+    if (progress < 0.95) return;
+    if (completionSentRef.current === chapterKey) return;
+    completionSentRef.current = chapterKey;
+    completeRef.current({ mangaId: manga.id, chapterId: current.id });
+  }, [progress, manga, current, isAuthenticated, chapterKey]);
+
   /* ===== Navigation between chapters ===== */
   const goChapter = useCallback(
     (c: ChapterItem) => navigate(`/manga/${slug}/chapter/${c.number}`),

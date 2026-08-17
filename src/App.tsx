@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router";
 import Layout from "@/components/Layout";
@@ -16,6 +17,7 @@ import Library from "@/pages/Library";
 import Profile from "@/pages/Profile";
 import Request from "@/pages/Request";
 import Support from "@/pages/Support";
+import Coins from "@/pages/Coins";
 import Fun from "@/pages/Fun";
 import Reels from "@/pages/Reels";
 import Today from "@/pages/Today";
@@ -61,6 +63,7 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="request" element={<Request />} />
           <Route path="support" element={<Support />} />
+          <Route path="coins" element={<Coins />} />
           <Route
             path="fun"
             element={hideCommunities && hideReels ? <Navigate to="/" replace /> : <Fun />}
