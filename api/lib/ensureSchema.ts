@@ -11,9 +11,12 @@ async function ignoreDuplicateColumn(p: Promise<unknown>, label: string) {
   try {
     await p;
   } catch (e) {
-    const msg = (e as Error).message ?? "";
-    if (!/duplicate column/i.test(msg)) {
-      console.warn(`[ensure-schema] ${label}: ${msg}`);
+    // رسالة drizzle الظاهرة = "Failed query: ALTER TABLE …" بلا نص التكرار؛
+    // نص MySQL الحقيقي ("Duplicate column name" / ER_DUP_FIELDNAME / 1060) في cause.
+    const err = e as { message?: string; cause?: { message?: string; code?: string | number } };
+    const full = `${err.message ?? ""} ${err.cause?.message ?? ""} ${err.cause?.code ?? ""}`;
+    if (!/duplicate column|ER_DUP_FIELDNAME|1060/i.test(full)) {
+      console.warn(`[ensure-schema] ${label}: ${err.message ?? ""}`);
     }
   }
 }
