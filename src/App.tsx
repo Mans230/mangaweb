@@ -6,6 +6,7 @@ import Onboarding from "@/components/Onboarding";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import { trpc } from "@/providers/trpc";
 import { useUiToggles } from "@/lib/uiToggles";
+import { useShopTheme } from "@/lib/shopThemes";
 import Home from "@/pages/Home";
 import Browse from "@/pages/Browse";
 import MangaDetail from "@/pages/MangaDetail";
@@ -18,6 +19,7 @@ import Profile from "@/pages/Profile";
 import Request from "@/pages/Request";
 import Support from "@/pages/Support";
 import Coins from "@/pages/Coins";
+import Polls from "@/pages/Polls";
 import Fun from "@/pages/Fun";
 import Reels from "@/pages/Reels";
 import Today from "@/pages/Today";
@@ -29,6 +31,8 @@ export default function App() {
   const utils = trpc.useUtils();
   // أقسام يخفيها الأدمن من الإعدادات — الروابط المباشرة تُحوَّل للرئيسية
   const { hideCommunities, hideReels } = useUiToggles();
+  // ثيم المتجر المُفعَّل للمستخدم الحالي (إن وجد)
+  useShopTheme();
 
   // تتبّع مشاهدات الصفحات بصمت (fail-safe — لا يؤثر أي خطأ على التنقل)
   useEffect(() => {
@@ -64,6 +68,7 @@ export default function App() {
           <Route path="request" element={<Request />} />
           <Route path="support" element={<Support />} />
           <Route path="coins" element={<Coins />} />
+          <Route path="polls" element={<Polls />} />
           <Route
             path="fun"
             element={hideCommunities && hideReels ? <Navigate to="/" replace /> : <Fun />}
