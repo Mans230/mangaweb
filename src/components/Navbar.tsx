@@ -215,7 +215,8 @@ export default function Navbar() {
           {/* Logo */}
           <Link to="/" className="flex shrink-0 items-center gap-2.5">
             <img src="/logo.svg" alt="zeko-manga" className="h-9 w-9 rounded-xl" />
-            <span className="font-display text-lg font-bold text-primary md:text-xl">
+            {/* الاسم يظهر على الشاشات الكبيرة فقط لتوفير المساحة على الهاتف */}
+            <span className="font-display hidden text-lg font-bold text-primary sm:inline md:text-xl">
               {t("زيكو مانجا", "zeko-manga")}
             </span>
           </Link>

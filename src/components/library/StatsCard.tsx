@@ -62,13 +62,14 @@ export default function StatsCard({ history }: StatsCardProps) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.55, ease: EASE }}
-      className="glass p-6 md:p-8"
+      className="glass p-5 md:p-6"
     >
-      <h3 className="font-display mb-5 text-base font-bold text-app">
+      <h3 className="font-display mb-4 text-base font-bold text-app">
         {t("إحصائيات القراءة", "Reading stats")}
       </h3>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4">
+      {/* صف أفقي مضغوط: 3 أعمدة صغيرة حتى على الهاتف بدل التكديس الطويل */}
+      <div className="grid grid-cols-3 gap-2.5 md:gap-4">
         {tiles.map((tile, i) => (
           <motion.div
             key={tile.label}
@@ -76,13 +77,13 @@ export default function StatsCard({ history }: StatsCardProps) {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, ease: EASE, delay: i * 0.08 }}
-            className="glass !rounded-2xl p-4 text-center"
+            className="glass !rounded-2xl p-3 text-center"
           >
-            <span className="gradient-primary mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-md">
-              <tile.icon size={18} />
+            <span className="gradient-primary mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-md">
+              <tile.icon size={16} />
             </span>
-            <div className="font-display text-2xl font-extrabold text-app">{tile.value}</div>
-            <div className="mt-0.5 text-[11.5px] text-app-3">{tile.label}</div>
+            <div className="font-display text-lg font-extrabold text-app sm:text-2xl">{tile.value}</div>
+            <div className="mt-0.5 text-[10px] leading-tight text-app-3 sm:text-[11.5px]">{tile.label}</div>
           </motion.div>
         ))}
       </div>

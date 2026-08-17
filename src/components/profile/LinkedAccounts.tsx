@@ -72,20 +72,22 @@ function AccountCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4, ease: EASE, delay }}
-      className="glass flex flex-col gap-3 !rounded-2xl p-4"
+      className="glass flex flex-wrap items-center gap-x-3 gap-y-2 !rounded-2xl px-4 py-3"
     >
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="min-w-0 flex-1 truncate text-sm font-bold text-app">{title}</span>
-        {badge}
+      {icon}
+      <div className="min-w-0 flex-1 basis-40">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-bold text-app">{title}</span>
+          {badge}
+        </div>
+        <div className="mt-0.5 truncate text-[11px] text-app-3">{desc}</div>
       </div>
-      <p className="text-[11.5px] leading-relaxed text-app-3">{desc}</p>
-      <div className="flex justify-end">{action}</div>
+      <div className="ms-auto flex shrink-0 items-center gap-2">{action}</div>
     </motion.div>
   );
 }
 
-const cardIconCls = "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl";
+const cardIconCls = "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl";
 
 export default function LinkedAccounts({ email, emailVerified = false, telegramLinked, telegramUsername, googleLinked = false }: LinkedAccountsProps) {
   const { t } = useLanguage();
