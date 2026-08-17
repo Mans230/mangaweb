@@ -12,17 +12,60 @@ export async function uploadToCatbox(
 ): Promise<string> {
   const userhash = (process.env.CATBOX_USERHASH ?? "").trim();
 
-  // 1) catbox — فقط عند توفر userhash (المجهول مرفوض حالياً من سيرفراتهم)
+  // 1) catbox — دائم، فقط عند توفر userhash (المجهول مرفوض من سيرفراتهم)
   if (userhash) {
     try {
       return await uploadCatbox(bytes, filename, userhash);
     } catch (e) {
-      console.warn(`[upload] catbox فشل (${(e as Error).message}) — تجربة uguu.se`);
+      console.warn(`[upload] catbox فشل (${(e as Error).message}) — تجربة 0x0.st`);
     }
   }
 
-  // 2) uguu.se — احتياطي دائم بلا حساب
+  // 2) 0x0.st — احتفاظ أطول بكثير من uguu (حتى سنة للملفات الصغيرة)، بلا حساب
+  try {
+    return await uploadZeroXZero(bytes, filename);
+  } catch (e) {
+    console.warn(`[upload] 0x0.st فشل (${(e as Error).message}) — تجربة uguu.se`);
+  }
+
+  // 3) uguu.se — احتياطي أخير (مؤقّت: يُمسح بعد ساعات)
   return uploadUguu(bytes, filename);
+}
+
+/** 0x0.st — رفع مجهول باحتفاظ يعتمد الحجم (الصغير يبقى ~سنة). يتطلب User-Agent. */
+async function uploadZeroXZero(
+  bytes: Uint8Array | Blob,
+  filename: string,
+): Promise<string> {
+  const form = new FormData();
+  const blob =
+    bytes instanceof Blob ? bytes : new Blob([bytes.buffer as ArrayBuffer]);
+  form.append("file", blob, filename);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+  let resp: Response;
+  try {
+    resp = await fetch("https://0x0.st", {
+      method: "POST",
+      body: form,
+      headers: { "User-Agent": "zekospace-uploader/1.0" },
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const isAbort = (e as Error).name === "AbortError";
+    throw new Error(
+      isAbort ? "انتهت مهلة الرفع إلى 0x0.st" : `فشل الاتصال بـ 0x0.st: ${(e as Error).message}`,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const body = (await resp.text()).trim();
+  if (!resp.ok || !/^https:\/\/0x0\.st\/\S+$/.test(body)) {
+    throw new Error(`رد غير متوقع من 0x0.st (${resp.status}): ${body.slice(0, 200)}`);
+  }
+  return body;
 }
 
 async function uploadCatbox(

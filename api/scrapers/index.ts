@@ -140,7 +140,8 @@ export function imageHostPolicy(): Map<string, string> {
   map.set("telegram-cdn.org", ""); // cdn1..cdn5.telegram-cdn.org
   map.set("t.me", "");
   // خدمات رفع ملفات المستخدمين (احتياطي الرفع عند تعذّر catbox)
-  map.set("uguu.se", ""); // a.uguu.se
+  map.set("0x0.st", "");
+  map.set("uguu.se", ""); // a.uguu.se / n.uguu.se
   map.set("kappa.lol", "");
   map.set("pomf2.lain.la", "");
   return map;
