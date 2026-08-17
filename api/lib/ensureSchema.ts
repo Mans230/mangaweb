@@ -32,23 +32,23 @@ export async function ensureBootSchema(): Promise<void> {
 
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`support_tickets\` (
-\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
-\`userId\` bigint unsigned NOT NULL,
-\`subject\` varchar(200) NOT NULL,
-\`category\` varchar(40) NOT NULL DEFAULT 'general',
-\`status\` varchar(20) NOT NULL DEFAULT 'open',
-\`createdAt\` timestamp NOT NULL DEFAULT (now()),
-\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
-CONSTRAINT \`support_tickets_id\` PRIMARY KEY(\`id\`)
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`subject\` varchar(200) NOT NULL,
+	\`category\` varchar(40) NOT NULL DEFAULT 'general',
+	\`status\` varchar(20) NOT NULL DEFAULT 'open',
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`support_tickets_id\` PRIMARY KEY(\`id\`)
 )`));
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`support_ticket_messages\` (
-\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
-\`ticketId\` bigint unsigned NOT NULL,
-\`authorId\` bigint unsigned NOT NULL,
-\`isAdmin\` boolean NOT NULL DEFAULT false,
-\`body\` text NOT NULL,
-\`createdAt\` timestamp NOT NULL DEFAULT (now()),
-CONSTRAINT \`support_ticket_messages_id\` PRIMARY KEY(\`id\`)
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`ticketId\` bigint unsigned NOT NULL,
+	\`authorId\` bigint unsigned NOT NULL,
+	\`isAdmin\` boolean NOT NULL DEFAULT false,
+	\`body\` text NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`support_ticket_messages_id\` PRIMARY KEY(\`id\`)
 )`));
     // CREATE INDEX لا يقبل IF NOT EXISTS في MySQL ≤8 — أنشئه فقط إن لم يوجد
     await ensureIndex(
@@ -73,11 +73,11 @@ CONSTRAINT \`support_ticket_messages_id\` PRIMARY KEY(\`id\`)
   // جدول أكواد تغيير كلمة المرور عبر البريد
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`password_reset_codes\` (
-\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
-\`userId\` bigint unsigned NOT NULL,
-\`code\` varchar(6) NOT NULL,
-\`expiresAt\` timestamp NOT NULL,
-CONSTRAINT \`password_reset_codes_id\` PRIMARY KEY(\`id\`)
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`code\` varchar(6) NOT NULL,
+	\`expiresAt\` timestamp NOT NULL,
+	CONSTRAINT \`password_reset_codes_id\` PRIMARY KEY(\`id\`)
 )`));
     await ensureIndex(
       "password_reset_codes",
@@ -86,6 +86,56 @@ CONSTRAINT \`password_reset_codes_id\` PRIMARY KEY(\`id\`)
     );
   } catch (e) {
     console.warn(`[ensure-schema] password_reset_codes: ${(e as Error).message}`);
+  }
+
+  // ===== نظام الكوينز/XP =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`coin_wallets\` (
+	\`userId\` bigint unsigned NOT NULL,
+	\`coins\` int NOT NULL DEFAULT 0,
+	\`xp\` int NOT NULL DEFAULT 0,
+	\`level\` int NOT NULL DEFAULT 1,
+	\`streakDays\` int NOT NULL DEFAULT 0,
+	\`lastReadDate\` varchar(10),
+	\`checkinDays\` int NOT NULL DEFAULT 0,
+	\`lastCheckinDate\` varchar(10),
+	\`lastSpinDate\` varchar(10),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`coin_wallets_userId\` PRIMARY KEY(\`userId\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`coin_transactions\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`amount\` int NOT NULL,
+	\`kind\` varchar(40) NOT NULL,
+	\`meta\` json,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`coin_transactions_id\` PRIMARY KEY(\`id\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`chapter_completions\` (
+	\`userId\` bigint unsigned NOT NULL,
+	\`chapterId\` bigint unsigned NOT NULL,
+	\`mangaId\` bigint unsigned NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`chapter_completions_pk\` PRIMARY KEY(\`userId\`, \`chapterId\`)
+)`));
+    await ensureIndex(
+      "coin_transactions",
+      "coin_transactions_user_idx",
+      "CREATE INDEX `coin_transactions_user_idx` ON `coin_transactions` (`userId`)",
+    );
+    await ensureIndex(
+      "coin_transactions",
+      "coin_transactions_created_idx",
+      "CREATE INDEX `coin_transactions_created_idx` ON `coin_transactions` (`createdAt`)",
+    );
+    await ensureIndex(
+      "chapter_completions",
+      "chapter_completions_user_idx",
+      "CREATE INDEX `chapter_completions_user_idx` ON `chapter_completions` (`userId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] coins tables: ${(e as Error).message}`);
   }
 }
 
