@@ -8,6 +8,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/library/toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { proxyImg, timeAgo } from "@/lib/manga";
+import { renderWithSpoilers } from "@/lib/spoiler";
 import { LOGIN_PATH } from "@/const";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -300,7 +301,7 @@ export default function ReviewsSection({ mangaId, isEn = false }: Props) {
                       </div>
                     </div>
                     <p className="mt-3 whitespace-pre-line text-sm leading-7 text-app-2">
-                      {r.text}
+                      {renderWithSpoilers(r.text)}
                     </p>
                   </motion.li>
                 );
