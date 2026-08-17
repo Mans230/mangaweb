@@ -19,6 +19,7 @@ import Profile from "@/pages/Profile";
 import Request from "@/pages/Request";
 import Support from "@/pages/Support";
 import Coins from "@/pages/Coins";
+import EnHome from "@/pages/en/EnHome";
 import Polls from "@/pages/Polls";
 import Fun from "@/pages/Fun";
 import Reels from "@/pages/Reels";
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="request" element={<Request />} />
           <Route path="support" element={<Support />} />
           <Route path="coins" element={<Coins />} />
+          <Route path="en" element={<EnHome />} />
           <Route path="polls" element={<Polls />} />
           <Route
             path="fun"

@@ -1,3 +1,4 @@
+
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -40,6 +41,8 @@ interface ReaderChromeProps {
   commentsCount: number;
   onOpenComments: () => void;
   markedRead: boolean;
+  /** مانجا إنجليزية — نصوص الشريط بالإنجليزية واتجاه التقدم من اليسار */
+  isEn?: boolean;
 }
 
 export default function ReaderChrome({
@@ -62,8 +65,10 @@ export default function ReaderChrome({
   commentsCount,
   onOpenComments,
   markedRead,
+  isEn = false,
 }: ReaderChromeProps) {
   const { t, dir } = useLanguage();
+  const tt = (ar: string, en: string) => (isEn ? en : t(ar, en));
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
 
   return (
@@ -74,7 +79,7 @@ export default function ReaderChrome({
           className="gradient-primary h-full w-full will-change-transform"
           style={{
             transform: `scaleX(${Math.max(0, Math.min(1, progress))})`,
-            transformOrigin: dir === "rtl" ? "right" : "left",
+            transformOrigin: isEn || dir !== "rtl" ? "left" : "right",
             transition: "transform 0.15s linear",
           }}
         />
@@ -107,7 +112,7 @@ export default function ReaderChrome({
           <Link
             to={`/manga/${slug}`}
             className="btn-icon !h-9 !w-9 shrink-0"
-            aria-label={t("عودة لصفحة المانجا", "Back to manga")}
+            aria-label={tt("عودة لصفحة المانجا", "Back to manga")}
           >
             <ArrowRight size={18} className="rtl:rotate-0 ltr:rotate-180" />
           </Link>
@@ -117,7 +122,7 @@ export default function ReaderChrome({
               {title}
               <span className="text-app-3"> — </span>
               <span className="text-primary">
-                {t("فصل", "Ch.")} {chapterNumber}
+                {tt("فصل", "Ch.")} {chapterNumber}
               </span>
             </p>
           </div>
@@ -125,22 +130,22 @@ export default function ReaderChrome({
           <button
             className="btn-icon !h-9 !w-9"
             onClick={onToggleMode}
-            aria-label={t("تبديل وضع القراءة", "Toggle reading mode")}
-            title={mode === "webtoon" ? t("ويب تون", "Webtoon") : t("صفحة-صفحة", "Paged")}
+            aria-label={tt("تبديل وضع القراءة", "Toggle reading mode")}
+            title={mode === "webtoon" ? tt("ويب تون", "Webtoon") : tt("صفحة-صفحة", "Paged")}
           >
             {mode === "webtoon" ? <Rows3 size={18} /> : <SquareStack size={18} />}
           </button>
           <button
             className="btn-icon !h-9 !w-9"
             onClick={onToggleBookmark}
-            aria-label={t("حفظ إشارة مرجعية", "Bookmark")}
+            aria-label={tt("حفظ إشارة مرجعية", "Bookmark")}
           >
             {bookmarked ? <BookmarkCheck size={18} className="text-primary" /> : <Bookmark size={18} />}
           </button>
           <button
             className="btn-icon !h-9 !w-9"
             onClick={onOpenSettings}
-            aria-label={t("إعدادات القارئ", "Reader settings")}
+            aria-label={tt("إعدادات القارئ", "Reader settings")}
           >
             <Settings size={18} />
           </button>
@@ -161,18 +166,18 @@ export default function ReaderChrome({
             disabled={!hasPrev}
           >
             <ChevronRight size={16} />
-            <span className="hidden sm:inline">{t("الفصل السابق", "Prev chapter")}</span>
-            <span className="sm:hidden">{t("السابق", "Prev")}</span>
+            <span className="hidden sm:inline">{tt("الفصل السابق", "Prev chapter")}</span>
+            <span className="sm:hidden">{tt("السابق", "Prev")}</span>
           </button>
 
           <button
             className="glass-chip mx-auto h-10 max-w-40 items-center justify-center !px-4 font-semibold text-app"
             onClick={onOpenChapters}
-            aria-label={t("قائمة الفصول", "Chapter list")}
+            aria-label={tt("قائمة الفصول", "Chapter list")}
           >
             {markedRead && <CheckCheck size={15} className="text-success" />}
             <span className="truncate">
-              {t("فصل", "Ch.")} {chapterNumber}
+              {tt("فصل", "Ch.")} {chapterNumber}
             </span>
             <ChevronsUpDown size={14} className="text-app-3" />
           </button>
@@ -180,7 +185,7 @@ export default function ReaderChrome({
           <button
             className="btn-icon relative !h-10 !w-10"
             onClick={onOpenComments}
-            aria-label={t("تعليقات الفصل", "Chapter comments")}
+            aria-label={tt("تعليقات الفصل", "Chapter comments")}
           >
             <MessageSquareText size={18} />
             {commentsCount > 0 && (
@@ -195,8 +200,8 @@ export default function ReaderChrome({
             onClick={onNextChapter}
             disabled={!hasNext}
           >
-            <span className="hidden sm:inline">{t("الفصل التالي", "Next chapter")}</span>
-            <span className="sm:hidden">{t("التالي", "Next")}</span>
+            <span className="hidden sm:inline">{tt("الفصل التالي", "Next chapter")}</span>
+            <span className="sm:hidden">{tt("التالي", "Next")}</span>
             <ChevronLeft size={16} />
           </button>
         </div>

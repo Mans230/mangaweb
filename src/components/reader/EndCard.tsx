@@ -12,6 +12,8 @@ interface EndCardProps {
   rating: number;
   onRate: (stars: number) => void;
   onOpenDownload: () => void;
+  /** مانجا إنجليزية — عرض النصوص بالإنجليزية حتى مع واجهة عربية */
+  isEn?: boolean;
 }
 
 export default function EndCard({
@@ -23,8 +25,10 @@ export default function EndCard({
   rating,
   onRate,
   onOpenDownload,
+  isEn = false,
 }: EndCardProps) {
   const { t } = useLanguage();
+  const tt = (ar: string, en: string) => (isEn ? en : t(ar, en));
 
   return (
     <motion.div
@@ -37,13 +41,13 @@ export default function EndCard({
       <div className="flex items-center gap-2 text-primary">
         <Flag size={18} />
         <h3 className="font-display text-xl font-bold text-app">
-          {t("نهاية الفصل", "End of chapter")} {chapterNumber}
+          {tt("نهاية الفصل", "End of chapter")} {chapterNumber}
         </h3>
       </div>
 
       {/* rate this chapter */}
       <div className="flex flex-col items-center gap-2">
-        <p className="text-sm font-semibold text-app-2">{t("قيّم هذا الفصل", "Rate this chapter")}</p>
+        <p className="text-sm font-semibold text-app-2">{tt("قيّم هذا الفصل", "Rate this chapter")}</p>
         <StarRating value={rating} size={26} interactive onChange={onRate} />
         {rating > 0 && (
           <motion.p
@@ -51,7 +55,7 @@ export default function EndCard({
             animate={{ opacity: 1, y: 0 }}
             className="text-xs text-success"
           >
-            {t("شكراً! تم حفظ تقييمك", "Thanks! Your rating was saved")}
+            {tt("شكراً! تم حفظ تقييمك", "Thanks! Your rating was saved")}
           </motion.p>
         )}
       </div>
@@ -64,21 +68,21 @@ export default function EndCard({
           disabled={!hasPrev}
         >
           <ChevronRight size={17} />
-          {t("الفصل السابق", "Previous chapter")}
+          {tt("الفصل السابق", "Previous chapter")}
         </button>
         <button
           className="btn-primary flex-1 !py-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
           onClick={onNext}
           disabled={!hasNext}
         >
-          {t("الفصل التالي", "Next chapter")}
+          {tt("الفصل التالي", "Next chapter")}
           <ChevronLeft size={17} />
         </button>
       </div>
 
       <button className="btn-glass !py-2.5 text-sm" onClick={onOpenDownload}>
         <Download size={16} />
-        {t("تحميل الفصل (PDF / CBZ)", "Download chapter (PDF / CBZ)")}
+        {tt("تحميل الفصل (PDF / CBZ)", "Download chapter (PDF / CBZ)")}
       </button>
     </motion.div>
   );
