@@ -50,7 +50,8 @@ export const COIN_SETTING_KEYS = {
   referralThreshold: "coins.referral_threshold",
 } as const;
 
-const DEFAULTS: Record<string, number> = {
+/** القيم الافتراضية لكل مفاتيح الاقتصاد — تُعرض في لوحة الأدمن كمرجع */
+export const COIN_SETTING_DEFAULTS: Record<string, number> = {
   [COIN_SETTING_KEYS.perChapter]: 5,
   [COIN_SETTING_KEYS.dailyCap]: 50,
   [COIN_SETTING_KEYS.xpPerChapter]: 10,
@@ -72,7 +73,7 @@ const DEFAULTS: Record<string, number> = {
 export async function coinSettingInt(key: string): Promise<number> {
   const raw = await getSetting(key);
   const n = parseInt(raw ?? "", 10);
-  return Number.isFinite(n) && n >= 0 ? n : (DEFAULTS[key] ?? 0);
+  return Number.isFinite(n) && n >= 0 ? n : (COIN_SETTING_DEFAULTS[key] ?? 0);
 }
 
 function dateStr(d = new Date()): string {

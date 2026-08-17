@@ -1,5 +1,6 @@
 import { authRouter } from "./auth-router";
 import { adminRouter } from "./adminRouter";
+import { adminCoinsRouter } from "./adminCoinsRouter";
 import { communityRouter } from "./communityRouter";
 import { communitiesRouter } from "./communitiesRouter";
 import { engagementRouter } from "./engagementRouter";
@@ -28,6 +29,7 @@ export const appRouter = createRouter({
   request: requestRouter,
   import: importRouter,
   admin: adminRouter,
+  adminCoins: adminCoinsRouter,
   lists: listsRouter,
   reports: reportsRouter,
   community: communityRouter,
