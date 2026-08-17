@@ -1,11 +1,20 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   BookOpen,
   CalendarCheck,
+  Check,
   Coins as CoinsIcon,
+  Copy,
+  Dices,
   Flame,
+  Gift,
   History,
+  Library,
   Loader2,
+  MessageSquare,
+  Star,
+  Target,
   TrendingUp,
   Zap,
 } from "lucide-react";
@@ -30,11 +39,19 @@ const KIND_LABELS: Record<string, { ar: string; en: string }> = {
   admin: { ar: "من الإدارة", en: "From admin" },
 };
 
+const MISSION_META: Record<string, { icon: typeof BookOpen; ar: string; en: string }> = {
+  read: { icon: BookOpen, ar: "اقرأ {target} فصول", en: "Read {target} chapters" },
+  comment: { icon: MessageSquare, ar: "اكتب تعليقاً", en: "Write a comment" },
+  rate: { icon: Star, ar: "قيّم مانجا", en: "Rate a manga" },
+  library: { icon: Library, ar: "أضف مانجا لمكتبتك", en: "Add a manga to your library" },
+};
+
 export default function Coins() {
   const { t, lang } = useLanguage();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const utils = trpc.useUtils();
+  const [copied, setCopied] = useState(false);
 
   const walletQ = trpc.coins.wallet.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -44,10 +61,37 @@ export default function Coins() {
     { page: 1, limit: 20 },
     { enabled: isAuthenticated, retry: false },
   );
+  const missionsQ = trpc.coins.missions.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const refQ = trpc.coins.referralInfo.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
 
   const checkinMut = trpc.coins.checkin.useMutation({
     onSuccess: (res) => {
       toast(t(`+${res.reward} كوين — حضور يوم ${res.checkinDays}`, `+${res.reward} coins — day ${res.checkinDays}`));
+      void utils.coins.wallet.invalidate();
+      void utils.coins.transactions.invalidate();
+    },
+    onError: (e) => toast(e.message, { kind: "info" }),
+  });
+
+  const claimMut = trpc.coins.claimMission.useMutation({
+    onSuccess: (res) => {
+      toast(t(`+${res.reward} كوين`, `+${res.reward} coins`));
+      void utils.coins.wallet.invalidate();
+      void utils.coins.missions.invalidate();
+      void utils.coins.transactions.invalidate();
+    },
+    onError: (e) => toast(e.message, { kind: "info" }),
+  });
+
+  const spinMut = trpc.coins.spin.useMutation({
+    onSuccess: (res) => {
+      toast(t(`🎰 +${res.reward} كوين!`, `🎰 +${res.reward} coins!`));
       void utils.coins.wallet.invalidate();
       void utils.coins.transactions.invalidate();
     },
@@ -85,6 +129,20 @@ export default function Coins() {
 
   const w = walletQ.data;
   const txs = txQ.data?.items ?? [];
+  const missions = missionsQ.data?.items ?? [];
+  const info = refQ.data;
+
+  const copyRefLink = async () => {
+    if (!info) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/login?ref=${info.code}`);
+      setCopied(true);
+      toast(t("تم النسخ", "Copied"));
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast(t("تعذّر النسخ", "Copy failed"), { kind: "info" });
+    }
+  };
 
   return (
     <motion.div
@@ -199,6 +257,151 @@ export default function Coins() {
                     style={{ width: `${Math.min(100, (w.read.todayEarned / Math.max(w.read.dailyCap, 1)) * 100)}%` }}
                   />
                 </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ===== مهام اليوم ===== */}
+      <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
+        <p className="flex items-center gap-2 text-sm font-bold text-app">
+          <Target size={16} className="text-primary" />
+          {t("مهام اليوم", "Daily missions")}
+        </p>
+        {missionsQ.isLoading ? (
+          <div className="flex flex-col gap-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-12 w-full !rounded-xl" />
+            ))}
+          </div>
+        ) : missions.length === 0 ? (
+          <p className="py-4 text-center text-sm text-app-3">
+            {t("لا مهام متاحة الآن", "No missions available right now")}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {missions.map((m) => {
+              const meta = MISSION_META[m.key] ?? { icon: Target, ar: m.key, en: m.key };
+              const MIcon = meta.icon;
+              const label = t(meta.ar, meta.en).replace("{target}", String(m.target));
+              const pct = Math.min(100, (m.progress / Math.max(m.target, 1)) * 100);
+              return (
+                <div key={m.key} className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                    <MIcon size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-semibold text-app">{label}</span>
+                      <span dir="ltr" className="shrink-0 text-[11px] font-bold text-app-3 tabular-nums">
+                        {m.progress}/{m.target}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-app-3/15">
+                      <div
+                        className="gradient-primary h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  {m.claimed ? (
+                    <span className="glass-chip shrink-0 text-[11px] font-bold text-success">
+                      {t("تم الاستلام ✓", "Claimed ✓")}
+                    </span>
+                  ) : m.claimable ? (
+                    <button
+                      onClick={() => claimMut.mutate({ key: m.key })}
+                      disabled={claimMut.isPending}
+                      className="btn-primary shrink-0 !px-4 !py-1.5 text-xs disabled:opacity-50"
+                    >
+                      {claimMut.isPending && claimMut.variables?.key === m.key ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : null}
+                      {t("استلام", "Claim")}
+                    </button>
+                  ) : (
+                    <span className="shrink-0 text-xs font-bold text-app-3 tabular-nums" dir="ltr">
+                      +{m.reward}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ===== عجلة الحظ + دعوة الأصدقاء ===== */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
+          <p className="flex items-center gap-2 text-sm font-bold text-app">
+            <Dices size={16} className="text-accent" />
+            {t("عجلة الحظ", "Lucky Spin")}
+          </p>
+          <p className="text-xs leading-relaxed text-app-3">
+            {t("لفّة يومية مجانية — من 5 إلى 100 كوين.", "One free spin daily — 5 to 100 coins.")}
+          </p>
+          <button
+            onClick={() => spinMut.mutate()}
+            disabled={!w?.canSpin || spinMut.isPending}
+            className="btn-primary mt-auto w-full !py-2.5 text-sm disabled:opacity-50"
+          >
+            {spinMut.isPending ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Dices size={15} />
+            )}
+            {w?.canSpin
+              ? t("لفّ العجلة", "Spin now")
+              : t("لفّيت النهاردة — تعالى بكرة", "Spun today — come back tomorrow")}
+          </button>
+        </div>
+
+        <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
+          <p className="flex items-center gap-2 text-sm font-bold text-app">
+            <Gift size={16} className="text-success" />
+            {t("ادعُ أصحابك", "Invite friends")}
+          </p>
+          {refQ.isLoading || !info ? (
+            <div className="flex flex-col gap-2">
+              <div className="skeleton h-4 w-full" />
+              <div className="skeleton h-10 w-full !rounded-xl" />
+            </div>
+          ) : (
+            <>
+              <p className="text-xs leading-relaxed text-app-3">
+                {t(
+                  `لك ${info.inviterReward} كوين ولصديقك ${info.inviteeReward} كوين بعد ما يقرأ ${info.threshold} فصول.`,
+                  `You get ${info.inviterReward} coins and your friend gets ${info.inviteeReward} after they read ${info.threshold} chapters.`,
+                )}
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  dir="ltr"
+                  value={`${window.location.origin}/login?ref=${info.code}`}
+                  className="input-glass min-w-0 flex-1 !py-2 text-xs"
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  onClick={() => void copyRefLink()}
+                  className="btn-glass shrink-0 !px-3 !py-2 text-xs"
+                  aria-label={t("نسخ الرابط", "Copy link")}
+                >
+                  {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="glass-chip text-[11px] font-bold text-app">
+                  {t(`${info.invited} دعوة`, `${info.invited} invited`)}
+                </span>
+                <span className="glass-chip text-[11px] font-bold text-app">
+                  {t(`${info.rewarded} مكتملة`, `${info.rewarded} rewarded`)}
+                </span>
+                <span className="glass-chip text-[11px] font-bold text-app" dir="ltr">
+                  {t(`+${info.earned} كوين`, `+${info.earned} coins`)}
+                </span>
               </div>
             </>
           )}

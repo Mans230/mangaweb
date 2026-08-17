@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, LogIn, Send, UserPlus } from "lucide-react";
 import { trpc } from "@/providers/trpc";
@@ -10,6 +10,7 @@ import TelegramLoginButton from "@/components/auth/TelegramLoginButton";
 import { ToastViewport, useToast } from "@/components/library/toast";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const REF_KEY = "zeko_ref";
 
 type TelegramAuthPayload = {
   id: number;
@@ -33,6 +34,8 @@ export default function Login() {
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const refParam = searchParams.get("ref");
 
   const [mode, setMode] = useState<Mode>("login");
   const [name, setName] = useState("");
@@ -44,6 +47,13 @@ export default function Login() {
   const [resetHelpOpen, setResetHelpOpen] = useState(false);
   const { t } = useLanguage();
   const { toast } = useToast();
+
+  // كود الدعوة من رابط ?ref= — يُخزَّن محلياً ليصمد عبر تدفقات OAuth/تليجرام
+  useEffect(() => {
+    if (refParam && /^\d+$/.test(refParam)) {
+      localStorage.setItem(REF_KEY, refParam);
+    }
+  }, [refParam]);
 
   const providersQ = trpc.auth.providers.useQuery(undefined, {
     staleTime: Infinity,
@@ -90,7 +100,10 @@ export default function Login() {
     ),
   });
   const registerMutation = trpc.auth.register.useMutation({
-    onSuccess,
+    onSuccess: () => {
+      localStorage.removeItem(REF_KEY);
+      void onSuccess();
+    },
     onError: (e) => onError(
       e.data?.code === "CONFLICT"
         ? "يوجد حساب مسجل بهذا البريد الإلكتروني"
@@ -190,7 +203,15 @@ export default function Login() {
     if (mode === "login") {
       loginMutation.mutate(payload);
     } else {
-      registerMutation.mutate({ ...payload, name: name.trim() });
+      const refCode =
+        refParam && /^\d+$/.test(refParam)
+          ? refParam
+          : (localStorage.getItem(REF_KEY) ?? undefined);
+      registerMutation.mutate({
+        ...payload,
+        name: name.trim(),
+        ...(refCode ? { refCode } : {}),
+      });
     }
   };
 
