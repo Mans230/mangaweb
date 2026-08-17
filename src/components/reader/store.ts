@@ -84,6 +84,9 @@ export interface SavedProgress {
   page: number;
   ratio: number;
   ts: number;
+  /** بيانات عرض اختيارية — تُحفظ من القارئ ليتمكن ContinueReading من عرض البطاقة دون جلب إضافي */
+  title?: string;
+  cover?: string;
 }
 
 const PROGRESS_KEY = "zeko-reader-progress";
@@ -123,6 +126,11 @@ function prune<T>(obj: Record<string, T>): Record<string, T> {
 export function loadProgress(slug: string): SavedProgress | null {
   const all = readJson<Record<string, SavedProgress>>(PROGRESS_KEY, {});
   return all[slug] ?? null;
+}
+
+/** كل إدخالات التقدم المحلية — يستخدمها ContinueReading للزائرين/الدمج */
+export function loadAllProgress(): Record<string, SavedProgress> {
+  return readJson<Record<string, SavedProgress>>(PROGRESS_KEY, {});
 }
 
 export function saveProgress(slug: string, progress: SavedProgress) {
