@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
@@ -526,6 +527,72 @@ function MostViewed() {
   );
 }
 
+/* ================= مانجا إنجليزي — قسم EN (trpc.en.homeSection) ================= */
+function EnMangaSection() {
+  const { t } = useLanguage();
+  const query = trpc.en.homeSection.useQuery({ limit: 12 }, { retry: false });
+
+  // en.homeSection يعيد نفس شكل mostViewed — نفس بناء البطاقات
+  const items: MangaCardData[] = (query.data ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type) as MangaType,
+    status: mangaStatusLabel(m.status) as MangaStatus,
+    rating: m.rating ?? 0,
+    ratingCount: 0,
+    chapters: m.chapterCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: "",
+    source: m.source?.name ?? "",
+    isAdult: false,
+    updatedAt: "",
+  }));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+        <SectionHeader title={t("مانجا إنجليزي", "EN Manga")} />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="skeleton aspect-[2/3] !rounded" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader
+        title={t("مانجا إنجليزي", "EN Manga")}
+        extra={
+          <Link to="/en" className="ed-btn-ghost-sm !border-[var(--ed-accent)] !text-[var(--ed-accent)]">
+            {t("استكشف الكل", "Explore all")}
+            <ArrowLeft size={13} className="rtl:-scale-x-100" />
+          </Link>
+        }
+      />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: (i % 6) * 0.06 }}
+          >
+            <MangaCard manga={manga} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* ================= أحدث الإضافات ================= */
 function LatestAdditions() {
   const { t } = useLanguage();
@@ -749,6 +816,7 @@ export default function Home() {
         <LatestChapters />
         <PopularCarousel />
         <MostViewed />
+        <EnMangaSection />
         <LatestAdditions />
         <LazySection minHeight={200}>
           <GenreCloud />
