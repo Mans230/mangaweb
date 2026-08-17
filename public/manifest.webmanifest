@@ -1,0 +1,21 @@
+{
+  "name": "زيكو مانجا — zeko-manga",
+  "short_name": "زيكو مانجا",
+  "description": "منصة عربية لقراءة المانهوا والمانجا",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#131110",
+  "theme_color": "#e0561f",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
