@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -33,6 +34,9 @@ import type { ChapterItem, ReaderManga, SavedProgress } from "@/components/reade
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
+/** أسماء مصادر المانجا الإنجليزية — قلب اتجاه القارئ LTR ونصوصه الإنجليزية */
+const EN_SOURCES = ["mangadex", "asurascans", "vortexscans"];
+
 export default function Reader() {
   const { slug = "", n = "1" } = useParams();
   const navigate = useNavigate();
@@ -66,6 +70,9 @@ export default function Reader() {
       })),
     };
   }, [apiQuery.data]);
+
+  /** عمل إنجليزي؟ — يُكشف من source.name الذي يعيده getBySlug */
+  const isEn = EN_SOURCES.includes(apiQuery.data?.source?.name ?? "");
 
   const loading = apiQuery.isLoading;
   const chapters = useMemo(() => manga?.chapters ?? [], [manga]);
@@ -412,7 +419,12 @@ export default function Reader() {
   }
 
   return (
-    <div className="relative min-h-[100dvh]" style={bgStyle}>
+    <div
+      className="relative min-h-[100dvh]"
+      style={bgStyle}
+      dir={isEn ? "ltr" : undefined}
+      lang={isEn ? "en" : undefined}
+    >
       {/* reader-local CSS: strip global chrome + bottom-nav padding without touching Layout */}
       <style>{IMMERSIVE_CSS}</style>
 
@@ -438,6 +450,7 @@ export default function Reader() {
         commentsCount={commentsTotal}
         onOpenComments={openComments}
         markedRead={markedRead}
+        isEn={isEn}
       />
 
       {/* زر تبليغ عن الفصل — عائم أسفل شريط الأدوات، يظهر/يختفي معه */}
@@ -502,6 +515,7 @@ export default function Reader() {
                 rating={rating}
                 onRate={handleRate}
                 onOpenDownload={() => setDownloadOpen(true)}
+                isEn={isEn}
               />
               <div id="chapter-comments">
                 <ChapterComments
