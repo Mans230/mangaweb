@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -248,6 +247,9 @@ export default function Reader() {
         page: pageRef.current,
         ratio: progressRef.current,
         ts: Date.now(),
+        // بيانات العرض لقسم "تابع القراءة" — تُحفظ محلياً لتجنّب جلب إضافي
+        title: manga.title,
+        cover: manga.cover,
       });
       if (isAuthenticated && manga.fromApi) {
         updateProgressRef.current({
