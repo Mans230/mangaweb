@@ -221,3 +221,11 @@ export async function purgeAdultManga(): Promise<{ deleted: number }> {
 export function enSourceFilter() {
   return inArray(sources.name, [...EN_SOURCE_KEYS]);
 }
+
+/**
+ * عكس enSourceFilter — يستبعد مصادر EN من الأقسام العربية (تظهر في /en فقط).
+ * صيغة subquery على sourceId حتى تعمل بلا join على جدول sources.
+ */
+export function arabicSourceFilter() {
+  return sql`${manga.sourceId} NOT IN (SELECT ${sources.id} FROM ${sources} WHERE ${sources.name} IN ('mangadex','asurascans','vortexscans'))`;
+}

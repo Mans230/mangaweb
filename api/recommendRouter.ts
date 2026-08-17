@@ -10,6 +10,7 @@ import {
 } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
+import { arabicSourceFilter } from "./services/enImport";
 
 /** شكل بطاقة المانجا الموحد (مطابق manga.mostViewed) */
 const cardSelect = {
@@ -119,6 +120,7 @@ export const recommendRouter = createRouter({
           .select(cardSelect)
           .from(manga)
           .innerJoin(sources, eq(manga.sourceId, sources.id))
+          .where(arabicSourceFilter())
           .orderBy(desc(manga.isTrending), desc(manga.viewCount), desc(manga.id))
           .limit(input.limit);
         return { items, fallback: true as const };
@@ -129,7 +131,7 @@ export const recommendRouter = createRouter({
           (g) => sql`JSON_CONTAINS(${manga.genres}, JSON_QUOTE(${g}))`,
         ),
       )!;
-      const conditions = [genreCond];
+      const conditions = [genreCond, arabicSourceFilter()];
       if (owned.size) {
         conditions.push(notInArray(manga.id, [...owned]));
       }
@@ -164,7 +166,7 @@ export const recommendRouter = createRouter({
       const dayCount = input?.days ?? 7;
       const since = new Date(Date.now() - dayCount * 24 * 60 * 60 * 1000);
 
-      const conditions = [gte(chapterTs, since)];
+      const conditions = [gte(chapterTs, since), arabicSourceFilter()];
       const userId = ctx.user ? Number(ctx.user.id) : null;
       if (input?.libraryOnly && userId) {
         const ids = await userMangaIds(db, userId);
@@ -235,7 +237,7 @@ export const recommendRouter = createRouter({
     const rows = await db
       .select({ slug: manga.slug })
       .from(manga)
-      .where(sql`${manga.chapterCount} > 0`)
+      .where(and(sql`${manga.chapterCount} > 0`, arabicSourceFilter()))
       .orderBy(sql`RAND()`)
       .limit(1);
     return rows[0]?.slug ?? null;

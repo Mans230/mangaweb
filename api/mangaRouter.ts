@@ -11,6 +11,7 @@ import {
 import { getDb } from "./queries/connection";
 import { createRouter, publicQuery } from "./middleware";
 import { getScraper } from "./scrapers";
+import { arabicSourceFilter } from "./services/enImport";
 import {
   getSetting,
   SETTING_UI_HIDE_COMMUNITIES,
@@ -55,6 +56,8 @@ export const mangaRouter = createRouter({
     if (input.maxChapters !== undefined) {
       conditions.push(lte(manga.chapterCount, input.maxChapters));
     }
+    // استبعاد مصادر EN من التصفح العربي — تظهر في /en فقط
+    conditions.push(arabicSourceFilter());
     const where = conditions.length ? and(...conditions) : undefined;
 
     const orderBy =
@@ -237,6 +240,7 @@ export const mangaRouter = createRouter({
         .from(chapters)
         .innerJoin(manga, eq(chapters.mangaId, manga.id))
         .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(arabicSourceFilter())
         .orderBy(
           desc(sql`COALESCE(${chapters.publishedAt}, ${chapters.createdAt})`),
           desc(chapters.id),
@@ -263,6 +267,7 @@ export const mangaRouter = createRouter({
         .from(chapters)
         .innerJoin(manga, eq(chapters.mangaId, manga.id))
         .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(arabicSourceFilter())
         .orderBy(
           desc(sql`COALESCE(${chapters.publishedAt}, ${chapters.createdAt})`),
           desc(chapters.id),
@@ -294,6 +299,7 @@ export const mangaRouter = createRouter({
         .select({ manga: manga, source: sources })
         .from(manga)
         .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(arabicSourceFilter())
         .orderBy(
           desc(manga.isTrending),
           desc(manga.viewCount),
@@ -312,7 +318,7 @@ export const mangaRouter = createRouter({
         .select({ manga: manga, source: sources })
         .from(manga)
         .innerJoin(sources, eq(manga.sourceId, sources.id))
-        .where(and(isNotNull(manga.featuredAt), isNull(manga.hiddenAt)))
+        .where(and(isNotNull(manga.featuredAt), isNull(manga.hiddenAt), arabicSourceFilter()))
         .orderBy(desc(manga.featuredAt))
         .limit(input.limit);
       return rows.map((r) => ({ ...r.manga, source: r.source }));
@@ -355,6 +361,7 @@ export const mangaRouter = createRouter({
         })
         .from(manga)
         .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(arabicSourceFilter())
         .orderBy(desc(manga.siteViewCount), desc(manga.id))
         .limit(input.limit);
       return rows;
