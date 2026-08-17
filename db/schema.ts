@@ -941,6 +941,8 @@ export const supportTicketMessages = mysqlTable(
       .references(() => users.id, { onDelete: "cascade" }),
     isAdmin: boolean("isAdmin").default(false).notNull(),
     body: text("body").notNull(),
+    /** مرفق صورة اختياري (رابط مرفوع) */
+    imageUrl: varchar("imageUrl", { length: 500 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({

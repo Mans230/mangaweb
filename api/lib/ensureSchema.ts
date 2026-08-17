@@ -70,6 +70,14 @@ export async function ensureBootSchema(): Promise<void> {
     console.warn(`[ensure-schema] support tables: ${(e as Error).message}`);
   }
 
+  // مرفق صورة على رسائل التذاكر
+  await ignoreDuplicateColumn(
+    db.execute(
+      sql.raw("ALTER TABLE `support_ticket_messages` ADD `imageUrl` varchar(500)"),
+    ),
+    "support_ticket_messages.imageUrl",
+  );
+
   // جدول أكواد تغيير كلمة المرور عبر البريد
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`password_reset_codes\` (

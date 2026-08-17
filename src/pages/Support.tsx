@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -6,7 +6,9 @@ import {
   CheckCircle2,
   ChevronDown,
   HelpCircle,
+  Image as ImageIcon,
   LifeBuoy,
+  Loader2,
   Lock,
   LogIn,
   MessageSquare,
@@ -14,6 +16,8 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { useImageUpload, IMAGE_ACCEPT } from "@/lib/upload";
+import { proxyImg } from "@/lib/manga";
 import EmptyState from "@/components/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -123,12 +127,61 @@ function TicketList({ onOpen, onNew }: { onOpen: (id: number) => void; onNew: ()
   );
 }
 
+/* زر إرفاق صورة مشترك للنماذج */
+function AttachImage({
+  url,
+  setUrl,
+}: {
+  url: string | null;
+  setUrl: (u: string | null) => void;
+}) {
+  const { t } = useLanguage();
+  const { upload, uploading } = useImageUpload();
+  const ref = useRef<HTMLInputElement>(null);
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    const u = await upload(f);
+    if (u) setUrl(u);
+    if (ref.current) ref.current.value = "";
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={ref}
+        type="file"
+        accept={IMAGE_ACCEPT}
+        className="hidden"
+        onChange={(e) => void pick(e.target.files?.[0])}
+      />
+      {url ? (
+        <span className="flex items-center gap-1.5 text-[11px] text-app-2">
+          <img src={proxyImg(url)} alt="" className="h-9 w-9 rounded object-cover" />
+          <button type="button" onClick={() => setUrl(null)} className="font-semibold text-danger">
+            {t("إزالة", "Remove")}
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={uploading}
+          className="btn-glass !px-3 !py-1.5 text-xs disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={13} className="animate-spin" /> : <ImageIcon size={13} />}
+          {t("إرفاق صورة", "Attach image")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ================= نموذج تذكرة جديدة ================= */
 function NewTicketForm({ onDone, onCancel }: { onDone: (id: number) => void; onCancel: () => void }) {
   const { t } = useLanguage();
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<Category>("general");
   const [body, setBody] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const mutation = trpc.support.create.useMutation({
@@ -139,7 +192,7 @@ function NewTicketForm({ onDone, onCancel }: { onDone: (id: number) => void; onC
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    mutation.mutate({ subject: subject.trim(), category, body: body.trim() });
+    mutation.mutate({ subject: subject.trim(), category, body: body.trim(), imageUrl });
   };
 
   return (
@@ -197,6 +250,8 @@ function NewTicketForm({ onDone, onCancel }: { onDone: (id: number) => void; onC
         />
       </label>
 
+      <AttachImage url={imageUrl} setUrl={setImageUrl} />
+
       {error && <p className="text-xs font-semibold text-danger">{error}</p>}
 
       <button type="submit" disabled={mutation.isPending} className="btn-primary !py-3 text-sm disabled:opacity-60">
@@ -211,12 +266,14 @@ function NewTicketForm({ onDone, onCancel }: { onDone: (id: number) => void; onC
 function TicketThread({ id, onBack }: { id: number; onBack: () => void }) {
   const { t, lang } = useLanguage();
   const [body, setBody] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const query = trpc.support.get.useQuery({ id }, { retry: false });
   const utils = trpc.useUtils();
 
   const replyMut = trpc.support.reply.useMutation({
     onSuccess: () => {
       setBody("");
+      setImageUrl(null);
       void query.refetch();
       void utils.support.list.invalidate();
     },
@@ -246,7 +303,7 @@ function TicketThread({ id, onBack }: { id: number; onBack: () => void }) {
   const send = (e: React.FormEvent) => {
     e.preventDefault();
     if (!body.trim()) return;
-    replyMut.mutate({ id, body: body.trim() });
+    replyMut.mutate({ id, body: body.trim(), imageUrl });
   };
 
   return (
@@ -300,6 +357,15 @@ function TicketThread({ id, onBack }: { id: number; onBack: () => void }) {
               <span className="text-app-3">{timeAgo(m.createdAt, lang)}</span>
             </div>
             <p className="whitespace-pre-wrap text-sm leading-7 text-app">{m.body}</p>
+            {m.imageUrl && (
+              <a href={proxyImg(m.imageUrl)} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={proxyImg(m.imageUrl)}
+                  alt=""
+                  className="mt-2 max-h-60 rounded-xl border border-app object-contain"
+                />
+              </a>
+            )}
           </div>
         ))}
       </div>
@@ -320,6 +386,9 @@ function TicketThread({ id, onBack }: { id: number; onBack: () => void }) {
             className="input-glass resize-y"
             placeholder={t("اكتب ردّك…", "Write your reply…")}
           />
+          <div className="flex items-center justify-between gap-2">
+            <AttachImage url={imageUrl} setUrl={setImageUrl} />
+          </div>
           <button type="submit" disabled={replyMut.isPending || !body.trim()} className="btn-primary self-end !px-5 !py-2.5 text-xs disabled:opacity-60">
             <Send size={14} />
             {replyMut.isPending ? t("جارٍ الإرسال…", "Sending…") : t("رد", "Reply")}

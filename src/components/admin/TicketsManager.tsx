@@ -11,7 +11,7 @@ import {
 import EmptyState from "@/components/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { timeAgo } from "@/lib/manga";
+import { proxyImg, timeAgo } from "@/lib/manga";
 import { EASE } from "./adminUtils";
 import type { RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
@@ -239,6 +239,15 @@ export default function TicketsManager() {
                       <span className="text-app-3">{timeAgo(m.createdAt, lang)}</span>
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-7 text-app">{m.body}</p>
+                    {m.imageUrl && (
+                      <a href={proxyImg(m.imageUrl)} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={proxyImg(m.imageUrl)}
+                          alt=""
+                          className="mt-2 max-h-60 rounded-xl border border-app object-contain"
+                        />
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>

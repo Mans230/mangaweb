@@ -45,6 +45,7 @@ export const supportRouter = createRouter({
         subject: z.string().trim().min(3).max(200),
         category: categoryEnum.default("general"),
         body: z.string().trim().min(5).max(5000),
+        imageUrl: z.string().trim().url().max(500).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -69,6 +70,7 @@ export const supportRouter = createRouter({
         authorId: ctx.user.id,
         isAdmin: false,
         body: input.body,
+        imageUrl: input.imageUrl ?? null,
       });
       return { id, success: true as const };
     }),
@@ -146,6 +148,7 @@ export const supportRouter = createRouter({
           id: supportTicketMessages.id,
           isAdmin: supportTicketMessages.isAdmin,
           body: supportTicketMessages.body,
+          imageUrl: supportTicketMessages.imageUrl,
           createdAt: supportTicketMessages.createdAt,
           authorName: users.name,
         })
@@ -162,6 +165,7 @@ export const supportRouter = createRouter({
       z.object({
         id: z.number().int().positive(),
         body: z.string().trim().min(1).max(5000),
+        imageUrl: z.string().trim().url().max(500).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -178,6 +182,7 @@ export const supportRouter = createRouter({
         authorId: ctx.user.id,
         isAdmin: false,
         body: input.body,
+        imageUrl: input.imageUrl ?? null,
       });
       await db
         .update(supportTickets)
@@ -291,6 +296,7 @@ export const supportRouter = createRouter({
           id: supportTicketMessages.id,
           isAdmin: supportTicketMessages.isAdmin,
           body: supportTicketMessages.body,
+          imageUrl: supportTicketMessages.imageUrl,
           createdAt: supportTicketMessages.createdAt,
           authorName: users.name,
         })
@@ -311,6 +317,7 @@ export const supportRouter = createRouter({
       z.object({
         id: z.number().int().positive(),
         body: z.string().trim().min(1).max(5000),
+        imageUrl: z.string().trim().url().max(500).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -328,6 +335,7 @@ export const supportRouter = createRouter({
         authorId: ctx.user.id,
         isAdmin: true,
         body: input.body,
+        imageUrl: input.imageUrl ?? null,
       });
       await db
         .update(supportTickets)
