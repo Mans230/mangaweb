@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { motion } from "framer-motion";
 import { BookOpen, Coins as CoinsIcon, Crown, Medal, Trophy } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -15,6 +16,7 @@ const BADGE_EMOJI: Record<string, string> = {
 type Entry = {
   userId: number;
   name: string | null;
+  username: string | null;
   avatarUrl: string | null;
   chapters: number;
   coins: number;
@@ -23,6 +25,17 @@ type Entry = {
 
 function avatarOf(e: Entry): string {
   return proxyImg(e.avatarUrl) || "/placeholder-avatar.svg";
+}
+
+/** الاسم يربط لصفحة البروفايل العام إن وُجد username */
+function NameLink({ e, className }: { e: Entry; className?: string }) {
+  const label = e.name ?? `#${e.userId}`;
+  if (!e.username) return <span className={className}>{label}</span>;
+  return (
+    <Link to={`/u/${e.username}`} className={`${className ?? ""} hover:text-primary`}>
+      {label}
+    </Link>
+  );
 }
 
 /** بطاقة منصّة التتويج (أول/ثاني/ثالث) */
@@ -55,7 +68,7 @@ function PodiumCard({ e, rank }: { e: Entry; rank: 1 | 2 | 3 }) {
         className={`${meta.size} rounded-full border-2 object-cover ${meta.ring}`}
       />
       <div className="flex items-center gap-1 text-sm font-bold text-app">
-        {e.name ?? `#${e.userId}`}
+        <NameLink e={e} />
         {e.badge && BADGE_EMOJI[e.badge] && <span>{BADGE_EMOJI[e.badge]}</span>}
       </div>
       <div className="flex items-center gap-3 text-[11px] text-app-3">
@@ -130,7 +143,7 @@ export default function Leaderboard() {
                     className="h-10 w-10 shrink-0 rounded-full border border-app object-cover"
                   />
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-app">
-                    {e.name ?? `#${e.userId}`}
+                    <NameLink e={e} />
                     {e.badge && BADGE_EMOJI[e.badge] && <span className="ms-1">{BADGE_EMOJI[e.badge]}</span>}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-app-3">

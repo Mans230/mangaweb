@@ -158,6 +158,7 @@ export function weekStartUtc(d = new Date()): Date {
 export type LeaderboardEntry = {
   userId: number;
   name: string | null;
+  username: string | null;
   avatarUrl: string | null;
   chapters: number;
   coins: number;
@@ -177,6 +178,7 @@ export async function weeklyLeaderboard(
     .select({
       userId: chapterCompletions.userId,
       name: users.name,
+      username: users.username,
       avatarUrl: users.avatarUrl,
       badge: coinWallets.equippedBadge,
       chapters: sql<number>`COUNT(${chapterCompletions.chapterId})`,
@@ -194,6 +196,7 @@ export async function weeklyLeaderboard(
     .groupBy(
       chapterCompletions.userId,
       users.name,
+      users.username,
       users.avatarUrl,
       coinWallets.equippedBadge,
     )
@@ -205,6 +208,7 @@ export async function weeklyLeaderboard(
   return rows.map((r) => ({
     userId: Number(r.userId),
     name: r.name,
+    username: r.username ?? null,
     avatarUrl: r.avatarUrl,
     chapters: Number(r.chapters ?? 0),
     coins: Number(r.coins ?? 0),

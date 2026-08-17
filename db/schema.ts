@@ -974,3 +974,23 @@ export const announcements = mysqlTable("announcements", {
 
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
+
+/** متابعة مستخدم لمستخدم (لصفحات البروفايل العامة) */
+export const userFollows = mysqlTable(
+  "user_follows",
+  {
+    followerId: bigint("followerId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    followingId: bigint("followingId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.followerId, table.followingId] }),
+    followingIdx: index("user_follows_following_idx").on(table.followingId),
+  }),
+);
+
+export type UserFollow = typeof userFollows.$inferSelect;

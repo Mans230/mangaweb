@@ -327,6 +327,12 @@ export default function Navbar() {
                     <User size={16} />
                     {t("الملف الشخصي", "Profile")}
                   </DropdownMenuItem>
+                  {user?.username && (
+                    <DropdownMenuItem onClick={() => navigate(`/u/${user.username}`)}>
+                      <UsersRound size={16} />
+                      {t("ملفي العام", "Public profile")}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => navigate("/library")}>
                     <Library size={16} />
                     {t("مكتبتي", "My Library")}

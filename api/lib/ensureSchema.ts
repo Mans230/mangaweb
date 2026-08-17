@@ -280,6 +280,23 @@ export async function ensureBootSchema(): Promise<void> {
   } catch (e) {
     console.warn(`[ensure-schema] announcements: ${(e as Error).message}`);
   }
+
+  // ===== متابعة المستخدمين (البروفايل العام) =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`user_follows\` (
+	\`followerId\` bigint unsigned NOT NULL,
+	\`followingId\` bigint unsigned NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`user_follows_pk\` PRIMARY KEY(\`followerId\`, \`followingId\`)
+)`));
+    await ensureIndex(
+      "user_follows",
+      "user_follows_following_idx",
+      "CREATE INDEX `user_follows_following_idx` ON `user_follows` (`followingId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] user_follows: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {
