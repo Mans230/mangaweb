@@ -22,7 +22,7 @@ export const MOCK_CHAPTER_COMMENTS: ChapterComment[] = [
   {
     id: "m1",
     userName: "قارئ الظلال",
-    avatar: "/avatar-1.png",
+    avatar: "/placeholder-avatar.svg",
     content: "الفصل كان نار! المعركة الأخيرة رسمها خيالي 🔥",
     isSpoiler: false,
     timeAgo: "قبل 10 د",
@@ -30,7 +30,7 @@ export const MOCK_CHAPTER_COMMENTS: ChapterComment[] = [
   {
     id: "m2",
     userName: "مانهوا_بالعربي",
-    avatar: "/avatar-2.png",
+    avatar: "/placeholder-avatar.svg",
     content: "لا تفتحوا التعليق إلا بعد ما تخلصون: موتة الشخصية في النهاية صدمتني، ما توقعتها أبداً.",
     isSpoiler: true,
     timeAgo: "قبل 32 د",
@@ -38,7 +38,7 @@ export const MOCK_CHAPTER_COMMENTS: ChapterComment[] = [
   {
     id: "m3",
     userName: "نور",
-    avatar: "/avatar-3.png",
+    avatar: "/placeholder-avatar.svg",
     content: "الترجمة ممتازة والجودة عالية، شكراً زيكو مانجا ❤️",
     isSpoiler: false,
     timeAgo: "قبل ساعة",
@@ -46,7 +46,7 @@ export const MOCK_CHAPTER_COMMENTS: ChapterComment[] = [
   {
     id: "m4",
     userName: "صياد الفصول",
-    avatar: "/avatar-4.png",
+    avatar: "/placeholder-avatar.svg",
     content: "الفصل الجاي بيكون نقطة تحول، من قرأ الرواية يعرف وش أقصد.",
     isSpoiler: true,
     timeAgo: "قبل 3 س",
@@ -90,7 +90,7 @@ export default function ChapterComments({
     return listQuery.data.items.map((c) => ({
       id: c.id,
       userName: c.user.name ?? t("قارئ", "Reader"),
-      avatar: proxyImg(c.user.avatar) || "/avatar-1.png",
+      avatar: proxyImg(c.user.avatar) || "/placeholder-avatar.svg",
       content: c.content,
       isSpoiler: c.isSpoiler,
       timeAgo: new Date(c.createdAt).toLocaleDateString("ar"),
@@ -130,7 +130,7 @@ export default function ChapterComments({
               {
                 id: `local-${Date.now()}`,
                 userName: user?.name ?? t("أنا", "Me"),
-                avatar: proxyImg(user?.avatarUrl) || "/avatar-1.png",
+                avatar: proxyImg(user?.avatarUrl) || "/placeholder-avatar.svg",
                 content,
                 isSpoiler,
                 timeAgo: t("الآن", "now"),
@@ -146,7 +146,7 @@ export default function ChapterComments({
         {
           id: `local-${Date.now()}`,
           userName: user?.name ?? t("زائر", "Guest"),
-          avatar: proxyImg(user?.avatarUrl) || "/avatar-1.png",
+          avatar: proxyImg(user?.avatarUrl) || "/placeholder-avatar.svg",
           content,
           isSpoiler,
           timeAgo: t("الآن", "now"),

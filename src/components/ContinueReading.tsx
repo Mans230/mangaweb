@@ -72,7 +72,7 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
       bySlug.set(slug, {
         slug,
         title: h.manga.title,
-        cover: proxyImg(h.manga.coverUrl) || "/cover-01.png",
+        cover: proxyImg(h.manga.coverUrl) || "/placeholder-cover.svg",
         chapter: Math.floor(h.chapter.number),
         ratio,
         ts: new Date(h.updatedAt).getTime(),

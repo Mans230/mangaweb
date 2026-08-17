@@ -25,7 +25,7 @@ export function displayName(u: CommunityUser): string {
 }
 
 export function avatarSrc(u: CommunityUser): string {
-  return proxyImg(u.avatarUrl) || `/avatar-${(Math.abs(u.id) % 4) + 1}.png`;
+  return proxyImg(u.avatarUrl) || "/placeholder-avatar.svg";
 }
 
 /** يبني نص ردّ يقتبس الرسالة المطلوبة في سطر أول. */

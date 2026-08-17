@@ -136,7 +136,7 @@ function RequestForm() {
     id: Number(m.id),
     slug: m.slug,
     title: m.title,
-    cover: m.coverUrl || "/cover-01.png",
+    cover: m.coverUrl || "/placeholder-cover.svg",
     type: typeLabel(m.type),
     chapters: m.chapterCount,
   }));

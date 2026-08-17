@@ -258,7 +258,7 @@ export default function ReelItem({ reel, onOpenComments }: ReelItemProps) {
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-2 p-4 pe-20 pb-5">
         <div className="flex items-center gap-2.5">
           <img
-            src={proxyImg(reel.user.avatarUrl) || "/avatar-1.png"}
+            src={proxyImg(reel.user.avatarUrl) || "/placeholder-avatar.svg"}
             alt=""
             className="h-9 w-9 rounded-full border border-white/30 object-cover"
           />

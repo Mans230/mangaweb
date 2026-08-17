@@ -49,7 +49,7 @@ function detectDuplicateGroups(items: ApiMangaItem[]): DuplicateGroup[] {
     const item: DuplicateItem = {
       id: Number(m.id),
       title: m.title,
-      cover: m.coverUrl || "/cover-01.png",
+      cover: m.coverUrl || "/placeholder-cover.svg",
       source: m.source.name,
       chapters: m.chapterCount,
       updatedAt: timeAgo(m.updatedAt),

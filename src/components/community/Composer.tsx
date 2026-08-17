@@ -94,7 +94,7 @@ export default function Composer({
 
       <div className="flex items-end gap-2">
         <img
-          src={proxyImg(userAvatar) || "/avatar-1.png"}
+          src={proxyImg(userAvatar) || "/placeholder-avatar.svg"}
           alt=""
           aria-hidden
           className="mb-0.5 h-9 w-9 shrink-0 rounded-full border border-app object-cover"

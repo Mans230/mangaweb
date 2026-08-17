@@ -26,6 +26,12 @@ export default function MangaCard({ manga, rank, className = "" }: MangaCardProp
           alt={manga.title}
           loading="lazy"
           decoding="async"
+          onError={(e) => {
+            // غلاف المصدر فشل — استبدله بالبديل بدل صورة مكسورة
+            if (!e.currentTarget.src.endsWith("/placeholder-cover.svg")) {
+              e.currentTarget.src = "/placeholder-cover.svg";
+            }
+          }}
           className={`h-full w-full object-cover ${blurCover ? "scale-110 blur-lg" : ""}`}
         />
         {blurCover && (

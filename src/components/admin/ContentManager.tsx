@@ -183,7 +183,7 @@ function CoverDialog({
   const [url, setUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const currentCover = manga.coverOverrideUrl || manga.coverUrl || "/cover-01.png";
+  const currentCover = manga.coverOverrideUrl || manga.coverUrl || "/placeholder-cover.svg";
   const alternatives = trpc.admin.coverAlternatives.useQuery(
     { mangaId: manga.id },
     { retry: false },
@@ -746,7 +746,7 @@ export default function ContentManager() {
           {query.data!.items.map((m, i) => {
             const hidden = !!m.hiddenAt;
             const featured = !!m.featuredAt;
-            const cover = m.coverOverrideUrl || m.coverUrl || "/cover-01.png";
+            const cover = m.coverOverrideUrl || m.coverUrl || "/placeholder-cover.svg";
             return (
               <motion.div
                 key={m.id}

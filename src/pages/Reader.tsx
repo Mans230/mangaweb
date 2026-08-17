@@ -58,7 +58,7 @@ export default function Reader() {
       id: d.id,
       slug: d.slug,
       title: d.title,
-      cover: proxyImg(d.coverUrl) || "/cover-01.png",
+      cover: proxyImg(d.coverUrl) || "/placeholder-cover.svg",
       isAdult: d.isAdult,
       fromApi: true,
       chapters: d.chapters.map((c) => ({

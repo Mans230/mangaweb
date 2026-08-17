@@ -33,7 +33,7 @@ function CommentItem({ comment }: { comment: CommentVM }) {
     >
       <div className="flex items-center gap-2.5">
         <img
-          src={comment.avatar || "/avatar-1.png"}
+          src={comment.avatar || "/placeholder-avatar.svg"}
           alt={comment.author}
           loading="lazy"
           className="h-9 w-9 shrink-0 rounded-full border border-app object-cover"
@@ -138,7 +138,7 @@ export default function CommentsTab({
       {isAuthenticated ? (
         <div className="glass mb-5 flex items-start gap-3 !rounded-2xl p-3.5">
           <img
-            src={userAvatar || "/avatar-4.png"}
+            src={userAvatar || "/placeholder-avatar.svg"}
             alt=""
             className="h-9 w-9 shrink-0 rounded-full border border-app object-cover"
           />

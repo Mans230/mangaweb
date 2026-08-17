@@ -102,7 +102,7 @@ export default function Community() {
           )}
           <Link to={`/manga/${manga.slug}`} className="relative shrink-0">
             <img
-              src={manga.coverUrl || "/cover-01.png"}
+              src={manga.coverUrl || "/placeholder-cover.svg"}
               alt={manga.title}
               className="h-24 w-16 rounded-xl border border-app object-cover shadow-md md:h-28 md:w-20"
             />

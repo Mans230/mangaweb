@@ -124,7 +124,7 @@ export default function Library() {
         <div className="relative flex flex-col gap-8">
           <LibraryHeader
             name={user?.name ?? t("قارئ", "Reader")}
-            avatar={user?.avatarUrl ?? "/avatar-1.png"}
+            avatar={user?.avatarUrl ?? "/placeholder-avatar.svg"}
             total={total}
             favCount={data.favorites.length}
             followCount={data.following.length}

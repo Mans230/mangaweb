@@ -69,12 +69,12 @@ export default function IdentityCard({
           />
           <span className="absolute inset-1 rounded-full border border-app" aria-hidden />
           <img
-            src={proxyImg(avatar) || "/avatar-1.png"}
+            src={proxyImg(avatar) || "/placeholder-avatar.svg"}
             alt={name}
             onError={(e) => {
               // لو فشل البروكسي لأي سبب اعرض الصورة المحلية بدل الأيقونة المكسورة
-              if (!e.currentTarget.src.endsWith("/avatar-1.png")) {
-                e.currentTarget.src = "/avatar-1.png";
+              if (!e.currentTarget.src.endsWith("/placeholder-avatar.svg")) {
+                e.currentTarget.src = "/placeholder-avatar.svg";
               }
             }}
             className="absolute inset-1.5 h-[68px] w-[68px] rounded-full border-2 border-app object-cover"

@@ -63,7 +63,7 @@ export function normalizeApiManga(m: {
     id: m.id,
     slug: m.slug,
     title: m.title,
-    cover: m.coverUrl || "/cover-01.png",
+    cover: m.coverUrl || "/placeholder-cover.svg",
     chapters: m.chapterCount,
     type: TYPE_AR[m.type] ?? m.type,
     status: STATUS_AR[m.status] ?? m.status,

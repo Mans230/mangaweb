@@ -107,7 +107,7 @@ export function dbMangaToCard(m: DbMangaLike, lang: Lang): MangaCardData {
     slug: m.slug,
     title: m.title,
     altTitle: m.altTitles?.[0],
-    cover: proxyImg(m.coverUrl) || "/cover-01.png",
+    cover: proxyImg(m.coverUrl) || "/placeholder-cover.svg",
     type: TYPE_AR[m.type] ?? "مانهوا",
     status: STATUS_AR[m.status] ?? "مستمر",
     rating: m.rating ?? 0,

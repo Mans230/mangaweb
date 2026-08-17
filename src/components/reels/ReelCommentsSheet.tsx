@@ -118,7 +118,7 @@ export default function ReelCommentsSheet({ reelId, onClose }: ReelCommentsSheet
                   {items.map((c) => (
                     <li key={c.id} className="flex items-start gap-2.5">
                       <img
-                        src={proxyImg(c.user.avatarUrl) || "/avatar-1.png"}
+                        src={proxyImg(c.user.avatarUrl) || "/placeholder-avatar.svg"}
                         alt=""
                         className="h-8 w-8 shrink-0 rounded-full border border-app object-cover"
                       />
@@ -145,7 +145,7 @@ export default function ReelCommentsSheet({ reelId, onClose }: ReelCommentsSheet
               {isAuthenticated ? (
                 <div className="flex items-end gap-2">
                   <img
-                    src={proxyImg(user?.avatarUrl) || "/avatar-1.png"}
+                    src={proxyImg(user?.avatarUrl) || "/placeholder-avatar.svg"}
                     alt=""
                     className="mb-0.5 h-8 w-8 shrink-0 rounded-full border border-app object-cover"
                   />

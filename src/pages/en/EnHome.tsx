@@ -66,7 +66,7 @@ function adaptEnCard(m: EnCardRow): MangaCardData {
     id: Number(m.id),
     slug: m.slug,
     title: m.title,
-    cover: proxyImg(m.coverUrl) || "/cover-01.png",
+    cover: proxyImg(m.coverUrl) || "/placeholder-cover.svg",
     type: (TYPE_EN[m.type] ?? "Manga") as MangaType,
     status: mangaStatusLabel(m.status) as MangaStatus,
     rating: m.rating ?? 0,

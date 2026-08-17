@@ -345,7 +345,7 @@ function ListDetail({
                 >
                   <div className="relative aspect-[2/3] overflow-hidden rounded-[14px]">
                     <img
-                      src={item.manga.coverUrl || "/cover-01.png"}
+                      src={item.manga.coverUrl || "/placeholder-cover.svg"}
                       alt={item.manga.title}
                       loading="lazy"
                       decoding="async"

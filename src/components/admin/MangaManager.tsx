@@ -45,7 +45,7 @@ function mapApiManga(m: ApiMangaItem): AdminMangaRow {
     slug: m.slug,
     title: m.title,
     altTitle: m.altTitles?.[0],
-    cover: m.coverUrl || "/cover-01.png",
+    cover: m.coverUrl || "/placeholder-cover.svg",
     type: typeLabel(m.type),
     status: mangaStatusLabel(m.status),
     chapters: m.chapterCount,
