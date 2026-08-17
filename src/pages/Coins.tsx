@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Award,
   BookOpen,
   CalendarCheck,
   Check,
@@ -13,16 +14,23 @@ import {
   Library,
   Loader2,
   MessageSquare,
+  Palette,
+  ShoppingBag,
+  Sparkles,
   Star,
   Target,
   TrendingUp,
+  Trophy,
   Zap,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast, ToastViewport } from "@/components/library/toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LOGIN_PATH } from "@/const";
+import { proxyImg } from "@/lib/manga";
+import { applyShopTheme } from "@/lib/shopThemes";
 import { trpc } from "@/providers/trpc";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -46,9 +54,23 @@ const MISSION_META: Record<string, { icon: typeof BookOpen; ar: string; en: stri
   library: { icon: Library, ar: "أضف مانجا لمكتبتك", en: "Add a manga to your library" },
 };
 
+const SHOP_GROUPS: { type: string; icon: typeof Palette; ar: string; en: string }[] = [
+  { type: "theme", icon: Palette, ar: "ثيمات", en: "Themes" },
+  { type: "badge", icon: Award, ar: "شارات", en: "Badges" },
+  { type: "adfree", icon: Sparkles, ar: "مزايا", en: "Perks" },
+];
+
+const BADGE_EMOJI: Record<string, string> = {
+  badge_star: "⭐",
+  badge_fire: "🔥",
+  badge_crown: "👑",
+};
+
+const RANK_MEDALS = ["🥇", "🥈", "🥉"];
+
 export default function Coins() {
   const { t, lang } = useLanguage();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [copied, setCopied] = useState(false);
@@ -69,6 +91,12 @@ export default function Coins() {
     enabled: isAuthenticated,
     retry: false,
   });
+  const shopQ = trpc.shop.list.useQuery(undefined, { retry: false });
+  const mineQ = trpc.shop.mine.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const lbQ = trpc.shop.leaderboard.useQuery({ limit: 10 }, { retry: false });
 
   const checkinMut = trpc.coins.checkin.useMutation({
     onSuccess: (res) => {
@@ -94,6 +122,25 @@ export default function Coins() {
       toast(t(`🎰 +${res.reward} كوين!`, `🎰 +${res.reward} coins!`));
       void utils.coins.wallet.invalidate();
       void utils.coins.transactions.invalidate();
+    },
+    onError: (e) => toast(e.message, { kind: "info" }),
+  });
+
+  const buyMut = trpc.shop.buy.useMutation({
+    onSuccess: () => {
+      toast(t("تم الشراء!", "Purchased!"));
+      void utils.shop.mine.invalidate();
+      void utils.coins.wallet.invalidate();
+      void utils.coins.transactions.invalidate();
+    },
+    onError: (e) => toast(e.message, { kind: "info" }),
+  });
+
+  const equipMut = trpc.shop.equip.useMutation({
+    onSuccess: (_res, vars) => {
+      void utils.shop.mine.invalidate();
+      const item = shopQ.data?.items.find((i) => i.itemKey === vars.itemKey);
+      if (item?.type === "theme") applyShopTheme(vars.itemKey);
     },
     onError: (e) => toast(e.message, { kind: "info" }),
   });
@@ -131,6 +178,9 @@ export default function Coins() {
   const txs = txQ.data?.items ?? [];
   const missions = missionsQ.data?.items ?? [];
   const info = refQ.data;
+  const shopItems = shopQ.data?.items ?? [];
+  const owned = mineQ.data?.itemKeys ?? [];
+  const lb = lbQ.data?.items ?? [];
 
   const copyRefLink = async () => {
     if (!info) return;
@@ -325,6 +375,168 @@ export default function Coins() {
                       +{m.reward}
                     </span>
                   )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ===== المتجر ===== */}
+      <div className="glass flex flex-col gap-4 !rounded-3xl p-5">
+        <p className="flex items-center gap-2 text-sm font-bold text-app">
+          <ShoppingBag size={16} className="text-primary" />
+          {t("المتجر", "Shop")}
+        </p>
+        {shopQ.isLoading ? (
+          <div className="flex flex-col gap-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-12 w-full !rounded-xl" />
+            ))}
+          </div>
+        ) : shopItems.length === 0 ? (
+          <p className="py-4 text-center text-sm text-app-3">
+            {t("لا عناصر متاحة الآن", "No items available right now")}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {SHOP_GROUPS.map((g) => {
+              const items = shopItems
+                .filter((i) => i.type === g.type && i.active)
+                .sort((a, b) => a.sort - b.sort);
+              if (items.length === 0) return null;
+              const GIcon = g.icon;
+              return (
+                <div key={g.type} className="flex flex-col gap-2">
+                  <p className="flex items-center gap-1.5 text-[11px] font-bold text-app-3">
+                    <GIcon size={13} />
+                    {t(g.ar, g.en)}
+                  </p>
+                  {items.map((item) => {
+                    const isOwned = owned.includes(item.itemKey);
+                    const isEquipped =
+                      item.type === "theme"
+                        ? mineQ.data?.equippedTheme === item.itemKey
+                        : item.type === "badge"
+                          ? mineQ.data?.equippedBadge === item.itemKey
+                          : false;
+                    return (
+                      <div key={item.id} className="flex items-center gap-3">
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-app">
+                          {t(item.nameAr, item.nameEn)}
+                        </span>
+                        <span
+                          className="glass-chip shrink-0 !py-1 text-[11px] font-bold text-primary tabular-nums"
+                          dir="ltr"
+                        >
+                          <CoinsIcon size={11} />
+                          {item.price}
+                        </span>
+                        {isAuthenticated && (
+                          <>
+                            {!isOwned ? (
+                              <button
+                                onClick={() => buyMut.mutate({ itemKey: item.itemKey })}
+                                disabled={buyMut.isPending}
+                                className="btn-primary shrink-0 !px-4 !py-1.5 text-xs disabled:opacity-50"
+                              >
+                                {buyMut.isPending && buyMut.variables?.itemKey === item.itemKey ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : null}
+                                {t("شراء", "Buy")}
+                              </button>
+                            ) : item.type === "adfree" ? (
+                              <span className="glass-chip shrink-0 text-[11px] font-bold text-success">
+                                {t("مُفعَّل ✓", "Active ✓")}
+                              </span>
+                            ) : isEquipped ? (
+                              <span className="glass-chip shrink-0 text-[11px] font-bold text-success">
+                                {t("مُفعَّل ✓", "Equipped ✓")}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => equipMut.mutate({ itemKey: item.itemKey })}
+                                disabled={equipMut.isPending}
+                                className="btn-glass shrink-0 !px-4 !py-1.5 text-xs disabled:opacity-50"
+                              >
+                                {equipMut.isPending && equipMut.variables?.itemKey === item.itemKey ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : null}
+                                {t("تفعيل", "Equip")}
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ===== متصدرو الأسبوع ===== */}
+      <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
+        <p className="flex items-center gap-2 text-sm font-bold text-app">
+          <Trophy size={16} className="text-accent-2" />
+          {t("متصدرو الأسبوع", "Weekly top readers")}
+        </p>
+        <p className="text-xs text-app-3">
+          {t(
+            "أكثر قراءة هذا الأسبوع — المراكز الثلاثة الأولى تاخذ شارة.",
+            "Most chapters read this week — top 3 earn a badge.",
+          )}
+        </p>
+        {lbQ.isLoading ? (
+          <div className="flex flex-col gap-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-10 w-full !rounded-xl" />
+            ))}
+          </div>
+        ) : lb.length === 0 ? (
+          <p className="py-4 text-center text-sm text-app-3">
+            {t("لا بيانات هذا الأسبوع بعد", "No data for this week yet")}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {lb.map((entry, idx) => {
+              const isMe = user?.id === entry.userId;
+              return (
+                <div
+                  key={entry.userId}
+                  className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 ${
+                    isMe ? "bg-primary/10" : ""
+                  }`}
+                >
+                  <span className="w-7 shrink-0 text-center text-sm font-bold tabular-nums">
+                    {idx < 3 ? (
+                      RANK_MEDALS[idx]
+                    ) : (
+                      <span className="text-app-3">{idx + 1}</span>
+                    )}
+                  </span>
+                  <Avatar className="size-8">
+                    <AvatarImage src={proxyImg(entry.avatarUrl)} alt={entry.name} />
+                    <AvatarFallback className="bg-primary/15 text-xs font-bold text-primary">
+                      {entry.name?.slice(0, 1) ?? "؟"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-xs font-semibold text-app">
+                    <span className="truncate">{entry.name}</span>
+                    {entry.badge && BADGE_EMOJI[entry.badge] ? (
+                      <span>{BADGE_EMOJI[entry.badge]}</span>
+                    ) : null}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-app-3 tabular-nums">
+                    <span dir="ltr">{entry.chapters}</span>
+                    <BookOpen size={12} />
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-primary tabular-nums">
+                    <span dir="ltr">{entry.coins}</span>
+                    <CoinsIcon size={12} />
+                  </span>
                 </div>
               );
             })}
