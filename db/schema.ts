@@ -345,6 +345,8 @@ export const ratings = mysqlTable(
       .notNull()
       .references(() => manga.id),
     stars: int("stars").notNull(),
+    /** مراجعة نصية اختيارية مع التقييم — تُضاف عبر ensureBootSchema */
+    reviewText: text("reviewText"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({
@@ -603,7 +605,7 @@ export const communityJoinRequests = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({
-    communityUserIdx: index("community_join_requests_community_user_idx").on(
+    communityUserIdx: index("community_join_requests_community_id_idx").on(
       table.communityId,
       table.userId,
     ),
