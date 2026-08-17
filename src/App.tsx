@@ -25,6 +25,7 @@ import Calendar from "@/pages/Calendar";
 import Fun from "@/pages/Fun";
 import Reels from "@/pages/Reels";
 import Today from "@/pages/Today";
+import Announcements from "@/pages/Announcements";
 import Login from "@/pages/Login";
 import Admin from "@/pages/Admin";
 
@@ -82,6 +83,7 @@ export default function App() {
             element={hideReels ? <Navigate to="/" replace /> : <Reels />}
           />
           <Route path="today" element={<Today />} />
+          <Route path="announcements" element={<Announcements />} />
           <Route path="auth" element={<Login />} />
           <Route path="login" element={<Login />} />
           <Route path="admin" element={<Admin />} />

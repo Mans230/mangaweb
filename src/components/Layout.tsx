@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router";
 import Lenis from "lenis";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import AnnouncementBanner from "./AnnouncementBanner";
 
 /**
  * Shared layout — nested-route pattern (<Outlet/>).
@@ -40,6 +41,7 @@ export default function Layout() {
     <div className="flex min-h-[100dvh] flex-col">
       <div className="noise-overlay" aria-hidden />
       <Navbar />
+      {!isReader && <AnnouncementBanner />}
       <main className={`flex-1 ${hideBottomNav ? "" : "pb-20"} md:pb-0`}>
         <Outlet />
       </main>

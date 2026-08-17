@@ -20,6 +20,7 @@ import { shopRouter } from "./shopRouter";
 import { pollsRouter } from "./pollsRouter";
 import { enRouter } from "./enRouter";
 import { recommendRouter } from "./recommendRouter";
+import { announcementsRouter } from "./announcementsRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -46,6 +47,7 @@ export const appRouter = createRouter({
   coins: coinsRouter,
   shop: shopRouter,
   polls: pollsRouter,
+  announcements: announcementsRouter,
 });
 
 export type AppRouter = typeof appRouter;

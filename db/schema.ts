@@ -950,3 +950,25 @@ export const supportTicketMessages = mysqlTable(
 
 export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
 export type InsertSupportTicketMessage = typeof supportTicketMessages.$inferInsert;
+
+/** إعلانات الموقع — بانر علوي + صفحة أرشيف /announcements */
+export const announcements = mysqlTable("announcements", {
+  id: bigint("id", { mode: "number", unsigned: true })
+    .autoincrement()
+    .primaryKey(),
+  /** info | warning | maintenance | new */
+  type: varchar("type", { length: 20 }).default("info").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  linkUrl: varchar("linkUrl", { length: 500 }),
+  linkLabel: varchar("linkLabel", { length: 80 }),
+  /** all | users */
+  audience: varchar("audience", { length: 20 }).default("all").notNull(),
+  active: boolean("active").default(true).notNull(),
+  startsAt: timestamp("startsAt"),
+  endsAt: timestamp("endsAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;

@@ -6,10 +6,13 @@ import {
   Construction,
   EyeOff,
   Loader2,
+  Megaphone,
+  Plus,
   RefreshCw,
   Save,
   ScrollText,
   ShieldBan,
+  Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import ErrorState from "@/components/ErrorState";
@@ -457,12 +460,176 @@ function AdminLogsCard() {
   );
 }
 
+/* ================= الإعلانات ================= */
+const ANN_TYPES: { key: string; ar: string; en: string }[] = [
+  { key: "info", ar: "معلومة", en: "Info" },
+  { key: "warning", ar: "تحذير", en: "Warning" },
+  { key: "maintenance", ar: "صيانة", en: "Maintenance" },
+  { key: "new", ar: "جديد", en: "New" },
+];
+
+function AnnouncementsCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const listQ = trpc.announcements.list.useQuery(undefined, { retry: false });
+
+  const [type, setType] = useState("info");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [audience, setAudience] = useState<"all" | "users">("all");
+
+  const create = trpc.announcements.create.useMutation({
+    onSuccess: () => {
+      toast(t("تم نشر الإعلان", "Announcement published"));
+      setTitle("");
+      setBody("");
+      setLinkUrl("");
+      listQ.refetch();
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+  const setActive = trpc.announcements.setActive.useMutation({
+    onSuccess: () => listQ.refetch(),
+    onError: (e) => toast(e.message, "danger"),
+  });
+  const remove = trpc.announcements.remove.useMutation({
+    onSuccess: () => {
+      toast(t("تم الحذف", "Deleted"));
+      listQ.refetch();
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+
+  const submit = () => {
+    if (title.trim().length < 2 || body.trim().length < 2) {
+      toast(t("العنوان والنص مطلوبان", "Title and body required"), "danger");
+      return;
+    }
+    create.mutate({
+      type: type as "info" | "warning" | "maintenance" | "new",
+      title: title.trim(),
+      body: body.trim(),
+      linkUrl: linkUrl.trim() || undefined,
+      audience,
+      active: true,
+    });
+  };
+
+  const items = listQ.data?.items ?? [];
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <Megaphone size={16} className="text-primary" />
+        {t("الإعلانات", "Announcements")}
+      </h3>
+
+      {/* نموذج إنشاء */}
+      <div className="mb-4 flex flex-col gap-2.5">
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="input-glass !py-2 text-xs"
+          >
+            {ANN_TYPES.map((a) => (
+              <option key={a.key} value={a.key}>
+                {t(a.ar, a.en)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={audience}
+            onChange={(e) => setAudience(e.target.value as "all" | "users")}
+            className="input-glass !py-2 text-xs"
+          >
+            <option value="all">{t("الكل", "Everyone")}</option>
+            <option value="users">{t("المسجّلين فقط", "Registered only")}</option>
+          </select>
+        </div>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={t("العنوان", "Title")}
+          className="input-glass !py-2 text-sm"
+        />
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={t("نص الإعلان", "Announcement body")}
+          rows={2}
+          className="input-glass !py-2 text-sm"
+        />
+        <input
+          value={linkUrl}
+          onChange={(e) => setLinkUrl(e.target.value)}
+          dir="ltr"
+          placeholder="https://… (اختياري)"
+          className="input-glass !py-2 text-xs"
+        />
+        <button
+          type="button"
+          onClick={submit}
+          disabled={create.isPending}
+          className="btn-primary self-start !px-4 !py-2 text-xs"
+        >
+          {create.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+          {t("نشر", "Publish")}
+        </button>
+      </div>
+
+      {/* القائمة */}
+      {listQ.isLoading ? (
+        <div className="skeleton h-16" />
+      ) : items.length === 0 ? (
+        <p className="text-xs text-app-3">{t("لا إعلانات بعد.", "No announcements yet.")}</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((a) => (
+            <div
+              key={a.id}
+              className="glass flex items-center justify-between gap-3 !rounded-xl p-3"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-app">{a.title}</div>
+                <div className="text-[11px] text-app-3">{a.type}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Switch
+                  checked={a.active}
+                  disabled={setActive.isPending}
+                  onCheckedChange={(v) => setActive.mutate({ id: a.id, active: v })}
+                />
+                <button
+                  onClick={() => remove.mutate({ id: a.id })}
+                  disabled={remove.isPending}
+                  className="btn-icon !h-8 !w-8 !text-danger"
+                  aria-label={t("حذف", "Delete")}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
 export default function AdminSettings() {
   return (
     <div className="space-y-4">
       <BannedWordsCard />
       <ScrapeTriggerCard />
       <UiSectionsCard />
+      <AnnouncementsCard />
       <MaintenanceCard />
       <AdminLogsCard />
     </div>

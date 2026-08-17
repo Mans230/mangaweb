@@ -244,6 +244,31 @@ export async function ensureBootSchema(): Promise<void> {
     db.execute(sql.raw("ALTER TABLE `ratings` ADD `reviewText` text")),
     "ratings.reviewText",
   );
+
+  // ===== إعلانات الموقع =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`announcements\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`type\` varchar(20) NOT NULL DEFAULT 'info',
+	\`title\` varchar(200) NOT NULL,
+	\`body\` text NOT NULL,
+	\`linkUrl\` varchar(500),
+	\`linkLabel\` varchar(80),
+	\`audience\` varchar(20) NOT NULL DEFAULT 'all',
+	\`active\` boolean NOT NULL DEFAULT true,
+	\`startsAt\` timestamp NULL,
+	\`endsAt\` timestamp NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`announcements_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "announcements",
+      "announcements_active_idx",
+      "CREATE INDEX `announcements_active_idx` ON `announcements` (`active`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] announcements: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {
