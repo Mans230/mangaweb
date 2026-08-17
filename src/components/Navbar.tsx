@@ -147,11 +147,9 @@ function NotificationsBell() {
 }
 
 const navLinks = [
-  { to: "/", ar: "الرئيسية", en: "Home" },
   { to: "/browse", ar: "تصفّح", en: "Browse" },
   { to: "/en", ar: "EN", en: "EN" },
   { to: "/calendar", ar: "التقويم", en: "Calendar" },
-  { to: "/library", ar: "مكتبتي", en: "Library" },
   { to: "/request", ar: "اطلب مانجا", en: "Request" },
 ];
 
@@ -181,7 +179,6 @@ export default function Navbar() {
     { to: "/", ar: "الرئيسية", en: "Home", icon: Home },
     ...(showFun ? [{ to: "/fun", ar: "Fun", en: "Fun", icon: Sparkles }] : []),
     { to: "/library", ar: "مكتبتي", en: "Library", icon: Library },
-    { to: "/support", ar: "الدعم", en: "Support", icon: LifeBuoy },
     { to: accountPath, ar: "حسابي", en: "Account", icon: User },
     ...(user?.role === "admin"
       ? [{ to: "/admin", ar: "الإدارة", en: "Admin", icon: LayoutDashboard }]

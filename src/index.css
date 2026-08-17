@@ -26,7 +26,7 @@
     --danger: #fb7185;
     --glass-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
     --glass-inset: none;
-    --radius: 12px;
+    --radius: 5px;
   }
 
   [data-theme="dark"] {
@@ -73,6 +73,18 @@
     min-height: 100dvh;
   }
 
+  /* نمط هافتون ورقي عام خلف كل الصفحات — نفس إحساس الصفحة الرئيسية الإفتتاحي */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: radial-gradient(circle, var(--ed-line) 1px, transparent 1.2px);
+    background-size: 7px 7px;
+    opacity: 0.05;
+  }
+
   [dir="ltr"] body {
     font-family: "Outfit", "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
   }
@@ -107,7 +119,7 @@
   .glass {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 5px;
     box-shadow: var(--glass-shadow);
   }
 
@@ -123,7 +135,7 @@
     gap: 6px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 5px;
     padding: 6px 14px;
     font-size: 13px;
     color: var(--text-2);
@@ -144,7 +156,7 @@
     background: var(--primary);
     color: #fff;
     font-weight: 600;
-    border-radius: 8px;
+    border-radius: 5px;
     padding: 12px 24px;
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease, box-shadow 0.2s ease;
   }
@@ -166,7 +178,7 @@
     border: 1px solid var(--border);
     color: var(--primary);
     font-weight: 600;
-    border-radius: 8px;
+    border-radius: 5px;
     padding: 12px 24px;
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, background 0.2s ease;
   }
@@ -206,7 +218,7 @@
   .input-glass {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 5px;
     padding: 12px 16px;
     color: var(--text);
     outline: none;
@@ -265,7 +277,7 @@
     position: relative;
     overflow: hidden;
     background: var(--surface-strong);
-    border-radius: 8px;
+    border-radius: 5px;
   }
   .skeleton::after {
     content: "";
