@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
@@ -148,6 +149,7 @@ function NotificationsBell() {
 const navLinks = [
   { to: "/", ar: "الرئيسية", en: "Home" },
   { to: "/browse", ar: "تصفّح", en: "Browse" },
+  { to: "/en", ar: "EN", en: "EN" },
   { to: "/library", ar: "مكتبتي", en: "Library" },
   { to: "/request", ar: "اطلب مانجا", en: "Request" },
 ];

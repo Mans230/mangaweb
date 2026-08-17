@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from "react";
 import { proxyImg } from "@/lib/manga";
 import { useParams } from "react-router";
@@ -24,6 +25,9 @@ import {
 } from "@/components/manga/types";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
+
+/** أسماء مصادر المانجا الإنجليزية — لكشف أعمال EN وقلب الاتجاه LTR */
+const EN_SOURCES = ["mangadex", "asurascans", "vortexscans"];
 
 type TabId = "chapters" | "comments" | "similar";
 
@@ -67,6 +71,9 @@ export default function MangaDetail() {
       ...computeReadState(chapters, d.userState.progress?.chapter?.number ?? null),
     };
   }, [detailQuery.data, lang]);
+
+  /** عمل إنجليزي؟ — يُكشف من source.name الذي يعيده getBySlug */
+  const isEn = !!vm && EN_SOURCES.includes(vm.source);
 
   /* ================= حالة القراءة ================= */
   const progressQuery = trpc.library.getProgress.useQuery(
@@ -297,13 +304,13 @@ export default function MangaDetail() {
   };
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: "chapters", label: `${t("الفصول", "Chapters")} (${vm.chapterTotal})` },
-    { id: "comments", label: `${t("التعليقات", "Comments")} (${commentTotal})` },
-    { id: "similar", label: t("أعمال مشابهة", "Similar") },
+    { id: "chapters", label: isEn ? `Chapters (${vm.chapterTotal})` : `${t("الفصول", "Chapters")} (${vm.chapterTotal})` },
+    { id: "comments", label: isEn ? `Comments (${commentTotal})` : `${t("التعليقات", "Comments")} (${commentTotal})` },
+    { id: "similar", label: isEn ? "Similar" : t("أعمال مشابهة", "Similar") },
   ];
 
   return (
-    <div className="relative pb-14">
+    <div className="relative pb-14" dir={isEn ? "ltr" : undefined} lang={isEn ? "en" : undefined}>
       {/* هالة محيطة واحدة (مخفّضة للأداء) */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
         <div
