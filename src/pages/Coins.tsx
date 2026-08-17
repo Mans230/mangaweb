@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Award,
@@ -67,6 +67,102 @@ const BADGE_EMOJI: Record<string, string> = {
 };
 
 const RANK_MEDALS = ["🥇", "🥈", "🥉"];
+
+/* ===== عجلة الحظ المتحركة ===== */
+const SPIN_SEGMENTS = [5, 10, 15, 20, 30, 50, 75, 100];
+
+function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+function wedgePath(i: number, n: number, r: number, cx: number, cy: number): string {
+  const [x0, y0] = polar(cx, cy, r, (360 / n) * i);
+  const [x1, y1] = polar(cx, cy, r, (360 / n) * (i + 1));
+  return `M${cx},${cy} L${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1} Z`;
+}
+
+function LuckySpinWheel({
+  canSpin,
+  pending,
+  reward,
+  onSpin,
+}: {
+  canSpin: boolean;
+  pending: boolean;
+  reward: number | undefined;
+  onSpin: () => void;
+}) {
+  const { t } = useLanguage();
+  const [rot, setRot] = useState(0);
+  const last = useRef<number | undefined>(undefined);
+  const n = SPIN_SEGMENTS.length;
+
+  useEffect(() => {
+    if (reward == null || reward === last.current) return;
+    last.current = reward;
+    const idx = SPIN_SEGMENTS.indexOf(reward);
+    const seg = idx >= 0 ? idx : 0;
+    const center = (360 / n) * seg + 360 / n / 2;
+    setRot((prev) => prev - (prev % 360) + 360 * 5 + (360 - center));
+  }, [reward, n]);
+
+  return (
+    <div className="glass flex flex-col items-center gap-3 !rounded-3xl p-5">
+      <p className="flex items-center gap-2 self-start text-sm font-bold text-app">
+        <Dices size={16} className="text-accent" />
+        {t("عجلة الحظ", "Lucky Spin")}
+      </p>
+      <div className="relative h-44 w-44">
+        <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2">
+          <div className="h-0 w-0 border-x-8 border-t-[14px] border-x-transparent border-t-[var(--primary)]" />
+        </div>
+        <motion.svg
+          viewBox="0 0 100 100"
+          className="h-full w-full"
+          animate={{ rotate: rot }}
+          transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {SPIN_SEGMENTS.map((v, i) => {
+            const mid = (360 / n) * i + 360 / n / 2;
+            const [tx, ty] = polar(50, 50, 48 * 0.62, mid);
+            return (
+              <g key={i}>
+                <path
+                  d={wedgePath(i, n, 48, 50, 50)}
+                  fill={i % 2 ? "var(--surface-strong)" : "var(--primary)"}
+                  stroke="var(--border)"
+                  strokeWidth="0.5"
+                />
+                <text
+                  x={tx}
+                  y={ty}
+                  fontSize="7"
+                  fontWeight="700"
+                  fill={i % 2 ? "var(--text)" : "#fff"}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  {v}
+                </text>
+              </g>
+            );
+          })}
+          <circle cx="50" cy="50" r="6" fill="var(--surface-strong)" stroke="var(--border)" strokeWidth="0.5" />
+        </motion.svg>
+      </div>
+      <button
+        onClick={onSpin}
+        disabled={!canSpin || pending}
+        className="btn-primary w-full !py-2.5 text-sm disabled:opacity-50"
+      >
+        {pending ? <Loader2 size={15} className="animate-spin" /> : <Dices size={15} />}
+        {canSpin
+          ? t("لفّ العجلة", "Spin now")
+          : t("لفّيت النهاردة — تعالى بكرة", "Spun today — come back tomorrow")}
+      </button>
+    </div>
+  );
+}
 
 export default function Coins() {
   const { t, lang } = useLanguage();
@@ -546,29 +642,12 @@ export default function Coins() {
 
       {/* ===== عجلة الحظ + دعوة الأصدقاء ===== */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
-          <p className="flex items-center gap-2 text-sm font-bold text-app">
-            <Dices size={16} className="text-accent" />
-            {t("عجلة الحظ", "Lucky Spin")}
-          </p>
-          <p className="text-xs leading-relaxed text-app-3">
-            {t("لفّة يومية مجانية — من 5 إلى 100 كوين.", "One free spin daily — 5 to 100 coins.")}
-          </p>
-          <button
-            onClick={() => spinMut.mutate()}
-            disabled={!w?.canSpin || spinMut.isPending}
-            className="btn-primary mt-auto w-full !py-2.5 text-sm disabled:opacity-50"
-          >
-            {spinMut.isPending ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <Dices size={15} />
-            )}
-            {w?.canSpin
-              ? t("لفّ العجلة", "Spin now")
-              : t("لفّيت النهاردة — تعالى بكرة", "Spun today — come back tomorrow")}
-          </button>
-        </div>
+        <LuckySpinWheel
+          canSpin={!!w?.canSpin}
+          pending={spinMut.isPending}
+          reward={spinMut.data?.reward}
+          onSpin={() => spinMut.mutate()}
+        />
 
         <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
           <p className="flex items-center gap-2 text-sm font-bold text-app">
