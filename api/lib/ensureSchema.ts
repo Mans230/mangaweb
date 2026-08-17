@@ -238,6 +238,12 @@ export async function ensureBootSchema(): Promise<void> {
   } catch (e) {
     console.warn(`[ensure-schema] shop/polls tables: ${(e as Error).message}`);
   }
+
+  // ===== المرحلة 3: مراجعات نصية على التقييمات =====
+  await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `ratings` ADD `reviewText` text")),
+    "ratings.reviewText",
+  );
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {
