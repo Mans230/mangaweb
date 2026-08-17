@@ -8,6 +8,7 @@ import {
   Flag,
   FolderCog,
   GitMerge,
+  Globe,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
@@ -41,9 +42,10 @@ import ContentManager from "@/components/admin/ContentManager";
 import ReelsModeration from "@/components/admin/ReelsModeration";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminCoins from "@/components/admin/AdminCoins";
+import AdminEnImport from "@/components/admin/AdminEnImport";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -81,6 +83,7 @@ function AdminShell() {
         { id: "reels", label: t("مراجعة الريلز", "Reels review"), icon: Clapperboard, badge: pendingReels },
         { id: "settings", label: t("الإعدادات", "Settings"), icon: Settings },
         { id: "coins", label: t("كوينز", "Coins"), icon: Coins },
+        { id: "en", label: t("مانجا EN", "EN Manga"), icon: Globe },
         { id: "dashboard", label: t("لوحة المعلومات", "Dashboard"), icon: LayoutDashboard },
         { id: "manga", label: t("إدارة المانجا", "Manga"), icon: BookOpen },
         { id: "add", label: t("إضافة بلينك", "Add by link"), icon: Link2 },
@@ -229,6 +232,7 @@ function AdminShell() {
             {view === "reels" && <ReelsModeration />}
             {view === "settings" && <AdminSettings />}
             {view === "coins" && <AdminCoins />}
+            {view === "en" && <AdminEnImport />}
             {view === "dashboard" && <AdminDashboard />}
             {view === "manga" && <MangaManager />}
             {view === "add" && <AddByLink />}
