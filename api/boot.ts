@@ -33,7 +33,7 @@ type UpstreamImg =
 
 /** حد تزامن لكل مصدر — صفحة واحدة فيها عشرات الأغلفة، وفتح الطلبات دفعة واحدة
  *  يجعل المصدر يخنقنا (429/5xx) فتظهر الأغلفة مكسورة رغم أنها سليمة */
-const IMG_HOST_CONCURRENCY = 3;
+const IMG_HOST_CONCURRENCY = 6;
 const imgHostSem = new Map<string, { active: number; queue: (() => void)[] }>();
 
 function acquireImgHost(host: string): Promise<() => void> {
@@ -68,8 +68,8 @@ async function fetchUpstreamImageRaw(target: URL, referer?: string): Promise<Ups
   };
   if (referer) headers.Referer = referer;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 700));
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 500 * attempt));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
