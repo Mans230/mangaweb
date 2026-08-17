@@ -42,7 +42,7 @@ export default function IdentityCard({
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: EASE }}
-      className="glass gradient-hero-bg relative overflow-hidden p-6 md:p-8"
+      className="glass gradient-hero-bg relative overflow-hidden p-4 md:p-6"
     >
       {/* صورة الغلاف كخلفية لرأس البطاقة */}
       {banner && (
@@ -57,9 +57,9 @@ export default function IdentityCard({
         </>
       )}
 
-      <div className={`relative flex flex-col items-center gap-6 text-center sm:flex-row sm:text-start ${banner ? "pt-24" : ""}`}>
-        {/* avatar + rotating double ring */}
-        <div className="relative h-28 w-28 shrink-0">
+      <div className={`relative flex items-center gap-4 text-start ${banner ? "pt-20" : ""}`}>
+        {/* avatar + rotating double ring — مضغوط */}
+        <div className="relative h-20 w-20 shrink-0">
           <motion.span
             animate={{ rotate: 360 }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -67,7 +67,7 @@ export default function IdentityCard({
             style={{ padding: 3, WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)", WebkitMaskComposite: "xor", maskComposite: "exclude" }}
             aria-hidden
           />
-          <span className="absolute inset-1.5 rounded-full border border-app" aria-hidden />
+          <span className="absolute inset-1 rounded-full border border-app" aria-hidden />
           <img
             src={proxyImg(avatar) || "/avatar-1.png"}
             alt={name}
@@ -77,20 +77,20 @@ export default function IdentityCard({
                 e.currentTarget.src = "/avatar-1.png";
               }
             }}
-            className="absolute inset-2.5 h-[92px] w-[92px] rounded-full border-2 border-app object-cover"
+            className="absolute inset-1.5 h-[68px] w-[68px] rounded-full border-2 border-app object-cover"
           />
           <a
             href="#profile-customize"
             aria-label={t("تغيير الصورة", "Change avatar")}
-            className="glass-strong absolute -bottom-1 -end-1 flex h-9 w-9 items-center justify-center rounded-full text-primary shadow-md transition-transform hover:scale-110"
+            className="glass-strong absolute -bottom-1 -end-1 flex h-7 w-7 items-center justify-center rounded-full text-primary shadow-md transition-transform hover:scale-110"
           >
-            <Pencil size={14} />
+            <Pencil size={12} />
           </a>
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-            <h1 className="font-display text-2xl font-bold text-app md:text-3xl">{name}</h1>
+          <div className="flex flex-wrap items-center justify-start gap-2">
+            <h1 className="font-display text-xl font-bold text-app md:text-2xl">{name}</h1>
             {/* role badge */}
             <span className="gradient-primary flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold text-white shadow-sm">
               <BadgeCheck size={12} />
@@ -100,27 +100,27 @@ export default function IdentityCard({
 
           <div className="mt-3 flex flex-col gap-1.5 text-sm text-app-3">
             {username ? (
-              <span className="flex items-center justify-center gap-1.5 font-semibold text-primary sm:justify-start">
+              <span className="flex items-center justify-start gap-1.5 font-semibold text-primary sm:justify-start">
                 <AtSign size={14} />
                 <span dir="ltr">@{username}</span>
               </span>
             ) : (
               <a
                 href="#profile-customize"
-                className="flex items-center justify-center gap-1.5 text-primary transition-colors hover:text-primary-soft sm:justify-start"
+                className="flex items-center justify-start gap-1.5 text-primary transition-colors hover:text-primary-soft sm:justify-start"
               >
                 <AtSign size={14} />
                 {t("عيّن اسم المستخدم الخاص بك", "Set your username")}
               </a>
             )}
             {email && (
-              <span className="flex items-center justify-center gap-1.5 sm:justify-start">
+              <span className="flex items-center justify-start gap-1.5 sm:justify-start">
                 <Mail size={14} />
                 <span dir="ltr">{email}</span>
               </span>
             )}
             {joinDate && (
-              <span className="flex items-center justify-center gap-1.5 sm:justify-start">
+              <span className="flex items-center justify-start gap-1.5 sm:justify-start">
                 <CalendarDays size={14} />
                 {t("عضو منذ", "Member since")} {joinDate}
               </span>

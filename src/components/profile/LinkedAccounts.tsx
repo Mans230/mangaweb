@@ -130,7 +130,7 @@ export default function LinkedAccounts({ email, emailVerified = false, telegramL
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 0.55, ease: EASE }}
-      className="glass p-6 md:p-8"
+      className="glass p-4 md:p-6"
     >
       <h3 className="font-display mb-5 text-base font-bold text-app">
         {t("الحسابات المرتبطة", "Linked accounts")}

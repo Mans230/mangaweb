@@ -57,7 +57,7 @@ export default function Achievements({ data }: AchievementsProps) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 0.55, ease: EASE }}
-      className="glass p-6 md:p-8"
+      className="glass p-4 md:p-6"
     >
       {/* level card */}
       <div className="flex flex-wrap items-end justify-between gap-2">

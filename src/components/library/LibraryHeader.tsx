@@ -57,7 +57,7 @@ export default function LibraryHeader({
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: EASE }}
-      className="glass gradient-hero-bg relative overflow-hidden p-6 md:p-8"
+      className="glass gradient-hero-bg relative overflow-hidden p-4 md:p-6"
     >
       <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:text-start">
         {/* avatar + gradient ring showing catch-up % */}
