@@ -70,10 +70,23 @@ export default function TicketsManager() {
     onError: (e) => toast(e.message, "danger"),
   });
 
+  const [search, setSearch] = useState("");
   const rows = useMemo(() => {
-    const list = query.data?.items ?? [];
-    return list.map((r) => ({ ...r, status: overrides[r.id] ?? (r.status as TicketStatus) }));
-  }, [query.data, overrides]);
+    let list = (query.data?.items ?? []).map((r) => ({
+      ...r,
+      status: overrides[r.id] ?? (r.status as TicketStatus),
+    }));
+    const term = search.trim().toLowerCase();
+    if (term) {
+      list = list.filter(
+        (r) =>
+          r.subject.toLowerCase().includes(term) ||
+          (r.userName ?? "").toLowerCase().includes(term) ||
+          String(r.id) === term,
+      );
+    }
+    return list;
+  }, [query.data, overrides, search]);
 
   const setStatus = (id: number, status: TicketStatus) => {
     setOverrides((prev) => ({ ...prev, [id]: status }));
@@ -121,6 +134,13 @@ export default function TicketsManager() {
           </button>
         ))}
       </div>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={t("ابحث بالعنوان أو اسم المستخدم أو رقم التذكرة…", "Search by subject, user, or ticket #…")}
+        className="input-glass w-full !py-2 text-sm"
+      />
 
       {query.isLoading ? (
         <div className="space-y-2.5">
