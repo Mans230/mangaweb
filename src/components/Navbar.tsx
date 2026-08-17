@@ -150,6 +150,7 @@ const navLinks = [
   { to: "/", ar: "الرئيسية", en: "Home" },
   { to: "/browse", ar: "تصفّح", en: "Browse" },
   { to: "/en", ar: "EN", en: "EN" },
+  { to: "/calendar", ar: "التقويم", en: "Calendar" },
   { to: "/library", ar: "مكتبتي", en: "Library" },
   { to: "/request", ar: "اطلب مانجا", en: "Request" },
 ];
