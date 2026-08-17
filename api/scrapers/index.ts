@@ -9,6 +9,8 @@ import DespairScraper from "./despair";
 import MangadarScraper from "./mangadar";
 import DilarScraper from "./dilar";
 import MangaDexScraper from "./mangadex";
+import AsuraScansScraper from "./asurascans";
+import VortexScansScraper from "./vortexscans";
 
 export * from "./base";
 
@@ -25,6 +27,8 @@ const REGISTRY: Record<string, ScraperCtor> = {
   mangadar: MangadarScraper,
   dilar: DilarScraper,
   mangadex: MangaDexScraper,
+  asurascans: AsuraScansScraper,
+  vortexscans: VortexScansScraper,
 };
 
 const DEFAULT_ENABLED = [
@@ -37,6 +41,8 @@ const DEFAULT_ENABLED = [
   "despair",
   "dilar",
   "mangadex",
+  "asurascans",
+  "vortexscans",
 ];
 
 let scrapers: BaseScraper[] | null = null;
