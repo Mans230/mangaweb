@@ -10,7 +10,17 @@ export async function uploadToCatbox(
   bytes: Uint8Array | Blob,
   filename: string,
 ): Promise<string> {
+  const imgbbKey = (process.env.IMGBB_API_KEY ?? "").trim();
   const userhash = (process.env.CATBOX_USERHASH ?? "").trim();
+
+  // 0) ImgBB — دائم ومجاني، يشتغل من السيرفرات، يتطلب مفتاح API مجاني فقط
+  if (imgbbKey) {
+    try {
+      return await uploadImgBB(bytes, filename, imgbbKey);
+    } catch (e) {
+      console.warn(`[upload] imgbb فشل (${(e as Error).message}) — تجربة البدائل`);
+    }
+  }
 
   // 1) catbox — دائم، فقط عند توفر userhash (المجهول مرفوض من سيرفراتهم)
   if (userhash) {
@@ -30,6 +40,55 @@ export async function uploadToCatbox(
 
   // 3) uguu.se — احتياطي أخير (مؤقّت: يُمسح بعد ساعات)
   return uploadUguu(bytes, filename);
+}
+
+/** ImgBB — استضافة صور دائمة مجانية عبر مفتاح API. الأنسب لصور المستخدمين. */
+async function uploadImgBB(
+  bytes: Uint8Array | Blob,
+  filename: string,
+  apiKey: string,
+): Promise<string> {
+  // ImgBB يقبل الصورة base64 في حقل image
+  let b64: string;
+  if (bytes instanceof Blob) {
+    b64 = Buffer.from(await bytes.arrayBuffer()).toString("base64");
+  } else {
+    b64 = Buffer.from(bytes).toString("base64");
+  }
+  const form = new FormData();
+  form.append("image", b64);
+  form.append("name", filename.replace(/\.[^.]+$/, ""));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+  let resp: Response;
+  try {
+    resp = await fetch(`https://api.imgbb.com/1/upload?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const isAbort = (e as Error).name === "AbortError";
+    throw new Error(
+      isAbort ? "انتهت مهلة الرفع إلى ImgBB" : `فشل الاتصال بـ ImgBB: ${(e as Error).message}`,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const text = await resp.text();
+  let data: any = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    /* يُعالج بالأسفل */
+  }
+  const url = data?.data?.url;
+  if (!resp.ok || !data?.success || typeof url !== "string" || !/^https?:\/\//.test(url)) {
+    throw new Error(`رد غير متوقع من ImgBB (${resp.status}): ${text.slice(0, 200)}`);
+  }
+  return url;
 }
 
 /** 0x0.st — رفع مجهول باحتفاظ يعتمد الحجم (الصغير يبقى ~سنة). يتطلب User-Agent. */
