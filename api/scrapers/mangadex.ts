@@ -204,12 +204,14 @@ export class MangaDexScraper extends BaseScraper {
     const limit = 500;
     for (;;) {
       const feed = await this.getJson(
+        // endpoint /feed لا يقبل excludedTags (يرفضه بـ 400) — التصفية بالتصنيفات
+        // تمّت على مستوى السلسلة؛ هنا نكتفي بـ contentRating=safe فقط.
         `/manga/${id}/feed${this.qs({
           limit,
           offset,
           "translatedLanguage[]": ["en"],
           "order[chapter]": "asc",
-          ...this.safeFilters(),
+          "contentRating[]": ["safe"],
         })}`,
       );
       const list: any[] = feed?.data ?? [];
