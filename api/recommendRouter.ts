@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm";
 import {
   chapters,
   favorites,
@@ -242,4 +242,41 @@ export const recommendRouter = createRouter({
       .limit(1);
     return rows[0]?.slug ?? null;
   }),
+
+  /** توب 10 هذا الأسبوع (عربي) — الرائج + الأكثر مشاهدة */
+  topWeek: publicQuery
+    .input(z.object({ limit: z.number().int().min(1).max(20).default(10) }))
+    .query(async ({ input }) => {
+      return getDb()
+        .select(cardSelect)
+        .from(manga)
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(arabicSourceFilter())
+        .orderBy(
+          desc(manga.isTrending),
+          desc(manga.siteViewCount),
+          desc(manga.viewCount),
+          desc(manga.id),
+        )
+        .limit(input.limit);
+    }),
+
+  /** جواهر مخفية (عربي) — تقييم مرتفع ومشاهدات منخفضة */
+  hiddenGems: publicQuery
+    .input(z.object({ limit: z.number().int().min(1).max(50).default(12) }))
+    .query(async ({ input }) => {
+      return getDb()
+        .select(cardSelect)
+        .from(manga)
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
+        .where(
+          and(
+            arabicSourceFilter(),
+            gte(manga.rating, 4),
+            gte(manga.chapterCount, 5),
+          ),
+        )
+        .orderBy(asc(manga.viewCount), desc(manga.rating), asc(manga.id))
+        .limit(input.limit);
+    }),
 });

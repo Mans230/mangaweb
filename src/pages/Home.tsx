@@ -542,6 +542,115 @@ function MostViewed() {
   );
 }
 
+/* ================= توب 10 هذا الأسبوع ================= */
+function TopWeekSection() {
+  const { t } = useLanguage();
+  const query = trpc.rec.topWeek.useQuery({ limit: 10 }, { retry: false });
+  const items: MangaCardData[] = (query.data ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type) as MangaType,
+    status: mangaStatusLabel(m.status) as MangaStatus,
+    rating: m.rating ?? 0,
+    ratingCount: 0,
+    chapters: m.chapterCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: "",
+    source: m.source?.name ?? "",
+    isAdult: false,
+    updatedAt: "",
+  }));
+  if (query.isLoading || items.length === 0) return null;
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader title={t("توب 10 هذا الأسبوع", "Top 10 this week")} />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: (i % 5) * 0.06 }}
+          >
+            <MangaCard manga={manga} rank={i + 1} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= جواهر مخفية ================= */
+function HiddenGemsSection() {
+  const { t } = useLanguage();
+  const query = trpc.rec.hiddenGems.useQuery({ limit: 10 }, { retry: false });
+  const items: MangaCardData[] = (query.data ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type) as MangaType,
+    status: mangaStatusLabel(m.status) as MangaStatus,
+    rating: m.rating ?? 0,
+    ratingCount: 0,
+    chapters: m.chapterCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: "",
+    source: m.source?.name ?? "",
+    isAdult: false,
+    updatedAt: "",
+  }));
+  if (query.isLoading || items.length === 0) return null;
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader title={t("💎 جواهر مخفية", "💎 Hidden gems")} />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: (i % 5) * 0.06 }}
+          >
+            <MangaCard manga={manga} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= تصويت الأسبوع + المواجهات — بانر إلى /polls ================= */
+function PollsTeaser() {
+  const { t } = useLanguage();
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-10 md:px-6">
+      <div className="flex flex-col items-center gap-3 rounded border border-[var(--ed-line)] bg-[var(--ed-bg2)] px-6 py-8 text-center">
+        <span className="ed-tag">⚔️ VS</span>
+        <h2 className="font-display text-xl font-extrabold text-app md:text-2xl">
+          {t("مواجهات وتصويت الأسبوع", "Battles & weekly poll")}
+        </h2>
+        <p className="max-w-md text-sm text-app-3">
+          {t(
+            "صوّت على أفضل مانجا وأفضل فصل هذا الأسبوع، وشارك في مواجهات «مين أفضل؟».",
+            "Vote for the best manga and chapter this week, and join the “who's better?” battles.",
+          )}
+        </p>
+        <Link to="/polls" className="ed-btn-primary mt-1">
+          {t("شارك بالتصويت", "Go vote")}
+          <ArrowLeft size={15} className="rtl:-scale-x-100" />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 /* ================= مانجا إنجليزي — قسم EN (trpc.en.homeSection) ================= */
 function EnMangaSection() {
   const { t } = useLanguage();
@@ -795,6 +904,9 @@ export default function Home() {
         <ForYouSection />
         <LatestChapters />
         <MostViewed />
+        <TopWeekSection />
+        <HiddenGemsSection />
+        <PollsTeaser />
         <EnMangaSection />
         <LatestAdditions />
         <LazySection minHeight={200}>
