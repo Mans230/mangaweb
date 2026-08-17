@@ -10,6 +10,7 @@ import {
   int,
   json,
   index,
+  uniqueIndex,
   primaryKey,
 } from "drizzle-orm/mysql-core";
 import { users } from "./schema";
@@ -82,3 +83,43 @@ export const chapterCompletions = mysqlTable(
 );
 
 export type ChapterCompletion = typeof chapterCompletions.$inferSelect;
+
+/** مطالبات المهام اليومية — صف واحد لكل (مستخدم، مهمة، يوم) */
+export const userMissionClaims = mysqlTable(
+  "user_mission_claims",
+  {
+    userId: int("userId").notNull(),
+    /** read | comment | rate | library */
+    missionKey: varchar("missionKey", { length: 64 }).notNull(),
+    /** اليوم بصيغة YYYY-MM-DD (UTC) */
+    periodKey: varchar("periodKey", { length: 16 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.userId, table.missionKey, table.periodKey],
+    }),
+  }),
+);
+
+export type UserMissionClaim = typeof userMissionClaims.$inferSelect;
+
+/** الإحالات: المدعو فريد (يُحال مرة واحدة)، تُدفع المكافأة عند بلوغ حد الفصول */
+export const referrals = mysqlTable(
+  "referrals",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    inviterId: int("inviterId").notNull(),
+    inviteeId: int("inviteeId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    rewardedAt: timestamp("rewardedAt"),
+  },
+  (table) => ({
+    inviteeUnique: uniqueIndex("referrals_invitee_unique").on(table.inviteeId),
+    inviterIdx: index("referrals_inviter_idx").on(table.inviterId),
+  }),
+);
+
+export type Referral = typeof referrals.$inferSelect;

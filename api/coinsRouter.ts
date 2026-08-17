@@ -12,6 +12,10 @@ import {
   COIN_SETTING_KEYS,
   completeChapter,
   dailyCheckin,
+  getMissions,
+  claimMission,
+  luckySpin,
+  referralInfo,
   getOrCreateWallet,
 } from "./lib/coins";
 
@@ -102,4 +106,42 @@ export const coinsRouter = createRouter({
         .offset((input.page - 1) * input.limit);
       return { items: rows, page: input.page };
     }),
+
+  /** المهام اليومية الأربع مع التقدم وحالة الاستلام */
+  missions: authedQuery.query(async ({ ctx }) => {
+    return { items: await getMissions(Number(ctx.user.id)) };
+  }),
+
+  /** استلام مكافأة مهمة مكتملة */
+  claimMission: authedQuery
+    .input(z.object({ key: z.enum(["read", "comment", "rate", "library"]) }))
+    .mutation(async ({ ctx, input }) => {
+      assertCoinsRateLimit("claim_mission", ctx.req);
+      const res = await claimMission(Number(ctx.user.id), input.key);
+      if (!res.ok) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "المهمة لم تكتمل بعد أو تم استلامها",
+        });
+      }
+      return res;
+    }),
+
+  /** عجلة الحظ — لفة واحدة يومياً */
+  spin: authedQuery.mutation(async ({ ctx }) => {
+    assertCoinsRateLimit("spin", ctx.req);
+    const res = await luckySpin(Number(ctx.user.id));
+    if (!res.ok) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "لفّيت العجلة النهاردة — تعالى بكرة",
+      });
+    }
+    return res;
+  }),
+
+  /** معلومات الإحالة: الكود + العدادات + المكافآت الحالية */
+  referralInfo: authedQuery.query(async ({ ctx }) => {
+    return referralInfo(Number(ctx.user.id));
+  }),
 });
