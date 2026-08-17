@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   Search,
+  Shuffle,
   Sparkles,
   User,
   UsersRound,
@@ -161,6 +162,18 @@ export default function Navbar() {
   const [query, setQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
+  const utils = trpc.useUtils();
+
+  /** «عشوائي»: يجلب slug عشوائي من السيرفر ويفتح صفحته */
+  const goRandom = async () => {
+    setMenuOpen(false);
+    try {
+      const slug = await utils.rec.randomPick.fetch();
+      if (slug) navigate(`/manga/${slug}`);
+    } catch {
+      /* تجاهل */
+    }
+  };
 
   useEffect(() => {
     setSearchOpen(false);
@@ -407,6 +420,13 @@ export default function Navbar() {
                   <LifeBuoy size={16} />
                   {t("الدعم", "Support")}
                 </Link>
+                <button
+                  onClick={goRandom}
+                  className="flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-start text-sm font-semibold text-app-2 transition-colors hover:bg-primary/10 hover:text-app"
+                >
+                  <Shuffle size={16} />
+                  {t("مانجا عشوائية", "Random manga")}
+                </button>
               </div>
             </motion.nav>
           )}

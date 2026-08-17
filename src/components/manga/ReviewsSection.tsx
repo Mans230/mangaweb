@@ -203,6 +203,12 @@ export default function ReviewsSection({ mangaId, isEn = false }: Props) {
               )}
               className="input-glass mt-3 w-full resize-none !rounded-2xl px-4 py-3 text-sm leading-7"
             />
+            <p className="mt-1.5 text-[11px] text-app-3">
+              {L(
+                "لإخفاء الحرق ضع النص بين ||…|| — يظهر مموّهاً حتى يضغطه القارئ.",
+                "Hide spoilers by wrapping text in ||…|| — shown blurred until the reader taps.",
+              )}
+            </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
                 type="button"

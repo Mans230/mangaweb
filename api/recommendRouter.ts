@@ -228,4 +228,16 @@ export const recommendRouter = createRouter({
       }
       return { items };
     }),
+
+  /** اختيار عشوائي — يرجع slug مانجا واحدة لها فصول (ORDER BY RAND()) */
+  randomPick: publicQuery.query(async () => {
+    const db = getDb();
+    const rows = await db
+      .select({ slug: manga.slug })
+      .from(manga)
+      .where(sql`${manga.chapterCount} > 0`)
+      .orderBy(sql`RAND()`)
+      .limit(1);
+    return rows[0]?.slug ?? null;
+  }),
 });
