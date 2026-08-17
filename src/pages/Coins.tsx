@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Award,
   BookOpen,
   CalendarCheck,
   Check,
@@ -56,7 +55,6 @@ const MISSION_META: Record<string, { icon: typeof BookOpen; ar: string; en: stri
 
 const SHOP_GROUPS: { type: string; icon: typeof Palette; ar: string; en: string }[] = [
   { type: "theme", icon: Palette, ar: "ثيمات", en: "Themes" },
-  { type: "badge", icon: Award, ar: "شارات", en: "Badges" },
   { type: "adfree", icon: Sparkles, ar: "مزايا", en: "Perks" },
 ];
 

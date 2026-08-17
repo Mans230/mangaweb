@@ -149,7 +149,7 @@ function NotificationsBell() {
 
 const navLinks = [
   { to: "/browse", ar: "تصفّح", en: "Browse" },
-  { to: "/en", ar: "EN", en: "EN" },
+  { to: "/en", ar: "EN Manga", en: "EN Manga" },
   { to: "/calendar", ar: "التقويم", en: "Calendar" },
   { to: "/request", ar: "اطلب مانجا", en: "Request" },
 ];

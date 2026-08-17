@@ -244,21 +244,7 @@ function ImageRow({
           </div>
           <p className="text-[11.5px] text-app-3">{desc}</p>
         </div>
-        {value && (
-          <button
-            onClick={() => apply(null)}
-            disabled={updateMut.isPending}
-            className="btn-icon !h-9 !w-9 !text-danger"
-            aria-label={t("إزالة الصورة", "Remove image")}
-            title={t("إزالة الصورة", "Remove image")}
-          >
-            <Trash2 size={15} />
-          </button>
-        )}
-      </div>
-
-      {/* رفع من الجهاز فقط (jpg/png/webp/gif) — بدون خيار الرابط لتوفير المساحة */}
-      <div className="mt-3 flex items-center gap-2 ps-14">
+        {/* زر الرفع بجانب العنوان على نفس الخط (هاتف + PC) */}
         <input
           ref={fileRef}
           type="file"
@@ -275,6 +261,17 @@ function ImageRow({
         >
           {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
         </button>
+        {value && (
+          <button
+            onClick={() => apply(null)}
+            disabled={updateMut.isPending}
+            className="btn-icon !h-9 !w-9 !text-danger"
+            aria-label={t("إزالة الصورة", "Remove image")}
+            title={t("إزالة الصورة", "Remove image")}
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
       </div>
       {error && <p className="mt-2 ps-14 text-xs font-semibold text-danger">{error}</p>}
     </div>
