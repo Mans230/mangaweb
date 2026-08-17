@@ -8,6 +8,7 @@ import Asq3Scraper from "./asq3";
 import DespairScraper from "./despair";
 import MangadarScraper from "./mangadar";
 import DilarScraper from "./dilar";
+import MangaDexScraper from "./mangadex";
 
 export * from "./base";
 
@@ -23,6 +24,7 @@ const REGISTRY: Record<string, ScraperCtor> = {
   despair: DespairScraper,
   mangadar: MangadarScraper,
   dilar: DilarScraper,
+  mangadex: MangaDexScraper,
 };
 
 const DEFAULT_ENABLED = [
@@ -34,6 +36,7 @@ const DEFAULT_ENABLED = [
   "3asq",
   "despair",
   "dilar",
+  "mangadex",
 ];
 
 let scrapers: BaseScraper[] | null = null;
@@ -94,6 +97,8 @@ export function scraperForUrl(rawUrl: string): BaseScraper | undefined {
       const host = new URL(s.baseUrl).hostname.toLowerCase().replace(/^www\./, "");
       // kawaiimanga.org موقع واجهة بينما baseUrl هو الـ API
       if (s.name === "kawaiimanga" && hostname === "kawaiimanga.org") return true;
+      // mangadex.org موقع واجهة بينما baseUrl هو api.mangadex.org
+      if (s.name === "mangadex" && hostname === "mangadex.org") return true;
       return hostname === host;
     } catch {
       return false;
