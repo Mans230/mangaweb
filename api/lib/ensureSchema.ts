@@ -137,6 +137,37 @@ export async function ensureBootSchema(): Promise<void> {
   } catch (e) {
     console.warn(`[ensure-schema] coins tables: ${(e as Error).message}`);
   }
+
+  // ===== الكوينز دفعة 3: المهام اليومية + الإحالات =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`user_mission_claims\` (
+	\`userId\` int NOT NULL,
+	\`missionKey\` varchar(64) NOT NULL,
+	\`periodKey\` varchar(16) NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`user_mission_claims_pk\` PRIMARY KEY(\`userId\`, \`missionKey\`, \`periodKey\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`referrals\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`inviterId\` int NOT NULL,
+	\`inviteeId\` int NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`rewardedAt\` timestamp,
+	CONSTRAINT \`referrals_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "referrals",
+      "referrals_invitee_unique",
+      "CREATE UNIQUE INDEX `referrals_invitee_unique` ON `referrals` (`inviteeId`)",
+    );
+    await ensureIndex(
+      "referrals",
+      "referrals_inviter_idx",
+      "CREATE INDEX `referrals_inviter_idx` ON `referrals` (`inviterId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] missions/referrals tables: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {
