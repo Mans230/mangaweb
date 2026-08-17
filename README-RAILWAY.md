@@ -120,3 +120,5 @@ npm run build && npm start
 | زر تليجرام لا يظهر | `VITE_TELEGRAM_BOT_USERNAME` غير مضبوط وقت البناء — أعد النشر |
 | Widget تليجرام يرفض الدومين | لم تنفّذ `/setdomain` في BotFather |
 | الكوكي لا يُحفظ | تأكد أن الموقع يعمل عبر HTTPS (الكوكي `Secure` في الإنتاج) |
+
+<!-- redeploy-trigger: coins-batch-2 -->

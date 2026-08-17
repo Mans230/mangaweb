@@ -12,7 +12,7 @@ import {
 import { Link } from "react-router";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/library/toast";
+import { useToast, ToastViewport } from "@/components/library/toast";
 import { LOGIN_PATH } from "@/const";
 import { trpc } from "@/providers/trpc";
 
@@ -254,6 +254,7 @@ export default function Coins() {
           </div>
         )}
       </div>
+      <ToastViewport />
     </motion.div>
   );
 }
