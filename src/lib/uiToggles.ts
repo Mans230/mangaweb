@@ -14,7 +14,9 @@ export function useUiToggles(): {
 } {
   const query = trpc.manga.uiToggles.useQuery(undefined, {
     retry: false,
-    staleTime: 60 * 1000,
+    // كاش قصير + إعادة جلب عند العودة للتاب حتى يظهر تغيير الأدمن خلال ثوانٍ لا دقيقة
+    staleTime: 10 * 1000,
+    refetchOnWindowFocus: true,
   });
   return {
     hideCommunities: query.data?.hideCommunities ?? false,
