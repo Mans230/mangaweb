@@ -111,6 +111,8 @@ export async function getOrCreateWallet(userId: number): Promise<Wallet> {
     checkinDays: 0,
     lastCheckinDate: null,
     lastSpinDate: null,
+    equippedTheme: null,
+    equippedBadge: null,
     updatedAt: new Date(),
   };
 }
@@ -136,6 +138,44 @@ export async function awardCoins(
   });
   const w = await getOrCreateWallet(userId);
   return w.coins;
+}
+
+/**
+ * صرف كوينز مع التحقق من الرصيد — خصم شرطي (لا ينزل تحت الصفر حتى مع سباق)
+ * يسجّل العملية بقيمة سالبة ويرجع الرصيد الجديد.
+ */
+export async function spendCoins(
+  userId: number,
+  amount: number,
+  kind: string,
+  meta?: Record<string, unknown>,
+): Promise<
+  { ok: true; balance: number } | { ok: false; reason: "insufficient" }
+> {
+  const db = getDb();
+  const w = await getOrCreateWallet(userId);
+  if (w.coins < amount) return { ok: false, reason: "insufficient" };
+  await db
+    .update(coinWallets)
+    .set({ coins: sql`${coinWallets.coins} - ${amount}` })
+    .where(
+      and(
+        eq(coinWallets.userId, userId),
+        gte(coinWallets.coins, amount),
+      ),
+    );
+  const after = await getOrCreateWallet(userId);
+  // لو الخصم الشرطي لم يُنفَّذ (سباق)، الرصيد لم يتغير → رصيد غير كافٍ
+  if (amount > 0 && after.coins === w.coins) {
+    return { ok: false, reason: "insufficient" };
+  }
+  await db.insert(coinTransactions).values({
+    userId,
+    amount: -amount,
+    kind,
+    meta: meta ?? null,
+  });
+  return { ok: true, balance: after.coins };
 }
 
 /** كوينز القراءة المكتسبة اليوم (لفرض الحد اليومي) */
