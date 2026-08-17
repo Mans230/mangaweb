@@ -19,6 +19,7 @@ import { coinsRouter } from "./coinsRouter";
 import { shopRouter } from "./shopRouter";
 import { pollsRouter } from "./pollsRouter";
 import { enRouter } from "./enRouter";
+import { recommendRouter } from "./recommendRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -26,6 +27,7 @@ export const appRouter = createRouter({
   auth: authRouter,
   manga: mangaRouter,
   en: enRouter,
+  rec: recommendRouter,
   library: libraryRouter,
   engagement: engagementRouter,
   request: requestRouter,
