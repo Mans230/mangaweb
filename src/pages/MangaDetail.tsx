@@ -14,6 +14,7 @@ import InfoCard from "@/components/manga/InfoCard";
 import ChaptersTab from "@/components/manga/ChaptersTab";
 import CommentsTab from "@/components/manga/CommentsTab";
 import SimilarTab from "@/components/manga/SimilarTab";
+import ReviewsSection from "@/components/manga/ReviewsSection";
 import DownloadModal from "@/components/manga/DownloadModal";
 import AuthPrompt from "@/components/manga/AuthPrompt";
 import type { CommentVM, DetailVM } from "@/components/manga/types";
@@ -411,6 +412,9 @@ export default function MangaDetail() {
           </motion.div>
         </AnimatePresence>
       </section>
+
+      {/* ===== المراجعات النصية ===== */}
+      <ReviewsSection mangaId={vm.id} isEn={isEn} />
 
       <DownloadModal
         open={downloadOpen}
