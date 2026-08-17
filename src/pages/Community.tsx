@@ -1,6 +1,7 @@
 import { Link, useParams, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, MessagesSquare, Radio } from "lucide-react";
+import { proxyImg } from "@/lib/manga";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -102,7 +103,7 @@ export default function Community() {
           )}
           <Link to={`/manga/${manga.slug}`} className="relative shrink-0">
             <img
-              src={manga.coverUrl || "/placeholder-cover.svg"}
+              src={proxyImg(manga.coverUrl) || "/placeholder-cover.svg"}
               alt={manga.title}
               className="h-24 w-16 rounded-xl border border-app object-cover shadow-md md:h-28 md:w-20"
             />

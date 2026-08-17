@@ -21,7 +21,7 @@ import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
-import { typeLabel } from "@/lib/manga";
+import { proxyImg, typeLabel } from "@/lib/manga";
 import { trpc } from "@/providers/trpc";
 import { detectSourceFromUrl, timeAgo } from "@/lib/manga";
 import type { SourceName } from "@/lib/manga";
@@ -133,7 +133,7 @@ function RequestForm() {
     id: Number(m.id),
     slug: m.slug,
     title: m.title,
-    cover: m.coverUrl || "/placeholder-cover.svg",
+    cover: proxyImg(m.coverUrl) || "/placeholder-cover.svg",
     type: typeLabel(m.type),
     chapters: m.chapterCount,
   }));
@@ -184,7 +184,6 @@ function RequestForm() {
 
   const reset = () => {
     setTitle("");
-    setUrl("");
     setNote("");
     setType("غير متأكد");
     setSubmittedId(null);

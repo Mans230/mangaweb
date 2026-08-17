@@ -1,5 +1,5 @@
 import type { Lang } from "@/lib/manga";
-import { STATUS_AR, TYPE_AR, formatViews, timeAgo } from "@/lib/manga";
+import { STATUS_AR, TYPE_AR, formatViews, proxyImg, timeAgo } from "@/lib/manga";
 
 /**
  * أنواع موحّدة لصفحة المكتبة — البيانات تأتي حصرياً من library.getLibrary.
@@ -63,7 +63,7 @@ export function normalizeApiManga(m: {
     id: m.id,
     slug: m.slug,
     title: m.title,
-    cover: m.coverUrl || "/placeholder-cover.svg",
+    cover: proxyImg(m.coverUrl) || "/placeholder-cover.svg",
     chapters: m.chapterCount,
     type: TYPE_AR[m.type] ?? m.type,
     status: STATUS_AR[m.status] ?? m.status,

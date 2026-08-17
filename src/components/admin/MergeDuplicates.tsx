@@ -13,7 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { timeAgo } from "@/lib/manga";
+import { proxyImg, timeAgo } from "@/lib/manga";
 import { EASE } from "./adminUtils";
 import type { DuplicateGroup, DuplicateItem, RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
@@ -49,7 +49,7 @@ function detectDuplicateGroups(items: ApiMangaItem[]): DuplicateGroup[] {
     const item: DuplicateItem = {
       id: Number(m.id),
       title: m.title,
-      cover: m.coverUrl || "/placeholder-cover.svg",
+      cover: proxyImg(m.coverUrl) || "/placeholder-cover.svg",
       source: m.source.name,
       chapters: m.chapterCount,
       updatedAt: timeAgo(m.updatedAt),

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
+import { proxyImg } from "@/lib/manga";
 import {
   ArrowRight,
   Check,
@@ -345,7 +346,7 @@ function ListDetail({
                 >
                   <div className="relative aspect-[2/3] overflow-hidden rounded-[14px]">
                     <img
-                      src={item.manga.coverUrl || "/placeholder-cover.svg"}
+                      src={proxyImg(item.manga.coverUrl) || "/placeholder-cover.svg"}
                       alt={item.manga.title}
                       loading="lazy"
                       decoding="async"

@@ -29,7 +29,7 @@ import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { GENRES, mangaStatusLabel, timeAgo, typeLabel } from "@/lib/manga";
+import { GENRES, mangaStatusLabel, proxyImg, timeAgo, typeLabel } from "@/lib/manga";
 import { EASE } from "./adminUtils";
 import type { AdminMangaRow, RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
@@ -45,7 +45,7 @@ function mapApiManga(m: ApiMangaItem): AdminMangaRow {
     slug: m.slug,
     title: m.title,
     altTitle: m.altTitles?.[0],
-    cover: m.coverUrl || "/placeholder-cover.svg",
+    cover: proxyImg(m.coverUrl) || "/placeholder-cover.svg",
     type: typeLabel(m.type),
     status: mangaStatusLabel(m.status),
     chapters: m.chapterCount,

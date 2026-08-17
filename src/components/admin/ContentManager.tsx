@@ -37,7 +37,7 @@ import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
-import { GENRES, formatNum, mangaStatusLabel, timeAgo, typeLabel } from "@/lib/manga";
+import { GENRES, formatNum, mangaStatusLabel, proxyImg, timeAgo, typeLabel } from "@/lib/manga";
 import { EASE } from "./adminUtils";
 import type { RouterOutputs } from "./adminUtils";
 import { useAdminToast } from "./AdminToast";
@@ -183,7 +183,7 @@ function CoverDialog({
   const [url, setUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const currentCover = manga.coverOverrideUrl || manga.coverUrl || "/placeholder-cover.svg";
+  const currentCover = manga.coverOverrideUrl || proxyImg(manga.coverUrl) || "/placeholder-cover.svg";
   const alternatives = trpc.admin.coverAlternatives.useQuery(
     { mangaId: manga.id },
     { retry: false },
@@ -746,7 +746,7 @@ export default function ContentManager() {
           {query.data!.items.map((m, i) => {
             const hidden = !!m.hiddenAt;
             const featured = !!m.featuredAt;
-            const cover = m.coverOverrideUrl || m.coverUrl || "/placeholder-cover.svg";
+            const cover = m.coverOverrideUrl || proxyImg(m.coverUrl) || "/placeholder-cover.svg";
             return (
               <motion.div
                 key={m.id}
