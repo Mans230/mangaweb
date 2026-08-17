@@ -1,19 +1,19 @@
 import { Link } from "react-router";
-import { Send } from "lucide-react";
+import { Send, Users } from "lucide-react";
 import { useLanguage } from "./LanguageProvider";
+import { useUiToggles } from "@/lib/uiToggles";
 
 export default function Footer() {
   const { t } = useLanguage();
+  const { communityGroupUrl } = useUiToggles();
 
   const linkCols = [
     {
       title: t("روابط", "Links"),
       items: [
-        { to: "/browse", label: t("البحث المتقدم", "Advanced search") },
         { to: "/request", label: t("اطلب مانجا", "Request a manga") },
         { to: "/support", label: t("الدعم", "Support") },
         { to: "/announcements", label: t("الإعلانات", "Announcements") },
-        { to: "/browse?sources=1", label: t("المصادر", "Sources") },
         { to: "/browse?adult=1", label: t("سياسة +18", "+18 policy") },
       ],
     },
@@ -45,7 +45,8 @@ export default function Footer() {
         {/* Links */}
         <div>
           <h3 className="font-display text-base font-bold text-app">{linkCols[0].title}</h3>
-          <ul className="mt-4 space-y-2.5">
+          {/* روابط جمب بعض (wrap) بدل عمود طويل */}
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2.5">
             {linkCols[0].items.map((item) => (
               <li key={item.to + item.label}>
                 <Link to={item.to} className="text-sm text-app-3 transition-colors hover:text-primary">
@@ -53,6 +54,19 @@ export default function Footer() {
                 </Link>
               </li>
             ))}
+            {communityGroupUrl && (
+              <li>
+                <a
+                  href={communityGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:text-primary-soft"
+                >
+                  <Users size={14} />
+                  {t("انضم لجروب المناقشات", "Join the discussion group")}
+                </a>
+              </li>
+            )}
           </ul>
         </div>
 

@@ -4,9 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   CheckCircle2,
-  ClipboardPaste,
   Clock,
-  Link2,
   LogIn,
   Send,
   Sparkles,
@@ -109,7 +107,6 @@ function RequestForm() {
   const { isAuthenticated } = useAuth();
 
   const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
   const [type, setType] = useState<(typeof TYPE_OPTIONS)[number]>("غير متأكد");
   const [note, setNote] = useState("");
   const [autocompleteOpen, setAutocompleteOpen] = useState(false);
@@ -153,16 +150,6 @@ function RequestForm() {
     );
   }, [title, suggestQuery.data]);
 
-  const detected = useMemo(() => detectSourceFromUrl(url), [url]);
-
-  const pasteUrl = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) setUrl(text.trim());
-    } catch {
-      // صلاحية الحافظة مرفوضة — المستخدم يلصق يدوياً
-    }
-  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,9 +166,8 @@ function RequestForm() {
       return;
     }
     const typeNote = type === "غير متأكد" ? "" : `[النوع: ${type}] `;
-    const sourceUrl = detected && url.trim() ? (url.trim().includes("://") ? url.trim() : `https://${url.trim()}`) : undefined;
     createMutation.mutate(
-      { title: title.trim(), sourceUrl, note: (typeNote + note.trim()).trim() || undefined },
+      { title: title.trim(), note: (typeNote + note.trim()).trim() || undefined },
       {
         onSuccess: (res) => {
           setSubmittedId(res.id);
@@ -321,52 +307,6 @@ function RequestForm() {
                     </Link>
                   </p>
                 )}
-              </div>
-
-              {/* رابط المصدر */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-app">
-                  {t("رابط المصدر", "Source link")}{" "}
-                  <span className="text-xs font-normal text-app-3">({t("اختياري", "optional")})</span>
-                </label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Link2 size={16} className="absolute start-4 top-1/2 -translate-y-1/2 text-app-3" />
-                    <input
-                      dir="ltr"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://azorafly.com/series/…"
-                      className="input-glass w-full !ps-11 text-left"
-                    />
-                  </div>
-                  <button type="button" onClick={pasteUrl} className="btn-icon shrink-0 !rounded-[14px]" aria-label={t("لصق", "Paste")}>
-                    <ClipboardPaste size={17} />
-                  </button>
-                </div>
-                <AnimatePresence>
-                  {detected && url.trim() && (
-                    <motion.div
-                      initial={{ scale: 0.6, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.6, opacity: 0 }}
-                      transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                      className="mt-2.5"
-                    >
-                      {detected.source ? (
-                        <span className="glass-chip !border-success/40 text-success">
-                          <Check size={14} />
-                          {t("تم التعرف:", "Detected:")} <span dir="ltr" className="font-semibold">{detected.source}</span>
-                        </span>
-                      ) : (
-                        <span className="glass-chip !border-warning/40 text-warning">
-                          <XCircle size={14} />
-                          {t("مصدر غير مدعوم حالياً — سنبحث عنها يدوياً", "Unsupported source — we'll search manually")}
-                        </span>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
 
               {/* النوع */}
