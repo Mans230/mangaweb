@@ -18,6 +18,7 @@ import { emailCodes, passwordResetCodes, sessions, users } from "@db/schema";
 import { and, eq, gt, ne } from "drizzle-orm";
 import { getDb } from "./queries/connection";
 import { createLinkCode } from "./lib/linkCodes";
+import { registerReferral } from "./lib/coins";
 import {
   telegramDisplayName,
   telegramWidgetSchema,
@@ -58,6 +59,8 @@ const credentialsSchema = z.object({
 
 const registerSchema = credentialsSchema.extend({
   name: z.string().min(1, "Name is required").max(255),
+  /** كود إحالة اختياري = معرّف المستخدم الداعي (أرقام فقط تُقبل) */
+  refCode: z.string().trim().max(32).optional(),
 });
 
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,20}$/;
@@ -359,6 +362,15 @@ export const authRouter = createRouter({
           });
         }
         throw err;
+      }
+
+      // إحالة اختيارية: refCode = معرّف المستخدم الداعي — أفضل جهد، لا تُفشل التسجيل أبداً
+      if (input.refCode && /^\d+$/.test(input.refCode)) {
+        try {
+          await registerReferral(Number(input.refCode), Number(user.id));
+        } catch (e) {
+          console.warn(`[auth] registerReferral: ${(e as Error).message}`);
+        }
       }
 
       const regToken = appendSessionCookie(
