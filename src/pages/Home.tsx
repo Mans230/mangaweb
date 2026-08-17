@@ -286,7 +286,7 @@ function HeroSlider() {
   );
 }
 
-/* ================= مختارة لك — ترشيحات حسب ذوقك (rec.forYou) ================= */
+/* ================= مختارة لك — ترشيحات شخصية (rec.forYou) ================= */
 function ForYouSection() {
   const { t } = useLanguage();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -315,9 +315,9 @@ function ForYouSection() {
   }));
   const fallback = query.data?.fallback ?? false;
 
-  // للزائرين يُخفى القسم كلياً؛ أثناء التحميل skeleton خفيف
-  if (authLoading) return null;
-  if (!isAuthenticated) return null;
+  // للزائرين يُخفى القسم كلياً
+  if (authLoading || !isAuthenticated) return null;
+
   if (query.isLoading) {
     return (
       <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
@@ -336,4 +336,582 @@ function ForYouSection() {
     <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
       <SectionHeader
         title={t("مختارة لك", "For You")}
-        count={fallback ? t("حسب الشائع", 
+        count={
+          fallback
+            ? t("الشائع الآن", "TRENDING")
+            : t("حسب ذوقك", "PICKED FOR YOU")
+        }
+        extra={
+          <span className="hidden items-center gap-1.5 text-[11.5px] font-semibold text-[var(--ed-dim)] md:inline-flex">
+            <Sparkles size={13} className="text-[var(--ed-accent)]" />
+            {fallback
+              ? t("اقرأ أكثر لتخصيص الترشيحات", "Read more to personalize picks")
+              : t("بناءً على التصنيفات اللي بتحبها", "Based on genres you love")}
+          </span>
+        }
+      />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: (i % 6) * 0.06 }}
+          >
+            <MangaCard manga={manga} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= آخر الفصول — فهرس TOC ================= */
+function LatestMangaCard({ item, index }: { item: LatestGroupedMangaData; index: number }) {
+  const { t } = useLanguage();
+  return (
+    <motion.article
+      initial={{ y: 24, opacity: 0 }}
+      whileInView={{ y: 0, opacity: 1 }}
+      viewport={{ once: true, margin: "-10%" }}
+      transition={{ duration: 0.45, ease: EASE, delay: (index % 2) * 0.07 }}
+      className="ed-card group flex h-full gap-3.5 p-3.5"
+    >
+      {/* الغلاف */}
+      <Link
+        to={`/manga/${item.slug}`}
+        className="block w-20 shrink-0 self-start overflow-hidden rounded-[3px] border border-[var(--ed-line)] bg-[var(--ed-bg2)]"
+        aria-label={item.title}
+      >
+        <img
+          src={item.cover}
+          alt={item.title}
+          loading="lazy"
+          decoding="async"
+          className="h-28 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </Link>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* العنوان + الحالة */}
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            to={`/manga/${item.slug}`}
+            className="min-w-0 truncate font-display text-[15px] font-bold text-[var(--ed-ink)] transition-colors hover:text-[var(--ed-accent)]"
+          >
+            {item.title}
+          </Link>
+          <span className="ed-tag shrink-0">{t(item.status, item.status)}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--ed-ink3)]">
+          <Star size={11} className="fill-[var(--ed-accent)] text-[var(--ed-accent)]" />
+          <span className="font-ednum font-semibold tabular-nums text-[var(--ed-ink2)]">{item.rating.toFixed(1)}</span>
+          <span>· {t(item.type, item.type)}</span>
+        </div>
+
+        {/* صفوف الفصول — الأحدث أولاً */}
+        <ul className="mt-2 flex flex-col border-t border-[var(--ed-line)]">
+          {item.chapters.map((ch, i2) => (
+            <li key={ch.id} className="border-b border-[var(--ed-line)] last:border-b-0">
+              <Link
+                to={`/manga/${item.slug}/chapter/${ch.number}`}
+                className="flex items-baseline gap-2 px-1 py-1.5 text-xs transition-colors hover:bg-[var(--ed-bg2)]"
+              >
+                <span className="font-ednum shrink-0 text-[12px] font-bold tabular-nums text-[var(--ed-accent)]" dir="ltr">
+                  CH.{ch.number}
+                </span>
+                {i2 === 0 && ch.isNew && (
+                  <span className="ed-tag shrink-0 !bg-[var(--ed-accent)] !text-[var(--ed-bg)]">
+                    {t("جديد", "NEW")}
+                  </span>
+                )}
+                <span className="ed-toc-dots" />
+                <span className="shrink-0 text-[10px] text-[var(--ed-ink3)]">{ch.timeAgo}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.article>
+  );
+}
+
+function LatestChapters() {
+  const { t } = useLanguage();
+  const query = trpc.manga.latestGrouped.useQuery({ limit: 8 }, { retry: false });
+  const items = adaptLatestGrouped(query.data ?? []);
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+        <SectionHeader title={t("آخر الفصول", "Latest chapters")} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton h-44 !rounded" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader
+        title={t("آخر الفصول", "Latest chapters")}
+        moreTo="/browse?sort=latest"
+        count={t("اليوم", "TODAY")}
+        extra={
+          <Link to="/today" className="ed-btn-ghost-sm !border-[var(--ed-accent)] !text-[var(--ed-accent)]">
+            <CalendarClock size={13} />
+            {t("نزل اليوم", "Today")}
+          </Link>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {items.map((item, i) => (
+          <LatestMangaCard key={item.mangaId} item={item} index={i} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= الأكثر شعبية — شريط أفقي ================= */
+function PopularCarousel() {
+  const { t } = useLanguage();
+  const trackRef = useRef<HTMLDivElement>(null);
+  const query = trpc.manga.popular.useQuery({ limit: 10 }, { retry: false });
+  const items = (query.data ?? []).map((m) => adaptMangaRow(m));
+
+  const scroll = (dir: 1 | -1) => {
+    const el = trackRef.current;
+    if (!el) return;
+    // RTL: الاتجاه المرئي معكوس
+    el.scrollBy({ left: dir * -el.clientWidth * 0.7, behavior: "smooth" });
+  };
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+        <div className="mb-6"><div className="skeleton h-8 w-44 !rounded" /></div>
+        <div className="flex gap-4 overflow-hidden">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="w-[42vw] shrink-0 sm:w-[30vw] md:w-[calc((100%-5*20px)/6)]">
+              <div className="skeleton aspect-[2/3] !rounded" />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader
+        title={t("الأكثر شعبية", "Most popular")}
+        count={`${String(items.length).padStart(2, "0")} ${t("عناوين", "TITLES")}`}
+        extra={
+          <div className="hidden gap-2 md:flex">
+            <button onClick={() => scroll(1)} className="ed-arrow" aria-label="next">
+              <ChevronRight size={17} className="rtl:-scale-x-100" />
+            </button>
+            <button onClick={() => scroll(-1)} className="ed-arrow" aria-label="prev">
+              <ChevronLeft size={17} className="rtl:-scale-x-100" />
+            </button>
+          </div>
+        }
+      />
+      <div
+        ref={trackRef}
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-10%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: i * 0.06 }}
+            className="w-[42vw] shrink-0 snap-start sm:w-[30vw] md:w-[calc((100%-5*16px)/6)]"
+          >
+            {i === 0 && <div className="ed-tag mb-2">{t("الأكثر قراءةً", "Most read")}</div>}
+            {i > 0 && <div className="mb-2 h-[25px]" />}
+            <MangaCard manga={manga} rank={i + 1} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= الأكثر مشاهدة ================= */
+function MostViewed() {
+  const { t } = useLanguage();
+  const query = trpc.manga.mostViewed.useQuery({ limit: 10 }, { retry: false });
+
+  // mostViewed يعيد حقولاً أقل من ApiMangaRow — نبني بطاقات العرض مباشرة
+  const items: MangaCardData[] = (query.data ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type) as MangaType,
+    status: mangaStatusLabel(m.status) as MangaStatus,
+    rating: m.rating ?? 0,
+    ratingCount: 0,
+    chapters: m.chapterCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: "",
+    source: m.source?.name ?? "",
+    isAdult: false,
+    updatedAt: "",
+  }));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+        <SectionHeader title={t("الأكثر مشاهدة", "Most viewed")} />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skeleton aspect-[2/3] !rounded" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader title={t("الأكثر مشاهدة", "Most viewed")} />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: (i % 5) * 0.06 }}
+          >
+            <span className="mb-2 inline-flex items-center gap-1.5 border border-[var(--ed-line)] px-2.5 py-1 text-[11px] font-bold text-[var(--ed-paper2)]">
+              <Flame size={11} className="text-[var(--ed-accent)]" />
+              <span className="font-ednum text-[12px] tracking-wide" dir="ltr">{manga.views}</span>
+              {t("مشاهدة", "views")}
+            </span>
+            {/* MangaCard تستخدم loading="lazy" داخلياً لكل الأغلفة */}
+            <MangaCard manga={manga} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= مانجا إنجليزي — قسم EN (trpc.en.homeSection) ================= */
+function EnMangaSection() {
+  const { t } = useLanguage();
+  const query = trpc.en.homeSection.useQuery({ limit: 12 }, { retry: false });
+
+  // en.homeSection يعيد نفس شكل mostViewed — نفس بناء البطاقات
+  const items: MangaCardData[] = (query.data ?? []).map((m) => ({
+    id: Number(m.id),
+    slug: m.slug,
+    title: m.title,
+    cover: m.coverUrl || "/cover-01.png",
+    type: typeLabel(m.type) as MangaType,
+    status: mangaStatusLabel(m.status) as MangaStatus,
+    rating: m.rating ?? 0,
+    ratingCount: 0,
+    chapters: m.chapterCount ?? 0,
+    views: formatViews(m.viewCount ?? 0),
+    genres: m.genres ?? [],
+    synopsis: "",
+    source: m.source?.name ?? "",
+    isAdult: false,
+    updatedAt: "",
+  }));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+        <SectionHeader title={t("مانجا إنجليزي", "EN Manga")} />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="skeleton aspect-[2/3] !rounded" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader
+        title={t("مانجا إنجليزي", "EN Manga")}
+        extra={
+          <Link to="/en" className="ed-btn-ghost-sm !border-[var(--ed-accent)] !text-[var(--ed-accent)]">
+            {t("استكشف الكل", "Explore all")}
+            <ArrowLeft size={13} className="rtl:-scale-x-100" />
+          </Link>
+        }
+      />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+        {items.map((manga, i) => (
+          <motion.div
+            key={manga.id}
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, margin: "-15%" }}
+            transition={{ duration: 0.5, ease: EASE, delay: (i % 6) * 0.06 }}
+          >
+            <MangaCard manga={manga} />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================= أحدث الإضافات ================= */
+function LatestAdditions() {
+  const { t } = useLanguage();
+  const query = trpc.manga.list.useQuery(
+    { page: 1, limit: 9, sort: "latest" },
+    { retry: false },
+  );
+  const items = (query.data?.items ?? []).map((m) => adaptMangaRow(m));
+
+  if (query.isLoading) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+        <SectionHeader title={t("أحدث الإضافات", "Latest additions")} moreTo="/browse?sort=latest" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="skeleton aspect-[16/10] !rounded lg:col-span-1" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:col-span-2 lg:grid-cols-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="skeleton aspect-[2/3] !rounded" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
+
+  const [featured, ...rest] = items;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader title={t("أحدث الإضافات", "Latest additions")} moreTo="/browse?sort=latest" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* البطاقة الكبيرة */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-15%" }}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="lg:col-span-1"
+        >
+          <Link
+            to={`/manga/${featured.slug}`}
+            className="group flex h-full flex-col border border-[var(--ed-line)] bg-[var(--ed-bg2)] p-2.5 transition-all duration-150 hover:-translate-x-1.5 hover:-translate-y-1.5 hover:border-[var(--ed-accent)] hover:shadow-[8px_8px_0_var(--ed-accent)]"
+          >
+            <div className="relative aspect-[16/10] overflow-hidden border border-[var(--ed-line)]">
+              <img
+                src={featured.cover}
+                alt={featured.title}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
+              <span className="ed-tag absolute end-3 top-3">{t("أحدث إضافة", "Latest")}</span>
+            </div>
+            <div className="flex flex-1 flex-col p-3">
+              <h3 className="font-ed text-lg font-bold text-[var(--ed-paper)]">{featured.title}</h3>
+              {featured.synopsis && (
+                <p className="mt-2 line-clamp-2 text-sm leading-7 text-[var(--ed-dim)]">{featured.synopsis}</p>
+              )}
+              <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-[var(--ed-paper2)]">
+                <span className="flex items-center gap-1 font-bold text-[var(--ed-accent)]">
+                  <Star size={12} fill="currentColor" /> {featured.rating.toFixed(1)}
+                </span>
+                <span>{featured.chapters} {t("فصل", "chapters")}</span>
+                <span className="ed-tag-outline">{featured.type}</span>
+              </div>
+            </div>
+          </Link>
+        </motion.div>
+
+        {/* شبكة الثمانية */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:col-span-2 lg:grid-cols-4">
+          {rest.map((manga, i) => (
+            <motion.div
+              key={manga.id}
+              initial={{ y: 30, opacity: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-15%" }}
+              transition={{ duration: 0.5, ease: EASE, delay: (i % 4) * 0.06 }}
+            >
+              <MangaCard manga={manga} />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ================= تصفّح حسب التصنيف ================= */
+function GenreCloud() {
+  const { t } = useLanguage();
+  const [gateOpen, setGateOpen] = useState(false);
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <SectionHeader title={t("تصفّح حسب التصنيف", "Browse by genre")} count={`${GENRES.length}`} />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-15%" }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="flex flex-wrap items-center gap-2.5"
+      >
+        {GENRES.map((g) => {
+          const cls = `ed-chip ${g.popular ? "ed-chip-popular" : ""} ${g.adult ? "ed-chip-adult" : ""}`;
+          if (g.adult) {
+            return (
+              <button
+                key={g.name}
+                type="button"
+                className={cls}
+                onClick={() => (isAgeConfirmed() ? undefined : setGateOpen(true))}
+              >
+                {g.name}
+              </button>
+            );
+          }
+          return (
+            <Link key={g.name} to={`/browse?genres=${encodeURIComponent(g.name)}`} className={cls}>
+              {g.name}
+            </Link>
+          );
+        })}
+      </motion.div>
+      <AgeGateModal open={gateOpen} onConfirm={() => setGateOpen(false)} onClose={() => setGateOpen(false)} />
+    </section>
+  );
+}
+
+/* ================= شريط المصادر ================= */
+function SourcesStrip() {
+  const { t } = useLanguage();
+  const query = trpc.manga.sources.useQuery(undefined, { retry: false });
+  const sources = query.data ?? [];
+
+  if (query.isLoading || query.isError || sources.length === 0) return null;
+
+  const doubled = [...sources, ...sources];
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <div className="ed-marquee marquee-paused">
+        <div className="animate-marquee flex w-max items-center gap-10 px-6" dir="ltr">
+          {doubled.map((s, i) => (
+            <span key={`${s.id}-${i}`} className="flex items-center gap-2.5 whitespace-nowrap">
+              <span className={`h-2 w-2 rounded-[2px] ${s.status === "active" ? "bg-success" : "bg-warning"}`} />
+              <span className="font-ednum text-sm font-semibold uppercase tracking-[0.14em] text-[var(--ed-paper2)]">
+                {s.name}
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+      <p className="mt-4 text-center text-[12.5px] text-[var(--ed-dim)]">
+        {t(
+          `نجمع لك أحدث الفصول من ${formatNum(sources.length)} مصادر — تلقائياً كل 15 دقيقة`,
+          `We aggregate the latest chapters from ${sources.length} sources — automatically, every 15 minutes`,
+        )}
+      </p>
+    </section>
+  );
+}
+
+/* ================= Telegram CTA ================= */
+function TelegramCTA() {
+  const { t } = useLanguage();
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-10 md:px-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-15%" }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="border border-[var(--ed-line)] bg-[var(--ed-bg2)] p-8 md:p-12"
+      >
+        <div className="flex flex-col items-start gap-7 md:flex-row md:items-center">
+          <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center border border-[var(--ed-accent)] bg-[var(--ed-accent-soft)] text-[var(--ed-accent)]">
+            <Send size={26} className="rtl:-scale-x-100" />
+          </span>
+          <div className="flex-1">
+            <span className="font-ednum text-[11px] uppercase tracking-[0.22em] text-[var(--ed-dim)]">
+              Telegram
+            </span>
+            <h2 className="font-ed mt-1 text-2xl font-extrabold text-[var(--ed-paper)] md:text-3xl">
+              {t("لا يفوتك أي فصل جديد", "Never miss a new chapter")}
+            </h2>
+            <p className="mt-2 max-w-lg text-sm leading-7 text-[var(--ed-dim)]">
+              {t(
+                "اشترك بقناة تليجرام واحصل على إشعار فوري بالغلاف والرابط",
+                "Join the Telegram channel and get an instant notification with the cover and link"
+              )}
+            </p>
+          </div>
+          <a
+            href="https://t.me/dateranime"
+            target="_blank"
+            rel="noreferrer"
+            className="ed-btn-primary"
+          >
+            {t("اشترك الآن", "Subscribe now")}
+            <Send size={15} className="rtl:-scale-x-100" />
+          </a>
+        </div>
+      </motion.div>
+    </section>
+  );
+}
+
+/* ================= Page ================= */
+export default function Home() {
+  return (
+    <div className="ed-home relative">
+      {/* نمط هافتون خفيف جداً أعلى الصفحة */}
+      <div
+        aria-hidden
+        className="ed-halftone pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-30 [mask-image:linear-gradient(to_bottom,black,transparent)]"
+      />
+      <div className="relative">
+        <ReleaseTicker />
+        <HeroSlider />
+        <ContinueReading />
+        <ForYouSection />
+        <LatestChapters />
+        <PopularCarousel />
+        <MostViewed />
+        <EnMangaSection />
+        <LatestAdditions />
+        <LazySection minHeight={200}>
+          <GenreCloud />
+        </LazySection>
+        <LazySection minHeight={120}>
+          <SourcesStrip />
+        </LazySection>
+        <TelegramCTA />
+      </div>
+    </div>
+  );
+}
