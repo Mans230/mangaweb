@@ -26,6 +26,7 @@ import {
 import type { LatestGroupedMangaData, MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import LazySection from "@/components/LazySection";
+import ContinueReading from "@/components/ContinueReading";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -813,6 +814,7 @@ export default function Home() {
       <div className="relative">
         <ReleaseTicker />
         <HeroSlider />
+        <ContinueReading />
         <LatestChapters />
         <PopularCarousel />
         <MostViewed />
