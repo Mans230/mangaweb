@@ -21,6 +21,7 @@ import Support from "@/pages/Support";
 import Coins from "@/pages/Coins";
 import EnHome from "@/pages/en/EnHome";
 import Polls from "@/pages/Polls";
+import Calendar from "@/pages/Calendar";
 import Fun from "@/pages/Fun";
 import Reels from "@/pages/Reels";
 import Today from "@/pages/Today";
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="coins" element={<Coins />} />
           <Route path="en" element={<EnHome />} />
           <Route path="polls" element={<Polls />} />
+          <Route path="calendar" element={<Calendar />} />
           <Route
             path="fun"
             element={hideCommunities && hideReels ? <Navigate to="/" replace /> : <Fun />}
