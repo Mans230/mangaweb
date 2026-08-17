@@ -25,6 +25,7 @@ import {
 import type { MangaCardData, MangaStatus, MangaType } from "@/lib/manga";
 import MangaCard from "@/components/MangaCard";
 import LazySection from "@/components/LazySection";
+import ContinueReading from "@/components/ContinueReading";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -414,6 +415,8 @@ export default function EnHome() {
       />
       <div className="relative">
         <EnHeader />
+
+        <ContinueReading lang="en" title="Continue Reading" />
 
         <EnCarousel
           title="Trending Now"
