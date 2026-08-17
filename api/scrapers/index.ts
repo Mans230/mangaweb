@@ -132,10 +132,16 @@ export function imageHostPolicy(): Map<string, string> {
   if (getScraper("kawaiimanga")?.enabled) {
     map.set("kawaiimanga.org", "https://kawaiimanga.org/");
   }
-  // صور حسابات المستخدمين (أفاتار/بانر) — تُمرَّر عبر البروكسي لتفادي حجب بعض الشبكات لها
-  map.set("files.catbox.moe", "");
-  map.set("lh3.googleusercontent.com", "");
-  map.set("cdn4.telegram-cdn.org", "");
+  // صور حسابات المستخدمين (أفاتار/بانر) — تُمرَّر عبر البروكسي لتفادي حجب بعض الشبكات لها.
+  // المفاتيح تُطابَق بـ host === key أو host.endsWith("." + key)، فنستخدم الدومين الجذر
+  // ليشمل كل النطاقات الفرعية (lh3/lh4/lh5..، cdn1..cdn5، a.uguu.se ...).
+  map.set("catbox.moe", ""); // files.catbox.moe
+  map.set("googleusercontent.com", ""); // lh3..lh6.googleusercontent.com
+  map.set("telegram-cdn.org", ""); // cdn1..cdn5.telegram-cdn.org
   map.set("t.me", "");
+  // خدمات رفع ملفات المستخدمين (احتياطي الرفع عند تعذّر catbox)
+  map.set("uguu.se", ""); // a.uguu.se
+  map.set("kappa.lol", "");
+  map.set("pomf2.lain.la", "");
   return map;
 }

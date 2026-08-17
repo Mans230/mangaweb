@@ -5,7 +5,6 @@ import {
   AtSign,
   Check,
   Image as ImageIcon,
-  Link2,
   Loader2,
   Send,
   Trash2,
@@ -30,7 +29,7 @@ interface CustomizeCardProps {
 /**
  * «تخصيص الملف» — اسم المستخدم + الصورة الشخصية + صورة الغلاف.
  * كل التغييرات عبر auth.updateProfile ويُبطل كاش auth.me بعدها.
- * خيارات الصور: تليجرام (تلقائي عند الربط) / رابط مباشر / رفع Cloudinary (إن توفّر الإعداد).
+ * الصور: تليجرام (تلقائي عند الربط للأفاتار) + رفع من جهاز المستخدم فقط.
  */
 export default function CustomizeCard({
   username,
@@ -177,7 +176,6 @@ function ImageRow({
   const { t } = useLanguage();
   const { toast } = useToast();
   const utils = trpc.useUtils();
-  const [urlDraft, setUrlDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   // فشل تحميل المعاينة (مضيف محجوب/بروكسي) — اعرض الأيقونة بدل صورة مكسورة
   const [previewBroken, setPreviewBroken] = useState(false);
@@ -187,7 +185,6 @@ function ImageRow({
 
   const updateMut = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
-      setUrlDraft("");
       setError(null);
       void utils.auth.me.invalidate();
       toast(t("حُدّثت الصورة", "Image updated"));
@@ -199,15 +196,6 @@ function ImageRow({
     updateMut.mutate(
       kind === "avatar" ? { avatarUrl: url } : { bannerUrl: url },
     );
-  };
-
-  const saveUrl = () => {
-    const url = urlDraft.trim();
-    if (!/^https?:\/\/.+/.test(url)) {
-      setError(t("ألصق رابط صورة مباشر يبدأ بـ https://", "Paste a direct image URL starting with https://"));
-      return;
-    }
-    apply(url);
   };
 
   const onPickFile = async (file: File | undefined) => {
@@ -269,31 +257,8 @@ function ImageRow({
         )}
       </div>
 
-      {/* (ب) لصق رابط مباشر + (ج) رفع Cloudinary */}
-      <div className="mt-3 flex flex-wrap gap-2 ps-14">
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
-          <Link2 size={13} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-app-3" />
-          <input
-            value={urlDraft}
-            onChange={(e) => {
-              setUrlDraft(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={(e) => e.key === "Enter" && saveUrl()}
-            dir="ltr"
-            placeholder="https://…"
-            className="input-glass w-full !py-2 ps-8 text-xs"
-          />
-        </div>
-        <button
-          onClick={saveUrl}
-          disabled={updateMut.isPending || !urlDraft.trim()}
-          className="btn-glass shrink-0 !px-3.5 !py-2 text-xs font-semibold disabled:opacity-50"
-        >
-          <Check size={13} />
-          {t("استخدام الرابط", "Use URL")}
-        </button>
-        {/* رفع من الجهاز عبر catbox (jpg/png/webp/gif — 5MB) */}
+      {/* رفع من الجهاز فقط (jpg/png/webp/gif) — بدون خيار الرابط لتوفير المساحة */}
+      <div className="mt-3 flex items-center gap-2 ps-14">
         <input
           ref={fileRef}
           type="file"
@@ -304,10 +269,11 @@ function ImageRow({
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading || updateMut.isPending}
-          className="btn-primary shrink-0 !px-3.5 !py-2 text-xs disabled:opacity-50"
+          className="btn-primary inline-flex h-9 w-9 shrink-0 items-center justify-center !px-0 !py-0 disabled:opacity-50"
+          aria-label={t("رفع من جهازك", "Upload from device")}
+          title={t("رفع من جهازك", "Upload from device")}
         >
-          {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-          {uploading ? t("جارٍ الرفع…", "Uploading…") : t("رفع من جهازك", "Upload")}
+          {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
         </button>
       </div>
       {error && <p className="mt-2 ps-14 text-xs font-semibold text-danger">{error}</p>}
