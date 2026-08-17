@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
+  HelpCircle,
   LifeBuoy,
   Lock,
   LogIn,
@@ -329,6 +331,82 @@ function TicketThread({ id, onBack }: { id: number; onBack: () => void }) {
 }
 
 /* ================= الصفحة ================= */
+/* ================= الأسئلة الشائعة ================= */
+const FAQ: { q: [string, string]; a: [string, string] }[] = [
+  {
+    q: ["الصور مكسورة أو لا تظهر", "Images are broken or missing"],
+    a: [
+      "اعمل تحديث قوي (Ctrl+Shift+R). لو استمر، الصورة القديمة مخزّنة — امسح كاش الموقع من إعدادات المتصفح.",
+      "Hard refresh (Ctrl+Shift+R). If it persists, clear the site cache from your browser settings.",
+    ],
+  },
+  {
+    q: ["تسجيل الدخول بتليجرام لا يعمل", "Telegram login not working"],
+    a: [
+      "عطّل مانع الإعلانات لهذا الموقع وجرّب متصفحاً آخر — ودجت تليجرام يحتاج كوكيز الطرف الثالث.",
+      "Disable your ad blocker for this site and try another browser — the Telegram widget needs third-party cookies.",
+    ],
+  },
+  {
+    q: ["لا أستطيع رفع صورة الملف الشخصي", "Can't upload a profile picture"],
+    a: [
+      "استخدم زر الرفع من جهازك في «تخصيص الملف». الحد 5MB وصيغ jpg/png/webp/gif.",
+      "Use the upload-from-device button in Customize profile. Max 5MB, formats jpg/png/webp/gif.",
+    ],
+  },
+  {
+    q: ["كيف أكسب الكوينز؟", "How do I earn coins?"],
+    a: [
+      "اقرأ الفصول، سجّل حضورك يومياً، أكمل المهام، ولفّ عجلة الحظ من صفحة الكوينز.",
+      "Read chapters, check in daily, finish missions, and spin the lucky wheel on the Coins page.",
+    ],
+  },
+  {
+    q: ["فصل لا يفتح", "A chapter won't open"],
+    a: [
+      "غالباً المصدر ضغط مؤقتاً — جرّب بعد دقائق. لو استمر لعمل واحد، افتح تذكرة بالرابط.",
+      "Usually the source is temporarily rate-limited — try again in a few minutes. If it persists for one title, open a ticket with the link.",
+    ],
+  },
+];
+
+function FaqSection() {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <div className="glass mb-6 !rounded-2xl p-4 md:p-5">
+      <h2 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <HelpCircle size={16} className="text-primary" />
+        {t("أسئلة شائعة", "Frequently asked")}
+      </h2>
+      <div className="flex flex-col divide-y divide-[var(--border)]">
+        {FAQ.map((item, i) => {
+          const isOpen = open === i;
+          return (
+            <div key={i} className="py-1">
+              <button
+                onClick={() => setOpen(isOpen ? null : i)}
+                className="flex w-full items-center justify-between gap-3 py-2.5 text-start text-sm font-semibold text-app-2 hover:text-app"
+              >
+                {t(item.q[0], item.q[1])}
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 text-app-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {isOpen && (
+                <p className="pb-3 text-[13px] leading-relaxed text-app-3">
+                  {t(item.a[0], item.a[1])}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Support() {
   const { t } = useLanguage();
   const { isAuthenticated, isLoading } = useAuth();
@@ -362,6 +440,8 @@ export default function Support() {
           <p className="text-xs text-app-3">{t("فريقنا يرد عادة خلال 24 ساعة.", "Our team usually replies within 24 hours.")}</p>
         </div>
       </div>
+
+      {view.kind === "list" && <FaqSection />}
 
       <AnimatePresence mode="wait">
         <motion.div key={view.kind + (view.kind === "thread" ? view.id : "")} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
