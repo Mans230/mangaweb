@@ -297,6 +297,32 @@ export async function ensureBootSchema(): Promise<void> {
   } catch (e) {
     console.warn(`[ensure-schema] user_follows: ${(e as Error).message}`);
   }
+
+  // ===== بوستات الأعضاء (قسم Fun) =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`posts\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`body\` text NOT NULL,
+	\`imageUrl\` varchar(500),
+	\`hidden\` boolean NOT NULL DEFAULT false,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`posts_id\` PRIMARY KEY(\`id\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`post_likes\` (
+	\`postId\` bigint unsigned NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`post_likes_pk\` PRIMARY KEY(\`postId\`, \`userId\`)
+)`));
+    await ensureIndex(
+      "posts",
+      "posts_created_idx",
+      "CREATE INDEX `posts_created_idx` ON `posts` (`createdAt`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] posts: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {

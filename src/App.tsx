@@ -32,7 +32,7 @@ export default function App() {
   const { pathname } = useLocation();
   const utils = trpc.useUtils();
   // أقسام يخفيها الأدمن من الإعدادات — الروابط المباشرة تُحوَّل للرئيسية
-  const { hideCommunities, hideReels } = useUiToggles();
+  const { hideReels } = useUiToggles();
   // ثيم المتجر المُفعَّل للمستخدم الحالي (إن وجد)
   useShopTheme();
 
@@ -67,10 +67,7 @@ export default function App() {
           <Route path="en" element={<EnHome />} />
           <Route path="polls" element={<Polls />} />
           <Route path="calendar" element={<Calendar />} />
-          <Route
-            path="fun"
-            element={hideCommunities && hideReels ? <Navigate to="/" replace /> : <Fun />}
-          />
+          <Route path="fun" element={<Fun />} />
           <Route
             path="fun/reels"
             element={hideReels ? <Navigate to="/" replace /> : <Reels />}

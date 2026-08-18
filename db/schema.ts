@@ -994,3 +994,45 @@ export const userFollows = mysqlTable(
 );
 
 export type UserFollow = typeof userFollows.$inferSelect;
+
+/** بوستات الأعضاء في قسم Fun */
+export const posts = mysqlTable(
+  "posts",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    imageUrl: varchar("imageUrl", { length: 500 }),
+    hidden: boolean("hidden").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    createdIdx: index("posts_created_idx").on(table.createdAt),
+    userIdx: index("posts_user_idx").on(table.userId),
+  }),
+);
+
+export type Post = typeof posts.$inferSelect;
+
+/** إعجابات البوستات */
+export const postLikes = mysqlTable(
+  "post_likes",
+  {
+    postId: bigint("postId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.postId, table.userId] }),
+  }),
+);
+
+export type PostLike = typeof postLikes.$inferSelect;

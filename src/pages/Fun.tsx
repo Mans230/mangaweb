@@ -1,53 +1,29 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { motion } from "framer-motion";
-import { Clapperboard, Eye, Heart, UsersRound } from "lucide-react";
+import { Clapperboard, Eye, Heart, MessageSquare } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { trpc } from "@/providers/trpc";
 import { useUiToggles } from "@/lib/uiToggles";
 import { formatCount, type ReelFeedItem } from "@/components/reels/ReelItem";
+import PostsFeed from "@/components/fun/PostsFeed";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-type FunTab = "communities" | "reels";
+type FunTab = "posts" | "reels";
 
-/** صفحة Fun — تبويبان: المجتمعات والريلز (كل تبويب يُخفى من إعدادات الأدمن) */
+/** صفحة Fun — بوستات الأعضاء + الريلز (الريلز تُخفى من إعدادات الأدمن) */
 export default function Fun() {
   const { t } = useLanguage();
-  const { hideCommunities, hideReels } = useUiToggles();
-  const [tab, setTab] = useState<FunTab>("communities");
+  const { hideReels } = useUiToggles();
+  const [tab, setTab] = useState<FunTab>("posts");
 
-  const tabs: { key: FunTab; label: string; icon: typeof UsersRound }[] = [
-    ...(hideCommunities
-      ? []
-      : [{ key: "communities" as FunTab, label: t("المجتمعات", "Communities"), icon: UsersRound }]),
+  const tabs: { key: FunTab; label: string; icon: typeof MessageSquare }[] = [
+    { key: "posts", label: t("المجتمع", "Community"), icon: MessageSquare },
     ...(hideReels
       ? []
       : [{ key: "reels" as FunTab, label: t("الريلز", "Reels"), icon: Clapperboard }]),
   ];
-
-  // كلا القسمين مخفي → حالة فارغة ودّية بدل صفحة بيضاء
-  if (tabs.length === 0) {
-    return (
-      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
-        <span className="glass flex h-16 w-16 items-center justify-center rounded-3xl text-primary">
-          <Clapperboard size={26} />
-        </span>
-        <h1 className="font-display text-xl font-bold text-app">
-          {t("قسم Fun متوقف حالياً", "Fun is currently unavailable")}
-        </h1>
-        <p className="text-sm leading-relaxed text-app-3">
-          {t(
-            "أخفت الإدارة هذا القسم مؤقتاً — تصفّح المانجا أو ارجع للرئيسية.",
-            "The team hid this section for now — browse manga or head back home.",
-          )}
-        </p>
-        <Link to="/" className="btn-primary !px-6 !py-2.5 text-sm">
-          {t("العودة للرئيسية", "Back to home")}
-        </Link>
-      </div>
-    );
-  }
   const activeTab = tabs.some((x) => x.key === tab) ? tab : tabs[0].key;
 
   return (
@@ -103,25 +79,7 @@ export default function Fun() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: EASE }}
         >
-          {activeTab === "communities" ? (
-            <div className="glass flex flex-col items-center gap-4 !rounded-3xl p-8 text-center">
-              <span className="gradient-primary flex h-14 w-14 items-center justify-center rounded-2xl text-white">
-                <UsersRound size={24} />
-              </span>
-              <p className="text-sm leading-relaxed text-app-2">
-                {t(
-                  "انضم لمجتمعات المانجا ودردش مع القرّاء مباشرة.",
-                  "Join manga communities and chat with readers live.",
-                )}
-              </p>
-              <Link to="/communities" className="btn-primary !px-6 !py-2.5 text-sm">
-                <UsersRound size={15} />
-                {t("تصفّح المجتمعات", "Browse communities")}
-              </Link>
-            </div>
-          ) : (
-            <ReelsPreview />
-          )}
+          {activeTab === "posts" ? <PostsFeed /> : <ReelsPreview />}
         </motion.div>
       </motion.div>
     </div>
