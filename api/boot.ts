@@ -60,6 +60,23 @@ function acquireImgHost(host: string): Promise<() => void> {
   });
 }
 
+/** يكتشف نوع الصورة من الـ magic bytes (لما content-type غير موثوق) */
+function sniffImageType(b: Uint8Array): string | null {
+  if (b.length < 12) return null;
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "image/gif";
+  // RIFF....WEBP
+  if (
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  )
+    return "image/webp";
+  // ....ftyp (avif/heic)
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return "image/avif";
+  return null;
+}
+
 /** جلب الصورة من المصدر مع إعادة محاولة واحدة عند 429/5xx */
 async function fetchUpstreamImageRaw(target: URL, referer?: string): Promise<UpstreamImg> {
   const headers: Record<string, string> = {
@@ -103,9 +120,6 @@ async function fetchUpstreamImageRaw(target: URL, referer?: string): Promise<Ups
         return { ok: false, status: 502, msg: `Upstream error ${upstream.status}` };
       }
       const contentType = (upstream.headers.get("content-type") ?? "").split(";")[0].trim();
-      if (!contentType.startsWith("image/")) {
-        return { ok: false, status: 415, msg: "Not an image" };
-      }
       const declared = Number(upstream.headers.get("content-length") ?? 0);
       if (declared > MAX_IMAGE_BYTES) return { ok: false, status: 413, msg: "Image too large" };
 
@@ -128,7 +142,15 @@ async function fetchUpstreamImageRaw(target: URL, referer?: string): Promise<Ups
         out.set(chunk, offset);
         offset += chunk.byteLength;
       }
-      return { ok: true, buf: out, ct: contentType };
+      // بعض المصادر (مثل storage.vortexscans.org) تُرجع الصورة بـ
+      // content-type: application/octet-stream — نشمّ الـ magic bytes بدل الرفض.
+      let ct = contentType;
+      if (!ct.startsWith("image/")) {
+        const sniffed = sniffImageType(out);
+        if (!sniffed) return { ok: false, status: 415, msg: "Not an image" };
+        ct = sniffed;
+      }
+      return { ok: true, buf: out, ct };
     } catch (e) {
       const isAbort = (e as Error).name === "AbortError";
       if (attempt === 0) continue; // أعد المحاولة مرة
