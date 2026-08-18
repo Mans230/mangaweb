@@ -230,6 +230,15 @@ export default function Coins() {
     onError: (e) => toast(e.message, { kind: "info" }),
   });
 
+  const resetThemeMut = trpc.shop.resetTheme.useMutation({
+    onSuccess: () => {
+      applyShopTheme(null);
+      void utils.shop.mine.invalidate();
+      toast(t("رجع للثيم الافتراضي", "Reset to default theme"));
+    },
+    onError: (e) => toast(e.message, { kind: "info" }),
+  });
+
   const equipMut = trpc.shop.equip.useMutation({
     onSuccess: (_res, vars) => {
       void utils.shop.mine.invalidate();
@@ -505,6 +514,15 @@ export default function Coins() {
                   <p className="flex items-center gap-1.5 text-[11px] font-bold text-app-3">
                     <GIcon size={13} />
                     {t(g.ar, g.en)}
+                    {g.type === "theme" && isAuthenticated && mineQ.data?.equippedTheme && (
+                      <button
+                        onClick={() => resetThemeMut.mutate()}
+                        disabled={resetThemeMut.isPending}
+                        className="btn-glass ms-auto !px-3 !py-1 text-[10.5px] disabled:opacity-50"
+                      >
+                        {t("الثيم الافتراضي", "Default theme")}
+                      </button>
+                    )}
                   </p>
                   {items.map((item) => {
                     const isOwned = owned.includes(item.itemKey);

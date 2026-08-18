@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { coinWallets } from "@db/schemaCoins";
+import { getDb } from "./queries/connection";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
 import { checkRateLimit, clientIp } from "./lib/rateLimit";
 import { getOrCreateWallet } from "./lib/coins";
@@ -76,6 +79,16 @@ export const shopRouter = createRouter({
       }
       return res;
     }),
+
+  /** إعادة الثيم للافتراضي (إزالة الثيم المُفعَّل) */
+  resetTheme: authedQuery.mutation(async ({ ctx }) => {
+    const db = getDb();
+    await db
+      .update(coinWallets)
+      .set({ equippedTheme: null })
+      .where(eq(coinWallets.userId, Number(ctx.user.id)));
+    return { success: true as const };
+  }),
 
   /** المتصدرون الأسبوعيون (عام) — يبدأ الأسبوع الاثنين UTC */
   leaderboard: publicQuery

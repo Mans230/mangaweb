@@ -1,13 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, History } from "lucide-react";
-import { useRef } from "react";
+import { ChevronLeft, ChevronRight, History, X } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { proxyImg, timeAgo } from "@/lib/manga";
-import { loadAllProgress } from "@/components/reader/store";
+import { loadAllProgress, removeProgress } from "@/components/reader/store";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -20,6 +19,8 @@ interface ContinueEntry {
   /** 0..1 */
   ratio: number;
   ts: number;
+  /** معرّف المانجا من السيرفر (للحذف) — غائب للإدخالات المحلية فقط */
+  id?: number;
 }
 
 interface Props {
@@ -39,12 +40,23 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
   const isEn = effectiveLang === "en";
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const trackRef = useRef<HTMLDivElement>(null);
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
 
   const libraryQ = trpc.library.getLibrary.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
     staleTime: 30_000,
   });
+  const utils = trpc.useUtils();
+  const clearMut = trpc.library.clearProgress.useMutation({
+    onSuccess: () => void utils.library.getLibrary.invalidate(),
+  });
+
+  const removeEntry = (e: ContinueEntry) => {
+    setRemoved((prev) => new Set(prev).add(e.slug));
+    removeProgress(e.slug);
+    if (e.id) clearMut.mutate({ mangaId: e.id });
+  };
 
   const entries = useMemo<ContinueEntry[]>(() => {
     const bySlug = new Map<string, ContinueEntry>();
@@ -71,6 +83,7 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
       const ratio = pageCount > 0 ? Math.min(1, Math.max(0, h.lastPage / pageCount)) : 0;
       bySlug.set(slug, {
         slug,
+        id: Number(h.manga.id),
         title: h.manga.title,
         cover: proxyImg(h.manga.coverUrl) || "/placeholder-cover.svg",
         chapter: Math.floor(h.chapter.number),
@@ -79,8 +92,11 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
       });
     }
 
-    return [...bySlug.values()].sort((a, b) => b.ts - a.ts).slice(0, limit);
-  }, [libraryQ.data, limit]);
+    return [...bySlug.values()]
+      .filter((e) => !removed.has(e.slug))
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, limit);
+  }, [libraryQ.data, limit, removed]);
 
   const scroll = (dir: 1 | -1) => {
     const el = trackRef.current;
@@ -151,9 +167,23 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
             >
               <Link
                 to={`/manga/${e.slug}/chapter/${e.chapter}`}
-                className="ed-card group flex h-full gap-3.5 p-3.5"
+                className="ed-card group relative flex h-full gap-3.5 p-3.5"
                 aria-label={`${e.title} — ${isEn ? `Chapter ${e.chapter}` : `الفصل ${e.chapter}`}`}
               >
+                {/* زر إزالة من تابع القراءة */}
+                <button
+                  type="button"
+                  onClick={(ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    removeEntry(e);
+                  }}
+                  className="btn-icon absolute end-2 top-2 z-10 !h-6 !w-6 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+                  aria-label={isEn ? "Remove" : "إزالة"}
+                  title={isEn ? "Remove" : "إزالة من المتابعة"}
+                >
+                  <X size={13} />
+                </button>
                 {/* الغلاف */}
                 <span className="block w-20 shrink-0 self-start overflow-hidden rounded-[3px] border border-[var(--ed-line)] bg-[var(--ed-bg2)]">
                   <img

@@ -140,6 +140,15 @@ export function saveProgress(slug: string, progress: SavedProgress) {
   writeJson(PROGRESS_KEY, prune(all));
 }
 
+/** حذف تقدم مانجا من التخزين المحلي (زر إزالة من "تابع القراءة") */
+export function removeProgress(slug: string) {
+  const all = readJson<Record<string, SavedProgress>>(PROGRESS_KEY, {});
+  if (slug in all) {
+    delete all[slug];
+    writeJson(PROGRESS_KEY, all);
+  }
+}
+
 export function loadReadSet(slug: string): number[] {
   const all = readJson<Record<string, number[]>>(READ_KEY, {});
   return all[slug] ?? [];
