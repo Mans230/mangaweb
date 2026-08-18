@@ -125,37 +125,59 @@ export const adminRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const allSources = await db.select().from(sources);
       let hostname = "";
       try {
         hostname = new URL(input.url).hostname.replace(/^www\./, "");
       } catch {
         hostname = "";
       }
-      const matched = allSources.find((s) => {
-        try {
-          return (
-            new URL(s.baseUrl).hostname.replace(/^www\./, "") === hostname
-          );
-        } catch {
-          return false;
-        }
-      });
+      // طابق الرابط مع سكرابر مفعّل حسب دومينه (يشمل كل المصادر، مش جدول sources فقط)
+      const scraper = hostname
+        ? enabledScrapers().find((s) => {
+            try {
+              return new URL(s.baseUrl).hostname.replace(/^www\./, "") === hostname;
+            } catch {
+              return false;
+            }
+          })
+        : undefined;
 
-      // Actual scraping is handled by an external service — register the request here.
+      // مصدر مطابق ومفعّل → استيراد فوري فعلي
+      if (scraper) {
+        try {
+          const { importSeries } = await import("./services/importer");
+          const res = await importSeries(scraper.name, input.url);
+          await logAdminAction(ctx.user.id, "manga.addByUrl", {
+            meta: { url: input.url, source: scraper.name, mangaId: res.manga.id },
+          });
+          return {
+            imported: true as const,
+            mangaId: res.manga.id,
+            slug: res.manga.slug,
+            title: res.manga.title,
+            chaptersAdded: res.chaptersAdded,
+            source: scraper.name,
+          };
+        } catch (e) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `فشل الاستيراد من ${scraper.name}: ${(e as Error).message}`,
+          });
+        }
+      }
+
+      // مصدر غير مدعوم/معطّل → سجّله كطلب يدوي (السلوك القديم)
       const [{ id }] = await db
         .insert(requests)
         .values({
           userId: ctx.user.id,
           title: input.title ?? input.url,
           sourceUrl: input.url,
-          note:
-            input.note ??
-            `admin import via ${matched?.name ?? "unknown source"} (pending scraper)`,
+          note: input.note ?? `admin import (unsupported source, pending)`,
         })
         .$returningId();
 
-      return { requestId: id, matchedSource: matched ?? null };
+      return { imported: false as const, requestId: id, source: null };
     }),
 
   listSources: adminQuery.query(() => getDb().select().from(sources)),

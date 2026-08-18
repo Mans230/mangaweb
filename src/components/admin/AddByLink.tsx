@@ -198,9 +198,22 @@ export default function AddByLink() {
               },
               {
                 onSuccess: (res) => {
-                  setRequestId(res.requestId);
-                  setMatchedSource(res.matchedSource?.name ?? null);
-                  toast(t("سُجّل طلب الاستيراد بنجاح", "Import request registered"));
+                  if (res.imported) {
+                    setMatchedSource(res.source);
+                    setRequestId(null);
+                    toast(
+                      t(
+                        `تم الاستيراد من ${res.source} (${res.chaptersAdded} فصل)`,
+                        `Imported from ${res.source} (${res.chaptersAdded} chapters)`,
+                      ),
+                    );
+                  } else {
+                    setRequestId(res.requestId);
+                    setMatchedSource(null);
+                    toast(
+                      t("مصدر غير مدعوم — سُجّل كطلب يدوي", "Unsupported source — registered as request"),
+                    );
+                  }
                 },
               },
             );
@@ -485,12 +498,12 @@ export default function AddByLink() {
                     <Check size={40} className="text-success" strokeWidth={3} />
                   </motion.span>
                   <h2 className="font-display mt-5 text-xl font-bold text-app">
-                    {t("سُجّل الطلب بنجاح", "Request registered")}
+                    {matchedSource ? t("تم الاستيراد", "Imported") : t("سُجّل الطلب", "Request registered")}
                   </h2>
                   <p className="mt-2 max-w-sm text-sm text-app-2">
                     {title.trim() ? `«${title.trim()}» — ` : ""}
                     {matchedSource
-                      ? t(`سيُستورد من ${matchedSource} عند توفر السكرابر`, `Will be imported from ${matchedSource} once the scraper runs`)
+                      ? t(`تمت الإضافة من ${matchedSource} — افتحها من إدارة المانجا`, `Added from ${matchedSource} — open it in Manage manga`)
                       : t("سيُراجع يدوياً لأن المصدر غير معروف", "Will be reviewed manually (unknown source)")}
                     {requestId ? ` · ${t("رقم التتبع", "Ref")} #${requestId}` : ""}
                   </p>
