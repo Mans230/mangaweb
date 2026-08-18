@@ -11,6 +11,7 @@ import DilarScraper from "./dilar";
 import MangaDexScraper from "./mangadex";
 import AsuraScansScraper from "./asurascans";
 import VortexScansScraper from "./vortexscans";
+import MangaStarzScraper from "./mangastarz";
 
 export * from "./base";
 
@@ -29,7 +30,11 @@ const REGISTRY: Record<string, ScraperCtor> = {
   mangadex: MangaDexScraper,
   asurascans: AsuraScansScraper,
   vortexscans: VortexScansScraper,
+  mangastarz: MangaStarzScraper,
 };
+
+/** مصادر محمية بـ Cloudflare — تُفعَّل فقط عند توفّر FlareSolverr */
+const CF_GATED = ["mangadar", "mangastarz"];
 
 const DEFAULT_ENABLED = [
   "kawaiimanga",
@@ -55,19 +60,18 @@ export function initScrapers(): BaseScraper[] {
     .map((s) => s.trim())
     .filter(Boolean);
   const enabledSet = new Set(enabledList);
-  // mangadar محجوب بـ Cloudflare Managed Challenge: يُفعّل فقط لو FlareSolverr
-  // مضبوط و(ENABLED_SOURCES غير مضبوط أو يتضمن mangadar صراحة)
-  if (
-    process.env.FLARESOLVERR_URL &&
-    (!enabledSourcesEnv || enabledSet.has("mangadar"))
-  ) {
-    enabledSet.add("mangadar");
+  // مصادر Cloudflare (mangadar/mangastarz): تُفعَّل فقط لو FlareSolverr مضبوط
+  // و(ENABLED_SOURCES غير مضبوط أو يتضمن المصدر صراحةً)
+  if (process.env.FLARESOLVERR_URL) {
+    for (const name of CF_GATED) {
+      if (!enabledSourcesEnv || enabledSet.has(name)) enabledSet.add(name);
+    }
   }
 
   scrapers = [];
   for (const [name, Cls] of Object.entries(REGISTRY)) {
     let enabled = enabledSet.has(name);
-    if (name === "mangadar" && enabled && !process.env.FLARESOLVERR_URL) {
+    if (CF_GATED.includes(name) && enabled && !process.env.FLARESOLVERR_URL) {
       enabled = false;
     }
     const s = new Cls({ enabled });
