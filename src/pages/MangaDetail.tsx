@@ -15,6 +15,7 @@ import ChaptersTab from "@/components/manga/ChaptersTab";
 import CommentsTab from "@/components/manga/CommentsTab";
 import SimilarTab from "@/components/manga/SimilarTab";
 import ReviewsSection from "@/components/manga/ReviewsSection";
+import Reactions from "@/components/Reactions";
 import DownloadModal from "@/components/manga/DownloadModal";
 import AuthPrompt from "@/components/manga/AuthPrompt";
 import type { CommentVM, DetailVM } from "@/components/manga/types";
@@ -412,6 +413,11 @@ export default function MangaDetail() {
           </motion.div>
         </AnimatePresence>
       </section>
+
+      {/* ===== رياكشنات المانهوا ===== */}
+      <div className="mx-auto mt-6 max-w-3xl px-4 md:px-6">
+        <Reactions targetType="manga" targetId={vm.id} title={isEn ? "What did you think of this series?" : "ما رأيك في هذا العمل؟"} />
+      </div>
 
       {/* ===== المراجعات النصية ===== */}
       <ReviewsSection mangaId={vm.id} isEn={isEn} />

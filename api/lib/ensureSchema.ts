@@ -329,6 +329,25 @@ export async function ensureBootSchema(): Promise<void> {
   } catch (e) {
     console.warn(`[ensure-schema] posts: ${(e as Error).message}`);
   }
+
+  // ===== رياكشنات المانهوا/الفصل =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`reactions\` (
+	\`targetType\` varchar(10) NOT NULL,
+	\`targetId\` bigint unsigned NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`kind\` varchar(12) NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`reactions_pk\` PRIMARY KEY(\`targetType\`, \`targetId\`, \`userId\`)
+)`));
+    await ensureIndex(
+      "reactions",
+      "reactions_target_idx",
+      "CREATE INDEX `reactions_target_idx` ON `reactions` (`targetType`, `targetId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] reactions: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {

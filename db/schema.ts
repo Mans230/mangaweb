@@ -1038,3 +1038,25 @@ export const postLikes = mysqlTable(
 );
 
 export type PostLike = typeof postLikes.$inferSelect;
+
+/** رياكشنات على مانهوا/فصل — رياكشن واحد لكل مستخدم لكل هدف */
+export const reactions = mysqlTable(
+  "reactions",
+  {
+    /** manga | chapter */
+    targetType: varchar("targetType", { length: 10 }).notNull(),
+    targetId: bigint("targetId", { mode: "number", unsigned: true }).notNull(),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** upvote | funny | love | surprised | angry | sad */
+    kind: varchar("kind", { length: 12 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.targetType, table.targetId, table.userId] }),
+    targetIdx: index("reactions_target_idx").on(table.targetType, table.targetId),
+  }),
+);
+
+export type Reaction = typeof reactions.$inferSelect;

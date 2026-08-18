@@ -7,6 +7,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { LOGIN_PATH } from "@/const";
 import { trpc } from "@/providers/trpc";
+import Reactions from "@/components/Reactions";
 
 export interface ChapterComment {
   id: number | string;
@@ -169,6 +170,12 @@ export default function ChapterComments({
 
   return (
     <section className="mx-3 mb-28 md:mx-0" aria-label={t("تعليقات الفصل", "Chapter comments")}>
+      {/* رياكشنات هذا الفصل */}
+      {canQuery && chapterId !== null && (
+        <div className="mb-4">
+          <Reactions targetType="chapter" targetId={chapterId} title={t("ما رأيك في هذا الفصل؟", "What did you think of this chapter?")} />
+        </div>
+      )}
       <div className="glass p-4 md:p-6">
         <h3 className="font-display mb-4 flex items-center gap-2 text-lg font-bold text-app">
           <MessageSquareText size={19} className="text-primary" />
