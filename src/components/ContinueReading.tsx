@@ -10,6 +10,9 @@ import { loadAllProgress, removeProgress } from "@/components/reader/store";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
+/** مصادر EN — لفصل قائمة متابعة الإنجليزي عن العربي */
+const EN_SOURCES = ["mangadex", "asurascans", "vortexscans"];
+
 /** مدخل موحّد لبطاقة "تابع القراءة" — من السيرفر أو من التخزين المحلي */
 interface ContinueEntry {
   slug: string;
@@ -61,23 +64,29 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
   const entries = useMemo<ContinueEntry[]>(() => {
     const bySlug = new Map<string, ContinueEntry>();
 
-    // 1) المحلي أولاً — إدخالات قديمة بلا title/cover تُستبعد (لا يمكن عرضها)
-    const local = loadAllProgress();
-    for (const [slug, p] of Object.entries(local)) {
-      if (!p.title || !p.cover) continue;
-      bySlug.set(slug, {
-        slug,
-        title: p.title,
-        cover: p.cover,
-        chapter: p.chapter,
-        ratio: Math.min(1, Math.max(0, p.ratio)),
-        ts: p.ts,
-      });
+    // 1) المحلي أولاً — إدخالات قديمة بلا title/cover تُستبعد (لا يمكن عرضها).
+    // المحلي بلا مصدر، فيظهر في القائمة العربية فقط (الإنجليزي يعتمد على السيرفر).
+    if (!isEn) {
+      const local = loadAllProgress();
+      for (const [slug, p] of Object.entries(local)) {
+        if (!p.title || !p.cover) continue;
+        bySlug.set(slug, {
+          slug,
+          title: p.title,
+          cover: p.cover,
+          chapter: p.chapter,
+          ratio: Math.min(1, Math.max(0, p.ratio)),
+          ts: p.ts,
+        });
+      }
     }
 
-    // 2) السيرفر يفوز عند التعارض
+    // 2) السيرفر يفوز عند التعارض — مع فصل قائمة الإنجليزي عن العربي حسب لغة المصدر
     const history = libraryQ.data?.history ?? [];
     for (const h of history) {
+      const sourceName = h.manga.source?.name ?? "";
+      const isEnSource = EN_SOURCES.includes(sourceName);
+      if (isEn !== isEnSource) continue; // الإنجليزي: مصادر EN فقط؛ العربي: الباقي
       const slug = h.manga.slug;
       const pageCount = h.chapter.pageCount ?? 0;
       const ratio = pageCount > 0 ? Math.min(1, Math.max(0, h.lastPage / pageCount)) : 0;
@@ -96,7 +105,7 @@ export default function ContinueReading({ lang, limit = 10, title }: Props) {
       .filter((e) => !removed.has(e.slug))
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
-  }, [libraryQ.data, limit, removed]);
+  }, [libraryQ.data, limit, removed, isEn]);
 
   const scroll = (dir: 1 | -1) => {
     const el = trackRef.current;
