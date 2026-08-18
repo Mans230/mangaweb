@@ -2,6 +2,7 @@ import { useParams } from "react-router";
 import { motion } from "framer-motion";
 import {
   BookOpen,
+  Crown,
   Flame,
   MessageSquare,
   UserMinus,
@@ -53,7 +54,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { user, wallet, stats, activity, isFollowing, isSelf } = q.data;
+  const { user, wallet, stats, activity, isFollowing, isSelf, isPremium } = q.data;
   const xpInLevel = wallet.xp % 100;
   const pct = Math.min(100, Math.round((xpInLevel / 100) * 100));
   const busy = followMut.isPending || unfollowMut.isPending;
@@ -88,7 +89,14 @@ export default function PublicProfile() {
             className="h-20 w-20 shrink-0 rounded-full border-2 border-app object-cover"
           />
           <div className="min-w-0 flex-1">
-            <h1 className="font-display truncate text-xl font-bold text-app">{user.name ?? user.username}</h1>
+            <h1 className="font-display flex items-center gap-1.5 truncate text-xl font-bold text-app">
+              {user.name ?? user.username}
+              {isPremium && (
+                <span className="glass-chip !py-0.5 text-[10px] font-bold text-warning" title="Premium">
+                  <Crown size={11} /> {t("مميّز", "Premium")}
+                </span>
+              )}
+            </h1>
             {user.username && <p className="text-xs text-app-3" dir="ltr">@{user.username}</p>}
             <p className="mt-1 text-[11px] text-app-3">
               {t("عضو منذ", "Member since")} {new Date(user.createdAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US")}

@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Construction,
+  Crown,
   EyeOff,
   Loader2,
   Megaphone,
@@ -676,11 +677,65 @@ function AnnouncementsCard() {
   );
 }
 
+/* ================= منح اشتراك مميّز ================= */
+function PremiumGrantCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const [username, setUsername] = useState("");
+  const [days, setDays] = useState("30");
+  const grant = trpc.premium.grant.useMutation({
+    onSuccess: (d) => {
+      toast(t("تم منح الاشتراك حتى " + new Date(d.until).toLocaleDateString(), "Premium granted"));
+      setUsername("");
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <Crown size={16} className="text-primary" />
+        {t("منح اشتراك مميّز", "Grant premium")}
+      </h3>
+      <div className="flex flex-wrap items-end gap-2">
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder={t("اسم المستخدم", "Username")}
+          className="input-glass min-w-0 flex-1 !py-2 text-sm"
+          dir="ltr"
+        />
+        <input
+          value={days}
+          onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))}
+          placeholder={t("أيام", "Days")}
+          className="input-glass w-24 !py-2 text-sm"
+          dir="ltr"
+        />
+        <button
+          type="button"
+          disabled={grant.isPending || !username.trim() || !Number(days)}
+          onClick={() => grant.mutate({ username: username.trim(), days: Number(days) })}
+          className="btn-primary !px-4 !py-2 text-xs disabled:opacity-50"
+        >
+          {grant.isPending ? <Loader2 size={13} className="animate-spin" /> : <Crown size={13} />}
+          {t("منح", "Grant")}
+        </button>
+      </div>
+    </motion.section>
+  );
+}
+
 export default function AdminSettings() {
   return (
     <div className="space-y-4">
       <BannedWordsCard />
       <ScrapeTriggerCard />
+      <PremiumGrantCard />
       <UiSectionsCard />
       <AnnouncementsCard />
       <MaintenanceCard />

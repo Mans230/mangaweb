@@ -12,6 +12,7 @@ import Browse from "@/pages/Browse";
 import MangaDetail from "@/pages/MangaDetail";
 import Leaderboard from "@/pages/Leaderboard";
 import PublicProfile from "@/pages/PublicProfile";
+import Premium from "@/pages/Premium";
 import Reader from "@/pages/Reader";
 import Library from "@/pages/Library";
 import Profile from "@/pages/Profile";
@@ -55,6 +56,7 @@ export default function App() {
           {/* مجتمعات الدردشة أُزيلت — كل روابطها تحوّل للوحة المتصدّرين */}
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="u/:username" element={<PublicProfile />} />
+          <Route path="premium" element={<Premium />} />
           <Route path="communities" element={<Navigate to="/leaderboard" replace />} />
           <Route path="c/:slug" element={<Navigate to="/leaderboard" replace />} />
           <Route path="manga/:slug/community" element={<Navigate to="/leaderboard" replace />} />

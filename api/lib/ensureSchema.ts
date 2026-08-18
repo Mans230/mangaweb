@@ -73,6 +73,12 @@ export async function ensureBootSchema(): Promise<void> {
     console.warn(`[ensure-schema] support tables: ${(e as Error).message}`);
   }
 
+  // اشتراك مميّز
+  await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `users` ADD `premiumUntil` timestamp NULL")),
+    "users.premiumUntil",
+  );
+
   // مرفق صورة على رسائل التذاكر
   await ignoreDuplicateColumn(
     db.execute(

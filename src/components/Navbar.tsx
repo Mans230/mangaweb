@@ -152,6 +152,7 @@ const navLinks = [
   { to: "/en", ar: "EN Manga", en: "EN Manga" },
   { to: "/calendar", ar: "التقويم", en: "Calendar" },
   { to: "/leaderboard", ar: "المتصدّرون", en: "Leaderboard" },
+  { to: "/premium", ar: "مميّز", en: "Premium" },
   { to: "/request", ar: "اطلب مانجا", en: "Request" },
 ];
 

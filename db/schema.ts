@@ -35,6 +35,8 @@ export const users = mysqlTable("users", {
     .notNull(),
   dnd: boolean("dnd").default(false).notNull(),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** اشتراك مميّز فعّال حتى هذا التاريخ (null = بلا اشتراك) */
+  premiumUntil: timestamp("premiumUntil"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()

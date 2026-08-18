@@ -23,6 +23,7 @@ import { recommendRouter } from "./recommendRouter";
 import { announcementsRouter } from "./announcementsRouter";
 import { usersRouter } from "./usersRouter";
 import { postsRouter } from "./postsRouter";
+import { premiumRouter } from "./premiumRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -52,6 +53,7 @@ export const appRouter = createRouter({
   announcements: announcementsRouter,
   users: usersRouter,
   posts: postsRouter,
+  premium: premiumRouter,
 });
 
 export type AppRouter = typeof appRouter;

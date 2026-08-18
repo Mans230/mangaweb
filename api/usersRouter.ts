@@ -24,6 +24,7 @@ export const usersRouter = createRouter({
           avatarUrl: users.avatarUrl,
           bannerUrl: users.bannerUrl,
           createdAt: users.createdAt,
+          premiumUntil: users.premiumUntil,
         })
         .from(users)
         .where(eq(users.username, input.username))
@@ -86,8 +87,10 @@ export const usersRouter = createRouter({
         .orderBy(desc(coinTransactions.createdAt))
         .limit(15);
 
+      const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();
       return {
         user,
+        isPremium,
         isSelf: ctx.user?.id === user.id,
         isFollowing,
         wallet: {
