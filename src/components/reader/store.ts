@@ -14,6 +14,14 @@ export interface ReaderSettings {
   bg: ReaderBg;
   direction: FlipDirection;
   quality: ImageQuality;
+  /** عرض حاوية القراءة بالبكسل (400–1600) */
+  containerWidth: number;
+  /** عرض الصورة داخل الحاوية كنسبة مئوية (40–100) */
+  imageWidth: number;
+  /** سطوع الصور كنسبة مئوية (30–150) */
+  brightness: number;
+  /** الفجوة بين الصفحات في وضع الويبتون بالبكسل (0–40) */
+  gap: number;
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -22,6 +30,10 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   bg: "auto",
   direction: "rtl",
   quality: "auto",
+  containerWidth: 900,
+  imageWidth: 100,
+  brightness: 100,
+  gap: 0,
 };
 
 const SETTINGS_KEY = "zeko-reader-settings";

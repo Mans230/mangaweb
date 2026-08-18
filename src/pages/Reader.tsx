@@ -507,6 +507,10 @@ export default function Reader() {
               onProgress={handleProgress}
               onTapSurface={toggleChrome}
               chapterKey={chapterKey}
+              containerWidth={settings.containerWidth}
+              imageWidth={settings.imageWidth}
+              brightness={settings.brightness}
+              gap={settings.gap}
             >
               <EndCard
                 chapterNumber={chapterNumber}
@@ -543,6 +547,9 @@ export default function Reader() {
               onTapCenter={toggleChrome}
               onProgress={handleProgress}
               chapterKey={chapterKey}
+              containerWidth={settings.containerWidth}
+              imageWidth={settings.imageWidth}
+              brightness={settings.brightness}
             />
           )}
         </motion.div>

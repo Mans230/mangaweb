@@ -19,6 +19,10 @@ interface PagedViewProps {
   /** report progress 0..1 for the progress bar */
   onProgress: (ratio: number) => void;
   chapterKey: string;
+  /** إعدادات العرض من المستخدم (تنطبق على كل الفصول) */
+  containerWidth?: number;
+  imageWidth?: number;
+  brightness?: number;
 }
 
 export default function PagedView({
@@ -32,6 +36,9 @@ export default function PagedView({
   onTapCenter,
   onProgress,
   chapterKey,
+  containerWidth = 900,
+  imageWidth = 100,
+  brightness = 100,
 }: PagedViewProps) {
   const { t } = useLanguage();
   const total = pages.length;
@@ -143,11 +150,13 @@ export default function PagedView({
           dragElastic={0.18}
           onDragEnd={onDragEnd}
           draggable={false}
-          className={`max-w-full cursor-grab active:cursor-grabbing ${
-            fit === "screen"
-              ? "max-h-[100svh] object-contain"
-              : "w-full object-contain"
-          } ${quality === "saver" ? "[filter:saturate(0.92)_contrast(0.98)]" : ""}`}
+          style={{
+            maxWidth: fit === "width" ? (containerWidth * imageWidth) / 100 : undefined,
+            filter: `brightness(${brightness}%)${quality === "saver" ? " saturate(0.92) contrast(0.98)" : ""}`,
+          }}
+          className={`mx-auto max-w-full cursor-grab active:cursor-grabbing ${
+            fit === "screen" ? "max-h-[100svh] object-contain" : "w-full object-contain"
+          }`}
         />
       </AnimatePresence>
 

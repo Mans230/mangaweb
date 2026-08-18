@@ -12,6 +12,11 @@ interface WebtoonViewProps {
   onTapSurface: () => void;
   /** chapter-scoped key: resets reveal state */
   chapterKey: string;
+  /** إعدادات العرض من المستخدم (تنطبق على كل الفصول) */
+  containerWidth?: number;
+  imageWidth?: number;
+  brightness?: number;
+  gap?: number;
   /** end-card + comments rendered after the pages */
   children?: ReactNode;
 }
@@ -22,6 +27,10 @@ export default function WebtoonView({
   onProgress,
   onTapSurface,
   chapterKey,
+  containerWidth = 900,
+  imageWidth = 100,
+  brightness = 100,
+  gap = 0,
   children,
 }: WebtoonViewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -53,9 +62,14 @@ export default function WebtoonView({
   }, [chapterKey]);
 
   return (
-    <div ref={rootRef} className="mx-auto w-full max-w-[800px]">
+    <div ref={rootRef} className="mx-auto w-full" style={{ maxWidth: containerWidth }}>
       {/* tapping the reading surface toggles the chrome (not end-card/comments) */}
-      <div className="flex flex-col gap-1" onClick={onTapSurface} role="presentation">
+      <div
+        className="mx-auto flex flex-col"
+        style={{ width: `${imageWidth}%`, gap: `${gap}px`, filter: `brightness(${brightness}%)` }}
+        onClick={onTapSurface}
+        role="presentation"
+      >
         {pages.map((src, i) => (
           <WebtoonPage
             key={`${chapterKey}-${i}`}

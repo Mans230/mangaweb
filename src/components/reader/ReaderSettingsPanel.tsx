@@ -107,6 +107,46 @@ export default function ReaderSettingsPanel({
               onSelect={(v) => onChange({ quality: v })}
             />
 
+            {/* عرض الحاوية / الصورة / السطوع / الفجوة — تُحفظ وتنطبق على كل الفصول */}
+            <Slider
+              label={t("عرض الحاوية", "Container width")}
+              value={settings.containerWidth}
+              min={400}
+              max={1600}
+              step={20}
+              suffix="px"
+              onChange={(v) => onChange({ containerWidth: v })}
+            />
+            <Slider
+              label={t("عرض الصورة", "Image width")}
+              value={settings.imageWidth}
+              min={40}
+              max={100}
+              step={5}
+              suffix="%"
+              onChange={(v) => onChange({ imageWidth: v })}
+            />
+            <Slider
+              label={t("السطوع", "Brightness")}
+              value={settings.brightness}
+              min={30}
+              max={150}
+              step={5}
+              suffix="%"
+              onChange={(v) => onChange({ brightness: v })}
+            />
+            {settings.mode === "webtoon" && (
+              <Slider
+                label={t("الفجوة بين الصفحات", "Page gap")}
+                value={settings.gap}
+                min={0}
+                max={40}
+                step={2}
+                suffix="px"
+                onChange={(v) => onChange({ gap: v })}
+              />
+            )}
+
             <button
               className="btn-primary mt-4 w-full !py-2.5 text-sm"
               onClick={() => {
@@ -153,6 +193,45 @@ function Segment<T extends string>({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix: string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="mb-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-xs font-semibold text-app-3">{label}</p>
+        <span className="glass-chip !py-0.5 text-[11px] font-bold text-app-2 tabular-nums" dir="ltr">
+          {value}
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-[var(--primary)]"
+      />
     </div>
   );
 }
