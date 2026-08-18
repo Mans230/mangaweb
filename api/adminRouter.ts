@@ -1139,7 +1139,9 @@ export const adminRouter = createRouter({
    * تشغيل دورة كتالوج يدوية: importCatalog لكل المصادر المفعّلة بنفس منطق
    * scraper-job في boot.ts. يعمل async (لا ينتظر الاكتمال) ويمنع التشغيل المتزامن.
    */
-  triggerScrape: adminQuery.mutation(async ({ ctx }) => {
+  triggerScrape: adminQuery
+    .input(z.object({ source: z.string().trim().optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
     if (scrapeRunning) {
       throw new TRPCError({
         code: "CONFLICT",
@@ -1147,11 +1149,12 @@ export const adminRouter = createRouter({
       });
     }
     const { importCatalog } = await import("./services/importer");
-    const active = enabledScrapers().map((s) => s.name);
+    const all = enabledScrapers().map((s) => s.name);
+    const active = input?.source ? all.filter((n) => n === input.source) : all;
     if (!active.length) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "لا توجد مصادر مفعّلة",
+        message: input?.source ? "المصدر غير مفعّل أو غير موجود" : "لا توجد مصادر مفعّلة",
       });
     }
     scrapeRunning = true;
@@ -1185,7 +1188,9 @@ export const adminRouter = createRouter({
    * سكراب كامل للكتالوج: لكل مصدر مفعّل، ترقيم كامل (كل الصفحات، بلا سقف 150)
    * في الخلفية مع rate limiting — يرجع فوراً { started, sources }.
    */
-  importFullCatalog: adminQuery.mutation(async ({ ctx }) => {
+  importFullCatalog: adminQuery
+    .input(z.object({ source: z.string().trim().optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
     if (scrapeRunning) {
       throw new TRPCError({
         code: "CONFLICT",
@@ -1193,11 +1198,12 @@ export const adminRouter = createRouter({
       });
     }
     const { importCatalog } = await import("./services/importer");
-    const active = enabledScrapers().map((s) => s.name);
+    const all = enabledScrapers().map((s) => s.name);
+    const active = input?.source ? all.filter((n) => n === input.source) : all;
     if (!active.length) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "لا توجد مصادر مفعّلة",
+        message: input?.source ? "المصدر غير مفعّل أو غير موجود" : "لا توجد مصادر مفعّلة",
       });
     }
     scrapeRunning = true;

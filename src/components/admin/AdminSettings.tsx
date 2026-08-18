@@ -98,6 +98,9 @@ function BannedWordsCard() {
 function ScrapeTriggerCard() {
   const { t } = useLanguage();
   const toast = useAdminToast();
+  const [src, setSrc] = useState("");
+  const sourcesQ = trpc.admin.listSources.useQuery(undefined, { retry: false });
+  const srcArg = src ? { source: src } : undefined;
   const trigger = trpc.admin.triggerScrape.useMutation({
     onSuccess: (d) =>
       toast(
@@ -143,8 +146,21 @@ function ScrapeTriggerCard() {
         {t("فحص المصادر (سكرابر)", "Sources scraper")}
       </h3>
       <div className="flex flex-col gap-2.5">
+        {/* اختيار المصدر — فارغ = كل المصادر */}
+        <select
+          value={src}
+          onChange={(e) => setSrc(e.target.value)}
+          className="input-glass !py-2 text-xs"
+        >
+          <option value="">{t("كل المصادر", "All sources")}</option>
+          {(sourcesQ.data ?? []).map((s) => (
+            <option key={s.id} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+        </select>
         <div className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5">
-          <p className="text-xs leading-relaxed text-muted">
+          <p className="text-xs leading-relaxed text-app-3">
             {t(
               "أحدث الفصول فقط — الفحص التلقائي يعمل دوريًا، اضغط لتشغيله فورًا",
               "Latest chapters only — press to run the periodic scan now",
@@ -152,7 +168,7 @@ function ScrapeTriggerCard() {
           </p>
           <button
             type="button"
-            onClick={() => trigger.mutate()}
+            onClick={() => trigger.mutate(srcArg)}
             disabled={trigger.isPending || full.isPending}
             className="btn-primary flex shrink-0 items-center gap-2 !rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50"
           >
@@ -165,7 +181,7 @@ function ScrapeTriggerCard() {
           </button>
         </div>
         <div className="glass flex items-center justify-between gap-3 !rounded-2xl p-3.5">
-          <p className="text-xs leading-relaxed text-muted">
+          <p className="text-xs leading-relaxed text-app-3">
             {t(
               "الكتالوج الكامل — يمرّ على كل صفحات كل المصادر ويضيف كل الأعمال القديمة والجديدة الناقصة (يأخذ وقتًا في الخلفية)",
               "Full catalog — walks every page of every source and adds all missing old + new titles (runs in background, takes a while)",
@@ -173,7 +189,7 @@ function ScrapeTriggerCard() {
           </p>
           <button
             type="button"
-            onClick={() => full.mutate()}
+            onClick={() => full.mutate(srcArg)}
             disabled={trigger.isPending || full.isPending}
             className="btn-glass flex shrink-0 items-center gap-2 !rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50"
           >
