@@ -176,7 +176,8 @@ export default function Reader() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlayOpen]);
 
-  // Webtoon: hide on scroll-down >200px, reveal on scroll-up
+  // Webtoon: يُخفي الشريط عند النزول فقط — الإظهار بالضغط على الشاشة (toggleChrome)
+  // لا يُظهر الشريط عند السحب لأعلى (كان يضيّق مساحة القراءة).
   useEffect(() => {
     if (settings.mode !== "webtoon") return;
     let lastY = window.scrollY;
@@ -184,12 +185,11 @@ export default function Reader() {
       const y = window.scrollY;
       const dy = y - lastY;
       if (dy > 8 && y > 200) setChromeVisible(false);
-      else if (dy < -8) showChrome();
       lastY = y;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [settings.mode, showChrome]);
+  }, [settings.mode]);
 
   /* ===== Progress reporting from the active view ===== */
   const pctTimerRef = useRef<number | null>(null);
