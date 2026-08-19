@@ -155,12 +155,19 @@ export class DilarScraper extends BaseScraper {
     const version = Number(data.v) || 1;
     let salt: Buffer;
     let info: string;
-    if (version === 7) {
-      // v7: salt = HKDF(ikm=iv, salt=epk, info="…v7.salt") ثم HKDF(shared, salt, "…v7|e")
+    if (version >= 7) {
+      // v7+ (v7, v10, …): salt = HKDF(ikm=iv, salt=epk, info="…v{N}.salt")
+      // ثم HKDF(shared, salt, "…v{N}|e") — نفس البناء مع رقم النسخة الديناميكي.
       salt = Buffer.from(
-        crypto.hkdfSync("sha256", fromB64u(data.iv), epkRaw, "dilar.response.ecies.v7.salt", 32),
+        crypto.hkdfSync(
+          "sha256",
+          fromB64u(data.iv),
+          epkRaw,
+          `dilar.response.ecies.v${version}.salt`,
+          32,
+        ),
       );
-      info = `dilar.response.ecies.v7|${data.e}`;
+      info = `dilar.response.ecies.v${version}|${data.e}`;
     } else {
       // v1: salt = clientPub||epk — v2: salt = epk||clientPub
       salt = version === 1 ? Buffer.concat([pubRaw, epkRaw]) : Buffer.concat([epkRaw, pubRaw]);
