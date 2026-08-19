@@ -1,97 +1,89 @@
 import { Link } from "react-router";
-import { Send, Users } from "lucide-react";
+import { BookOpen, Send, ShieldAlert, Users } from "lucide-react";
 import { useLanguage } from "./LanguageProvider";
 import { useUiToggles } from "@/lib/uiToggles";
+
+const NOTIF_CHANNEL = "https://t.me/dateranime";
 
 export default function Footer() {
   const { t } = useLanguage();
   const { communityGroupUrl } = useUiToggles();
 
-  const linkCols = [
-    {
-      title: t("روابط", "Links"),
-      items: [
-        { to: "/request", label: t("اطلب مانجا", "Request a manga") },
-        { to: "/support", label: t("الدعم", "Support") },
-        { to: "/announcements", label: t("الإعلانات", "Announcements") },
-        { to: "/browse?adult=1", label: t("سياسة +18", "+18 policy") },
-      ],
-    },
-    {
-      title: t("تابعنا", "Follow us"),
-      items: [],
-    },
+  const links = [
+    { to: "/request", label: t("اطلب مانجا", "Request") },
+    { to: "/support", label: t("الدعم", "Support") },
+    { to: "/announcements", label: t("الإعلانات", "News") },
+    { to: "/browse?adult=1", label: t("سياسة +18", "+18") },
+    { to: "/support?topic=dmca", label: t("DMCA", "DMCA") },
+    { to: "/support?topic=abuse", label: t("إبلاغ إساءة", "Abuse report") },
   ];
 
   return (
-    <footer className="mt-20 border-t border-app pb-24 md:pb-0" style={{ background: "var(--surface)" }}>
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-3 md:px-6">
-        {/* About */}
+    <footer
+      className="mt-16 border-t border-app pb-24 md:pb-0"
+      style={{ background: "var(--surface)" }}
+    >
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 md:grid-cols-[1.4fr_1fr_1fr] md:items-start md:gap-10 md:px-6">
+        {/* العلامة + التعريف */}
         <div>
           <Link to="/" className="flex items-center gap-2.5">
-            <img src="/logo.svg" alt="zeko-manga" className="h-9 w-9 rounded-xl" />
-            <span className="font-display gradient-text text-lg font-bold">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-app bg-[var(--surface-strong)] text-primary">
+              <BookOpen size={18} strokeWidth={2.4} />
+            </span>
+            <span className="font-display text-lg font-bold text-app">
               {t("زيكو مانجا", "zeko-manga")}
             </span>
           </Link>
-          <p className="mt-4 max-w-xs text-sm text-app-2">
+          <p className="mt-3 max-w-xs text-[13px] leading-6 text-app-2">
             {t(
-              "منصة عربية تجمع لك أحدث فصول المانهوا والمانجا من 8 مصادر — تحديث تلقائي كل 15 دقيقة، بتجربة قراءة نظيفة بروح المجلات المطبوعة.",
-              "An Arabic platform aggregating the latest manhwa & manga chapters from 8 sources — auto-refreshed every 15 minutes in a clean editorial reading experience."
+              "منصة عربية تجمع أحدث فصول المانهوا والمانجا من عدة مصادر — تحديث تلقائي وتجربة قراءة نظيفة.",
+              "Arabic platform aggregating the latest manhwa & manga from multiple sources — auto-updated, clean reading.",
             )}
           </p>
         </div>
 
-        {/* Links */}
+        {/* تابعنا — زرّان جنب بعض */}
         <div>
-          <h3 className="font-display text-base font-bold text-app">{linkCols[0].title}</h3>
-          {/* روابط جمب بعض (wrap) بدل عمود طويل */}
-          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2.5">
-            {linkCols[0].items.map((item) => (
-              <li key={item.to + item.label}>
-                <Link to={item.to} className="text-sm text-app-3 transition-colors hover:text-primary">
-                  {item.label}
-                </Link>
-              </li>
+          <h3 className="font-display mb-3 text-sm font-bold text-app">{t("تابعنا", "Follow us")}</h3>
+          <div className="flex flex-col gap-2 sm:flex-row md:flex-col lg:flex-row">
+            <a
+              href={NOTIF_CHANNEL}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary !px-3.5 !py-2 text-[13px]"
+            >
+              <Send size={15} />
+              {t("قناة الإشعارات", "Notifications")}
+            </a>
+            <a
+              href={communityGroupUrl || NOTIF_CHANNEL}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-glass !px-3.5 !py-2 text-[13px]"
+            >
+              <Users size={15} />
+              {t("جروب التليجرام", "Telegram group")}
+            </a>
+          </div>
+        </div>
+
+        {/* روابط — شبكة مضغوطة 3×2 */}
+        <div>
+          <h3 className="font-display mb-3 text-sm font-bold text-app">{t("روابط", "Links")}</h3>
+          <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+            {links.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="inline-flex items-center gap-1 truncate text-[12.5px] text-app-3 transition-colors hover:text-primary"
+              >
+                {l.label === "DMCA" || l.label === "إبلاغ إساءة" ? (
+                  <ShieldAlert size={12} className="shrink-0" />
+                ) : null}
+                {l.label}
+              </Link>
             ))}
-            {communityGroupUrl && (
-              <li>
-                <a
-                  href={communityGroupUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:text-primary-soft"
-                >
-                  <Users size={14} />
-                  {t("انضم لجروب المناقشات", "Join the discussion group")}
-                </a>
-              </li>
-            )}
-          </ul>
-        </div>
-
-        {/* Telegram */}
-        <div>
-          <h3 className="font-display text-base font-bold text-app">{linkCols[1].title}</h3>
-          <p className="mt-4 text-sm text-app-2">
-            {t("اشترك بقناة الإشعارات ليصلك كل فصل جديد فور صدوره.", "Join the notification channel to get every new chapter the moment it drops.")}
-          </p>
-          <a
-            href="https://t.me/dateranime"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-glass mt-4 !py-2.5 text-sm"
-          >
-            <Send size={16} />
-            {t("اشترك بقناة الإشعارات", "Join the channel")}
-          </a>
-        </div>
-      </div>
-
-      <div className="border-t border-app">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-app-3 sm:flex-row md:px-6">
-          <span>© 2026 zeko-manga</span>
-          <span>{t("المحتوى مجمّع من مصادر خارجية", "Content aggregated from external sources")}</span>
+          </div>
         </div>
       </div>
     </footer>
