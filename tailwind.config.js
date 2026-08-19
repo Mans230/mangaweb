@@ -57,14 +57,21 @@ module.exports = {
       },
       fontFamily: {
         sans: ['"IBM Plex Sans Arabic"', "Outfit", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ['"Noto Kufi Arabic"', '"Space Grotesk"', "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ['"IBM Plex Sans Arabic"', '"Barlow Condensed"', "ui-sans-serif", "system-ui", "sans-serif"],
+        condensed: ['"Barlow Condensed"', "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      // Zeko spec: حواف حادة 2px في كل مكان — الأفاتار فقط دائري (rounded-full)
       borderRadius: {
-        xl: "20px",
-        lg: "14px",
-        md: "12px",
-        sm: "8px",
-        xs: "6px",
+        none: "0px",
+        DEFAULT: "2px",
+        xs: "2px",
+        sm: "2px",
+        md: "2px",
+        lg: "2px",
+        xl: "2px",
+        "2xl": "2px",
+        "3xl": "2px",
+        full: "9999px",
       },
       transitionTimingFunction: {
         "expo-out": "cubic-bezier(0.22, 1, 0.36, 1)",

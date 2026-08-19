@@ -222,7 +222,7 @@ export default function Navbar() {
         initial={{ y: "-100%" }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: EASE }}
-        className="glass-strong sticky top-0 z-50 border-x-0 border-t-0"
+        className="app-header sticky top-0 z-50"
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 md:px-6">
           {/* Logo */}
