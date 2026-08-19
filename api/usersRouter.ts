@@ -3,12 +3,23 @@
  * publicProfile: بيانات مستخدم عام + إحصاءاته + نشاطه الأخير + حالة متابعتي له.
  */
 import { z } from "zod";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { comments, userFollows, users } from "@db/schema";
+import { comments, manga, postLikes, posts, userFollows, users } from "@db/schema";
 import { coinTransactions, coinWallets, chapterCompletions } from "@db/schemaCoins";
 import { getDb } from "./queries/connection";
 import { createRouter, publicQuery, authedQuery } from "./middleware";
+
+/** يحوّل username إلى id، أو NOT_FOUND */
+async function userIdByUsername(username: string): Promise<number> {
+  const [u] = await getDb()
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
+  if (!u) throw new TRPCError({ code: "NOT_FOUND", message: "المستخدم غير موجود" });
+  return u.id;
+}
 
 export const usersRouter = createRouter({
   /** ملف عام لمستخدم عبر اسم المستخدم */
@@ -23,6 +34,7 @@ export const usersRouter = createRouter({
           username: users.username,
           avatarUrl: users.avatarUrl,
           bannerUrl: users.bannerUrl,
+          socialLinks: users.socialLinks,
           createdAt: users.createdAt,
           premiumUntil: users.premiumUntil,
         })
@@ -107,6 +119,148 @@ export const usersRouter = createRouter({
         },
         activity,
       };
+    }),
+
+  /** تعليقات/مراجعات المستخدم العامة (مع رابط المانجا) */
+  userComments: publicQuery
+    .input(
+      z.object({
+        username: z.string().trim().min(1).max(32),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(50).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const uid = await userIdByUsername(input.username);
+      const where = eq(comments.userId, uid);
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            id: comments.id,
+            content: comments.content,
+            stars: comments.stars,
+            createdAt: comments.createdAt,
+            mangaSlug: manga.slug,
+            mangaTitle: manga.title,
+          })
+          .from(comments)
+          .innerJoin(manga, eq(comments.mangaId, manga.id))
+          .where(where)
+          .orderBy(desc(comments.createdAt))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(comments).where(where),
+      ]);
+      return { items: rows, total, page: input.page };
+    }),
+
+  /** منشورات المستخدم في قسم Fun */
+  userPosts: publicQuery
+    .input(
+      z.object({
+        username: z.string().trim().min(1).max(32),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(50).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const uid = await userIdByUsername(input.username);
+      const where = and(eq(posts.userId, uid), eq(posts.hidden, false));
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            id: posts.id,
+            body: posts.body,
+            imageUrl: posts.imageUrl,
+            createdAt: posts.createdAt,
+          })
+          .from(posts)
+          .where(where)
+          .orderBy(desc(posts.createdAt))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(posts).where(where),
+      ]);
+      const ids = rows.map((r) => r.id);
+      const likeMap = new Map<number, number>();
+      if (ids.length > 0) {
+        const agg = await db
+          .select({ postId: postLikes.postId, c: count() })
+          .from(postLikes)
+          .where(inArray(postLikes.postId, ids))
+          .groupBy(postLikes.postId);
+        for (const a of agg) likeMap.set(a.postId, Number(a.c));
+      }
+      return {
+        items: rows.map((r) => ({ ...r, likes: likeMap.get(r.id) ?? 0 })),
+        total,
+        page: input.page,
+      };
+    }),
+
+  /** قائمة المتابِعين أو مَن يتابعهم المستخدم */
+  followList: publicQuery
+    .input(
+      z.object({
+        username: z.string().trim().min(1).max(32),
+        kind: z.enum(["followers", "following"]),
+        limit: z.number().int().min(1).max(100).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const uid = await userIdByUsername(input.username);
+      const rows =
+        input.kind === "followers"
+          ? await db
+              .select({
+                id: users.id,
+                name: users.name,
+                username: users.username,
+                avatarUrl: users.avatarUrl,
+              })
+              .from(userFollows)
+              .innerJoin(users, eq(userFollows.followerId, users.id))
+              .where(eq(userFollows.followingId, uid))
+              .orderBy(desc(userFollows.createdAt))
+              .limit(input.limit)
+          : await db
+              .select({
+                id: users.id,
+                name: users.name,
+                username: users.username,
+                avatarUrl: users.avatarUrl,
+              })
+              .from(userFollows)
+              .innerJoin(users, eq(userFollows.followingId, users.id))
+              .where(eq(userFollows.followerId, uid))
+              .orderBy(desc(userFollows.createdAt))
+              .limit(input.limit);
+      return { items: rows };
+    }),
+
+  /** تحديث روابط السوشيال الخاصة بي */
+  updateSocialLinks: authedQuery
+    .input(
+      z.object({
+        links: z
+          .array(
+            z.object({
+              label: z.string().trim().min(1).max(40),
+              url: z.string().trim().url().max(300),
+            }),
+          )
+          .max(8),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await getDb()
+        .update(users)
+        .set({ socialLinks: input.links })
+        .where(eq(users.id, ctx.user.id));
+      return { success: true as const };
     }),
 
   /** متابعة مستخدم */

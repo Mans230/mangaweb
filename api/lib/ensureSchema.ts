@@ -79,6 +79,12 @@ export async function ensureBootSchema(): Promise<void> {
     "users.premiumUntil",
   );
 
+  // روابط السوشيال العامة على البروفايل
+  await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `users` ADD `socialLinks` json")),
+    "users.socialLinks",
+  );
+
   // مرفق صورة على رسائل التذاكر
   await ignoreDuplicateColumn(
     db.execute(

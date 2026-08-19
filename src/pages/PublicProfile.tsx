@@ -1,10 +1,16 @@
-import { useParams } from "react-router";
+import { useState } from "react";
+import { Link, useParams } from "react-router";
 import { motion } from "framer-motion";
 import {
   BookOpen,
   Crown,
   Flame,
+  Heart,
+  Link as LinkIcon,
   MessageSquare,
+  Plus,
+  Star,
+  Trash2,
   UserMinus,
   UserPlus,
   Users,
@@ -17,23 +23,14 @@ import { trpc } from "@/providers/trpc";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-const ACT_LABEL: Record<string, [string, string]> = {
-  read: ["قرأ فصلاً", "Read a chapter"],
-  checkin: ["تسجيل حضور يومي", "Daily check-in"],
-  mission: ["أكمل مهمة", "Completed a mission"],
-  spin: ["لفّ عجلة الحظ", "Spun the wheel"],
-  referral: ["دعا صديقاً", "Referred a friend"],
-  achievement: ["حقّق إنجازاً", "Unlocked an achievement"],
-  streak: ["مكافأة سلسلة", "Streak reward"],
-  shop_spend: ["شراء من المتجر", "Shop purchase"],
-  admin: ["من الإدارة", "From admin"],
-};
+type TabKey = "comments" | "posts" | "followers" | "following" | "social";
 
 export default function PublicProfile() {
   const { username = "" } = useParams();
   const { t, lang } = useLanguage();
   const { isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
+  const [tab, setTab] = useState<TabKey>("comments");
   const q = trpc.users.publicProfile.useQuery({ username }, { retry: false });
 
   const followMut = trpc.users.follow.useMutation({
@@ -54,7 +51,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { user, wallet, stats, activity, isFollowing, isSelf, isPremium } = q.data;
+  const { user, wallet, stats, isFollowing, isSelf, isPremium } = q.data;
   const xpInLevel = wallet.xp % 100;
   const pct = Math.min(100, Math.round((xpInLevel / 100) * 100));
   const busy = followMut.isPending || unfollowMut.isPending;
@@ -152,26 +149,260 @@ export default function PublicProfile() {
         ))}
       </div>
 
-      {/* النشاط الأخير */}
-      <h2 className="font-display mb-3 mt-6 text-base font-bold text-app">{t("النشاط الأخير", "Recent activity")}</h2>
-      {activity.length === 0 ? (
-        <p className="glass !rounded-2xl px-4 py-8 text-center text-sm text-app-3">{t("لا نشاط بعد.", "No activity yet.")}</p>
-      ) : (
-        <div className="glass flex flex-col divide-y divide-[var(--border)] !rounded-2xl">
-          {activity.map((a, i) => {
-            const label = ACT_LABEL[a.kind] ?? [a.kind, a.kind];
-            return (
-              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="flex-1 text-sm text-app-2">{t(label[0], label[1])}</span>
-                {a.amount > 0 && (
-                  <span className="glass-chip !py-0.5 text-[10.5px] font-bold text-success" dir="ltr">+{a.amount} XP</span>
-                )}
-                <span className="text-[11px] text-app-3">{timeAgo(a.createdAt, lang)}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* التبويبات */}
+      <div className="mt-6 flex items-center gap-1 overflow-x-auto rounded-full border border-app bg-[var(--surface)] p-1 text-xs">
+        {TABS.map((tb) => (
+          <button
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 font-semibold transition-colors ${
+              tab === tb.key ? "bg-primary text-[var(--primary-ink)]" : "text-app-3 hover:text-app"
+            }`}
+          >
+            <tb.icon size={14} />
+            {t(tb.ar, tb.en)}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        {tab === "comments" && <CommentsTab username={username} />}
+        {tab === "posts" && <PostsTab username={username} />}
+        {tab === "followers" && <FollowTab username={username} kind="followers" />}
+        {tab === "following" && <FollowTab username={username} kind="following" />}
+        {tab === "social" && (
+          <SocialTab
+            isSelf={isSelf}
+            links={user.socialLinks ?? []}
+            onSaved={() => utils.users.publicProfile.invalidate({ username })}
+          />
+        )}
+      </div>
     </motion.div>
   );
+}
+
+const TABS: { key: TabKey; ar: string; en: string; icon: typeof MessageSquare }[] = [
+  { key: "comments", ar: "التعليقات", en: "Comments", icon: MessageSquare },
+  { key: "posts", ar: "المنشورات", en: "Posts", icon: BookOpen },
+  { key: "followers", ar: "المتابِعون", en: "Followers", icon: Users },
+  { key: "following", ar: "يتابع", en: "Following", icon: UserPlus },
+  { key: "social", ar: "روابط", en: "Social", icon: LinkIcon },
+];
+
+/* ================= تبويب التعليقات ================= */
+function CommentsTab({ username }: { username: string }) {
+  const { t, lang } = useLanguage();
+  const q = trpc.users.userComments.useQuery({ username, page: 1, limit: 30 }, { retry: false });
+  if (q.isLoading) return <Skeleton />;
+  const items = q.data?.items ?? [];
+  if (items.length === 0) return <Empty text={t("لا تعليقات بعد", "No comments yet")} />;
+  return (
+    <div className="flex flex-col gap-3">
+      {items.map((c) => (
+        <Link
+          key={c.id}
+          to={`/manga/${c.mangaSlug}`}
+          className="glass block !rounded-2xl p-3.5 transition-colors hover:border-[var(--border-glow)]"
+        >
+          <div className="mb-1 flex items-center gap-2">
+            {c.stars != null && (
+              <span className="flex items-center gap-0.5 text-warning" dir="ltr">
+                <Star size={12} fill="currentColor" /> {c.stars}
+              </span>
+            )}
+            <span className="truncate text-xs font-bold text-primary">{c.mangaTitle}</span>
+            <span className="ms-auto shrink-0 text-[11px] text-app-3">{timeAgo(c.createdAt, lang)}</span>
+          </div>
+          {c.content && <p className="line-clamp-3 text-sm leading-6 text-app-2">{c.content}</p>}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/* ================= تبويب المنشورات ================= */
+function PostsTab({ username }: { username: string }) {
+  const { t, lang } = useLanguage();
+  const q = trpc.users.userPosts.useQuery({ username, page: 1, limit: 30 }, { retry: false });
+  if (q.isLoading) return <Skeleton />;
+  const items = q.data?.items ?? [];
+  if (items.length === 0) return <Empty text={t("لا منشورات بعد", "No posts yet")} />;
+  return (
+    <div className="flex flex-col gap-3">
+      {items.map((p) => (
+        <div key={p.id} className="glass !rounded-2xl p-3.5">
+          <p className="whitespace-pre-wrap text-sm leading-7 text-app-2">{p.body}</p>
+          {p.imageUrl && (
+            <img src={p.imageUrl} alt="" loading="lazy" className="mt-2 max-h-72 rounded-lg border border-app" />
+          )}
+          <div className="mt-2 flex items-center gap-3 text-[11px] text-app-3">
+            <span className="inline-flex items-center gap-1">
+              <Heart size={13} /> {p.likes}
+            </span>
+            <span className="ms-auto">{timeAgo(p.createdAt, lang)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ================= تبويب المتابعين/يتابع ================= */
+function FollowTab({ username, kind }: { username: string; kind: "followers" | "following" }) {
+  const { t } = useLanguage();
+  const q = trpc.users.followList.useQuery({ username, kind, limit: 100 }, { retry: false });
+  if (q.isLoading) return <Skeleton />;
+  const items = q.data?.items ?? [];
+  if (items.length === 0)
+    return <Empty text={kind === "followers" ? t("لا متابِعين بعد", "No followers yet") : t("لا يتابع أحداً بعد", "Not following anyone")} />;
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {items.map((u) => (
+        <Link
+          key={u.id}
+          to={u.username ? `/u/${u.username}` : "#"}
+          className="glass flex items-center gap-3 !rounded-2xl p-2.5 transition-colors hover:border-[var(--border-glow)]"
+        >
+          <img
+            src={proxyImg(u.avatarUrl) || "/placeholder-avatar.svg"}
+            alt=""
+            loading="lazy"
+            className="h-9 w-9 shrink-0 rounded-full border border-app object-cover"
+          />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-app">{u.name ?? u.username}</div>
+            {u.username && <div className="truncate text-[11px] text-app-3" dir="ltr">@{u.username}</div>}
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/* ================= تبويب روابط السوشيال ================= */
+function SocialTab({
+  isSelf,
+  links,
+  onSaved,
+}: {
+  isSelf: boolean;
+  links: { label: string; url: string }[];
+  onSaved: () => void;
+}) {
+  const { t } = useLanguage();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<{ label: string; url: string }[]>(links);
+  const save = trpc.users.updateSocialLinks.useMutation({
+    onSuccess: () => {
+      setEditing(false);
+      onSaved();
+    },
+  });
+
+  if (isSelf && editing) {
+    return (
+      <div className="glass !rounded-2xl p-4">
+        <div className="flex flex-col gap-2">
+          {draft.map((l, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={l.label}
+                onChange={(e) =>
+                  setDraft((d) => d.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))
+                }
+                placeholder={t("الاسم", "Label")}
+                className="input-glass w-28 shrink-0 text-sm"
+              />
+              <input
+                value={l.url}
+                onChange={(e) =>
+                  setDraft((d) => d.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))
+                }
+                placeholder="https://…"
+                dir="ltr"
+                className="input-glass min-w-0 flex-1 text-sm"
+              />
+              <button
+                onClick={() => setDraft((d) => d.filter((_, j) => j !== i))}
+                className="shrink-0 text-danger"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {draft.length < 8 && (
+            <button
+              onClick={() => setDraft((d) => [...d, { label: "", url: "" }])}
+              className="btn-glass !px-3 !py-1.5 text-xs"
+            >
+              <Plus size={14} /> {t("إضافة", "Add")}
+            </button>
+          )}
+          <button
+            onClick={() => save.mutate({ links: draft.filter((l) => l.label.trim() && l.url.trim()) })}
+            disabled={save.isPending}
+            className="btn-primary ms-auto !px-4 !py-1.5 text-xs disabled:opacity-50"
+          >
+            {t("حفظ", "Save")}
+          </button>
+          <button onClick={() => setEditing(false)} className="btn-glass !px-3 !py-1.5 text-xs">
+            {t("إلغاء", "Cancel")}
+          </button>
+        </div>
+        {save.isError && <p className="mt-2 text-xs text-danger">{save.error.message}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {links.length === 0 ? (
+        <Empty text={t("لا روابط اجتماعية بعد", "No social links yet")} />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {links.map((l, i) => (
+            <a
+              key={i}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="glass flex items-center gap-3 !rounded-2xl p-3 transition-colors hover:border-[var(--border-glow)]"
+            >
+              <LinkIcon size={15} className="shrink-0 text-primary" />
+              <span className="text-sm font-semibold text-app">{l.label}</span>
+              <span className="ms-auto truncate text-[11px] text-app-3" dir="ltr">{l.url}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      {isSelf && (
+        <button
+          onClick={() => {
+            setDraft(links);
+            setEditing(true);
+          }}
+          className="btn-glass mt-3 !px-4 !py-2 text-xs"
+        >
+          <LinkIcon size={14} /> {t("تعديل الروابط الاجتماعية", "Edit social links")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Skeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="skeleton h-20 !rounded-2xl" />
+      ))}
+    </div>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <p className="glass !rounded-2xl px-4 py-10 text-center text-sm text-app-3">{text}</p>;
 }

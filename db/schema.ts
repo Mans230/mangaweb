@@ -25,6 +25,8 @@ export const users = mysqlTable("users", {
   usernameChangedAt: timestamp("usernameChangedAt"),
   avatarUrl: text("avatarUrl"),
   bannerUrl: text("bannerUrl"),
+  /** روابط السوشيال العامة: [{label,url}] */
+  socialLinks: json("socialLinks").$type<{ label: string; url: string }[]>(),
   telegramId: varchar("telegramId", { length: 64 }).unique(),
   telegramUsername: varchar("telegramUsername", { length: 64 }),
   telegramPhotoUrl: text("telegramPhotoUrl"),
