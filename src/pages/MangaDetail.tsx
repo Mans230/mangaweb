@@ -13,7 +13,6 @@ import InfoCard from "@/components/manga/InfoCard";
 import ChaptersTab from "@/components/manga/ChaptersTab";
 import CommentsSection from "@/components/comments/CommentsSection";
 import SimilarTab from "@/components/manga/SimilarTab";
-import ReviewsSection from "@/components/manga/ReviewsSection";
 import Reactions from "@/components/Reactions";
 import DownloadModal from "@/components/manga/DownloadModal";
 import AuthPrompt from "@/components/manga/AuthPrompt";
@@ -356,7 +355,9 @@ export default function MangaDetail() {
       </div>
 
       {/* ===== المراجعات النصية ===== */}
-      <ReviewsSection mangaId={vm.id} isEn={isEn} />
+      <div className="relative z-10 mx-4 mt-10 md:mx-auto md:max-w-3xl">
+        <CommentsSection mangaId={vm.id} review title={isEn ? "Reviews" : t("المراجعات", "Reviews")} />
+      </div>
 
       <DownloadModal
         open={downloadOpen}

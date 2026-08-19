@@ -340,6 +340,25 @@ export async function ensureBootSchema(): Promise<void> {
     "comments.imageUrl",
   );
   await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `comments` ADD `stars` int")),
+    "comments.stars",
+  );
+  // نقل المراجعات النصية القديمة من ratings إلى نظام التعليقات (idempotent)
+  try {
+    await db.execute(
+      sql.raw(`INSERT INTO \`comments\` (\`userId\`, \`mangaId\`, \`content\`, \`stars\`, \`createdAt\`)
+SELECT r.\`userId\`, r.\`mangaId\`, r.\`reviewText\`, r.\`stars\`, r.\`createdAt\`
+FROM \`ratings\` r
+WHERE r.\`reviewText\` IS NOT NULL AND r.\`reviewText\` <> ''
+AND NOT EXISTS (
+  SELECT 1 FROM \`comments\` c
+  WHERE c.\`userId\` = r.\`userId\` AND c.\`mangaId\` = r.\`mangaId\` AND c.\`stars\` IS NOT NULL
+)`),
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] reviews backfill: ${(e as Error).message}`);
+  }
+  await ignoreDuplicateColumn(
     db.execute(sql.raw("ALTER TABLE `reports` ADD `commentId` bigint unsigned")),
     "reports.commentId",
   );

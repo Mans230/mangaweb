@@ -13,6 +13,7 @@ import {
   Reply as ReplyIcon,
   Send,
   Share2,
+  Star,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -30,6 +31,8 @@ type SortKey = "best" | "newest" | "oldest";
 interface Props {
   mangaId: number;
   chapterId?: number;
+  /** وضع المراجعات: يطلب النجوم في المحرّر ويعرضها على البطاقات */
+  review?: boolean;
   /** يُستدعى بالعدد الكلي (لعدّاد قائمة القارئ) */
   onTotalChange?: (total: number) => void;
   title?: string;
@@ -43,15 +46,32 @@ type ApiComment = {
   isSpoiler: boolean;
   createdAt: string | Date;
   user: { id: number; name: string | null; avatar: string | null };
+  stars: number | null;
   likes: number;
   dislikes: number;
   score: number;
   myVote: number;
 };
 
+/** صف نجوم للعرض فقط */
+function StarsRow({ value }: { value: number }) {
+  return (
+    <span className="flex items-center gap-0.5" dir="ltr">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          size={13}
+          className={i <= value ? "fill-amber-400 text-amber-400" : "text-app-3"}
+        />
+      ))}
+    </span>
+  );
+}
+
 export default function CommentsSection({
   mangaId,
   chapterId,
+  review = false,
   onTotalChange,
   title,
 }: Props) {
@@ -62,8 +82,9 @@ export default function CommentsSection({
   const [limit, setLimit] = useState(20);
   const [rulesOpen, setRulesOpen] = useState(true);
 
+  const kind = review ? "reviews" : "comments";
   const listQuery = trpc.engagement.listComments.useQuery(
-    { mangaId, chapterId, sort, page: 1, limit },
+    { mangaId, chapterId, sort, kind, page: 1, limit },
     { retry: false, refetchOnWindowFocus: false },
   );
 
@@ -74,8 +95,13 @@ export default function CommentsSection({
     onTotalChange?.(total);
   }, [total, onTotalChange]);
 
-  const invalidate = () =>
+  const invalidate = () => {
     utils.engagement.listComments.invalidate({ mangaId, chapterId });
+    if (review) {
+      utils.engagement.getRating.invalidate({ mangaId });
+      utils.engagement.myReview.invalidate({ mangaId });
+    }
+  };
 
   const sorts: { key: SortKey; ar: string; en: string }[] = [
     { key: "best", ar: "الأفضل", en: "Best" },
@@ -108,11 +134,15 @@ export default function CommentsSection({
         </div>
       </div>
 
-      {/* محرّر التعليق الرئيسي */}
+      {/* محرّر التعليق/المراجعة الرئيسي */}
       <Composer
         mangaId={mangaId}
         chapterId={chapterId}
         parentId={null}
+        review={review}
+        placeholder={
+          review ? t("اكتب مراجعتك…", "Write your review…") : undefined
+        }
         onDone={invalidate}
       />
 
@@ -149,7 +179,9 @@ export default function CommentsSection({
         </div>
       ) : items.length === 0 ? (
         <p className="py-10 text-center text-sm text-app-3">
-          {t("كن أول من يعلّق", "Be the first to comment")}
+          {review
+            ? t("لا مراجعات بعد — كن أول من يشارك رأيه", "No reviews yet — be the first")
+            : t("كن أول من يعلّق", "Be the first to comment")}
         </p>
       ) : (
         <div className="flex flex-col gap-5">
@@ -158,6 +190,7 @@ export default function CommentsSection({
               key={c.id}
               comment={c}
               replies={c.replies}
+              review={review}
               mangaId={mangaId}
               chapterId={chapterId}
               currentUserId={(user as { id?: number } | null)?.id ?? null}
@@ -188,6 +221,7 @@ function Composer({
   mangaId,
   chapterId,
   parentId,
+  review = false,
   autoFocus,
   placeholder,
   onDone,
@@ -196,6 +230,7 @@ function Composer({
   mangaId: number;
   chapterId?: number;
   parentId: number | null;
+  review?: boolean;
   autoFocus?: boolean;
   placeholder?: string;
   onDone: () => void;
@@ -206,14 +241,19 @@ function Composer({
   const [draft, setDraft] = useState("");
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [stars, setStars] = useState(0);
+  const [hoverStar, setHoverStar] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useImageUpload();
+  // النجوم مطلوبة فقط للمراجعة الرئيسية (لا على الردود)
+  const needsStars = review && parentId === null;
 
   const add = trpc.engagement.addComment.useMutation({
     onSuccess: () => {
       setDraft("");
       setIsSpoiler(false);
       setImageUrl(null);
+      setStars(0);
       onDone();
       onCancel?.();
     },
@@ -240,19 +280,51 @@ function Composer({
 
   const submit = () => {
     const content = draft.trim();
-    if ((!content && !imageUrl) || add.isPending) return;
+    if (needsStars && stars < 1) return;
+    if ((!content && !imageUrl && !needsStars) || add.isPending) return;
     add.mutate({
       mangaId,
       chapterId,
       parentId,
       content,
       imageUrl: imageUrl ?? undefined,
+      stars: needsStars ? stars : undefined,
       isSpoiler,
     });
   };
 
   return (
     <div className="rounded-2xl border border-app bg-[var(--surface)] p-3">
+      {needsStars && (
+        <div className="mb-2 flex items-center gap-2 border-b border-app pb-2">
+          <span className="text-xs font-bold text-app-2">{t("تقييمك:", "Your rating:")}</span>
+          <span className="flex items-center gap-1" dir="ltr">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <button
+                key={i}
+                type="button"
+                onMouseEnter={() => setHoverStar(i)}
+                onMouseLeave={() => setHoverStar(0)}
+                onClick={() => setStars(i)}
+                aria-label={`${i}`}
+                className="transition-transform hover:scale-110"
+              >
+                <Star
+                  size={20}
+                  className={
+                    i <= (hoverStar || stars) ? "fill-amber-400 text-amber-400" : "text-app-3"
+                  }
+                />
+              </button>
+            ))}
+          </span>
+          {stars > 0 && (
+            <span className="text-[11px] font-semibold text-app-3" dir="ltr">
+              {stars}/5
+            </span>
+          )}
+        </div>
+      )}
       <textarea
         autoFocus={autoFocus}
         value={draft}
@@ -308,11 +380,13 @@ function Composer({
         )}
         <button
           onClick={submit}
-          disabled={(!draft.trim() && !imageUrl) || add.isPending}
+          disabled={
+            (needsStars ? stars < 1 : !draft.trim() && !imageUrl) || add.isPending
+          }
           className="btn-primary !px-4 !py-1.5 text-sm disabled:opacity-50"
         >
           {add.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          {t("نشر", "Post")}
+          {needsStars ? t("انشر المراجعة", "Publish review") : t("نشر", "Post")}
         </button>
       </div>
     </div>
@@ -324,6 +398,7 @@ function Composer({
 function CommentNode({
   comment,
   replies,
+  review,
   mangaId,
   chapterId,
   currentUserId,
@@ -332,6 +407,7 @@ function CommentNode({
 }: {
   comment: ApiComment;
   replies: ApiComment[];
+  review: boolean;
   mangaId: number;
   chapterId?: number;
   currentUserId: number | null;
@@ -346,6 +422,7 @@ function CommentNode({
     <div>
       <CommentCard
         comment={comment}
+        showStars={review}
         mangaId={mangaId}
         chapterId={chapterId}
         currentUserId={currentUserId}
@@ -389,6 +466,7 @@ function CommentNode({
                     <CommentCard
                       key={r.id}
                       comment={r}
+                      showStars={false}
                       mangaId={mangaId}
                       chapterId={chapterId}
                       currentUserId={currentUserId}
@@ -410,6 +488,7 @@ function CommentNode({
 
 function CommentCard({
   comment,
+  showStars = false,
   mangaId,
   chapterId,
   currentUserId,
@@ -418,6 +497,7 @@ function CommentCard({
   onChanged,
 }: {
   comment: ApiComment;
+  showStars?: boolean;
   mangaId: number;
   chapterId?: number;
   currentUserId: number | null;
@@ -479,6 +559,7 @@ function CommentCard({
             <span className="truncate text-sm font-bold text-app">
               {comment.user.name ?? t("مستخدم", "User")}
             </span>
+            {showStars && comment.stars != null && <StarsRow value={comment.stars} />}
             <span className="shrink-0 text-[11px] text-app-3">
               {timeAgo(comment.createdAt, lang)}
             </span>

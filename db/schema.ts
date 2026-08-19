@@ -328,6 +328,8 @@ export const comments = mysqlTable(
     parentId: bigint("parentId", { mode: "number", unsigned: true }),
     /** صورة مرفقة اختيارية (catbox) */
     imageUrl: varchar("imageUrl", { length: 500 }),
+    /** تقييم بالنجوم 1..5 — إن وُجد فالتعليق مراجعة، وإلا تعليق عادي */
+    stars: int("stars"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({

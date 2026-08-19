@@ -54,12 +54,14 @@ export const engagementRouter = createRouter({
         parentId: z.number().int().positive().nullish(),
         content: z.string().trim().max(2000),
         imageUrl: z.string().trim().url().max(500).optional(),
+        /** تقييم بالنجوم — يجعل التعليق مراجعة (للتعليقات الرئيسية فقط) */
+        stars: z.number().int().min(1).max(5).optional(),
         isSpoiler: z.boolean().default(false),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // لا نص ولا صورة = رفض
-      if (!input.content && !input.imageUrl) {
+      // مراجعة بلا نص مسموحة (نجوم فقط)؛ تعليق عادي لازم نص أو صورة
+      if (!input.content && !input.imageUrl && input.stars === undefined) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "التعليق فارغ" });
       }
       if (input.content && (await containsBannedWord(input.content))) {
@@ -81,6 +83,8 @@ export const engagementRouter = createRouter({
         }
         parentId = parent.parentId ?? parent.id;
       }
+      // النجوم للمراجعات الرئيسية فقط (لا على الردود)
+      const stars = parentId === null ? (input.stars ?? null) : null;
       const [{ id }] = await db
         .insert(comments)
         .values({
@@ -90,9 +94,27 @@ export const engagementRouter = createRouter({
           parentId,
           content: input.content,
           imageUrl: input.imageUrl ?? null,
+          stars,
           isSpoiler: input.isSpoiler,
         })
         .$returningId();
+
+      // مزامنة متوسط تقييم المانجا عند وجود نجوم (نظام المراجعات)
+      if (stars !== null) {
+        await db
+          .insert(ratings)
+          .values({ userId: ctx.user.id, mangaId: input.mangaId, stars })
+          .onDuplicateKeyUpdate({ set: { stars } });
+        const [agg] = await db
+          .select({ average: avg(ratings.stars), total: count() })
+          .from(ratings)
+          .where(eq(ratings.mangaId, input.mangaId));
+        const average = Math.round(Number(agg.average ?? 0) * 100) / 100;
+        await db
+          .update(manga)
+          .set({ rating: average, ratingCount: agg.total })
+          .where(eq(manga.id, input.mangaId));
+      }
       const [row] = await db
         .select({
           comment: comments,
@@ -194,19 +216,28 @@ export const engagementRouter = createRouter({
         mangaId: z.number().int().positive(),
         chapterId: z.number().int().positive().optional(),
         sort: z.enum(["best", "newest", "oldest"]).default("best"),
+        /** all=الكل، comments=تعليقات فقط (بلا نجوم)، reviews=مراجعات فقط (بنجوم) */
+        kind: z.enum(["all", "comments", "reviews"]).default("all"),
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(100).default(20),
       }),
     )
     .query(async ({ ctx, input }) => {
       const db = getDb();
+      const kindFilter =
+        input.kind === "reviews"
+          ? isNotNull(comments.stars)
+          : input.kind === "comments"
+            ? isNull(comments.stars)
+            : undefined;
       const targetWhere =
         input.chapterId !== undefined
           ? and(
               eq(comments.mangaId, input.mangaId),
               eq(comments.chapterId, input.chapterId),
+              kindFilter,
             )
-          : eq(comments.mangaId, input.mangaId);
+          : and(eq(comments.mangaId, input.mangaId), kindFilter);
 
       // مستخدمون محظورون من الحاظر الحالي (لإخفاء تعليقاتهم)
       const blockedIds = new Set<number>();
@@ -295,6 +326,7 @@ export const engagementRouter = createRouter({
         return {
           ...r.comment,
           user: r.user,
+          stars: r.comment.stars ?? null,
           likes: v.likes,
           dislikes: v.dislikes,
           score: v.likes - v.dislikes,
