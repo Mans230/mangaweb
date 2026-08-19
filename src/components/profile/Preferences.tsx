@@ -95,7 +95,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
                 }}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
                   theme === (th.key === "auto" ? theme : th.key) && th.key !== "auto"
-                    ? "gradient-primary text-white shadow-sm"
+                    ? "gradient-primary shadow-sm"
                     : "text-app-3 hover:text-app-2"
                 }`}
               >
@@ -119,7 +119,7 @@ export default function Preferences({ telegramLinked }: PreferencesProps) {
                   }
                 }}
                 className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
-                  lang === l ? "gradient-primary text-white shadow-sm" : "text-app-3 hover:text-app-2"
+                  lang === l ? "gradient-primary shadow-sm" : "text-app-3 hover:text-app-2"
                 }`}
               >
                 {l === "ar" ? "عربي" : "English"}

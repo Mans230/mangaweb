@@ -132,7 +132,7 @@ export default function AddToListModal({ open, onClose, mangaId, mangaTitle }: A
                 </span>
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                    isMember ? "gradient-primary border-transparent text-white" : "border-app text-transparent"
+                    isMember ? "gradient-primary border-transparent" : "border-app text-transparent"
                   }`}
                 >
                   <Check size={13} />

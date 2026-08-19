@@ -113,7 +113,7 @@ export default function ListsTab() {
                   onClick={() => setCreateOpen(true)}
                   className="glass flex aspect-[4/5] flex-col items-center justify-center gap-3 !rounded-2xl border-dashed text-app-3 transition-colors hover:border-primary/50 hover:text-primary"
                 >
-                  <span className="gradient-primary flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-md">
+                  <span className="gradient-primary flex h-12 w-12 items-center justify-center rounded-2xl shadow-md">
                     <ListPlus size={20} />
                   </span>
                   <span className="text-xs font-bold">{t("قائمة جديدة", "New list")}</span>
@@ -168,7 +168,7 @@ function ListCard({ list, index, onOpen }: { list: MyList; index: number; onOpen
       transition={{ duration: 0.4, ease: EASE, delay: index * 0.05 }}
       whileHover={{ y: -4 }}
       onClick={onOpen}
-      className="glass group flex flex-col overflow-hidden !rounded-2xl p-2 text-start transition-shadow hover:shadow-[0_16px_40px_rgba(224,86,31,0.18)]"
+      className="glass group flex flex-col overflow-hidden !rounded-2xl p-2 text-start transition-shadow hover:shadow-[0_16px_40px_rgba(244,241,236,0.18)]"
     >
       {/* شبكة ٢×٢ من الأغلفة */}
       <div className="grid aspect-[4/3] grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-xl bg-black/10 dark:bg-white/5">
@@ -342,7 +342,7 @@ function ListDetail({
               >
                 <Link
                   to={`/manga/${item.manga.slug}`}
-                  className="glass block overflow-hidden !rounded-2xl p-2 transition-shadow hover:shadow-[0_16px_40px_rgba(224,86,31,0.18)]"
+                  className="glass block overflow-hidden !rounded-2xl p-2 transition-shadow hover:shadow-[0_16px_40px_rgba(244,241,236,0.18)]"
                 >
                   <div className="relative aspect-[2/3] overflow-hidden rounded-[14px]">
                     <img

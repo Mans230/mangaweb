@@ -46,7 +46,7 @@ export default function Today() {
         className="relative flex flex-col gap-5"
       >
         <div className="flex items-center gap-3">
-          <span className="gradient-primary flex h-11 w-11 items-center justify-center rounded-2xl text-white">
+          <span className="gradient-primary flex h-11 w-11 items-center justify-center rounded-2xl">
             <CalendarClock size={19} />
           </span>
           <div>

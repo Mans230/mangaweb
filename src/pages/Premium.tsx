@@ -33,7 +33,7 @@ export default function Premium() {
       className="mx-auto max-w-3xl px-4 py-8 md:px-6"
     >
       <div className="mb-6 text-center">
-        <span className="gradient-primary mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl text-white">
+        <span className="gradient-primary mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl">
           <Crown size={26} />
         </span>
         <h1 className="font-display text-2xl font-bold text-app">{t("زيكو مميّز", "Zeko Premium")}</h1>

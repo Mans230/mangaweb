@@ -143,7 +143,7 @@ export default function PublicProfile() {
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((tile) => (
           <div key={tile.label} className="glass !rounded-2xl p-3 text-center">
-            <span className="gradient-primary mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl text-white">
+            <span className="gradient-primary mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl">
               <tile.icon size={16} />
             </span>
             <div className="font-display text-lg font-extrabold text-app">{tile.value}</div>

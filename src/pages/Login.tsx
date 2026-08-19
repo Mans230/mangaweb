@@ -258,7 +258,7 @@ export default function Login() {
               }}
               className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
                 mode === tab.key
-                  ? "gradient-primary text-white shadow"
+                  ? "gradient-primary shadow"
                   : "text-app-2 hover:text-app"
               }`}
             >

@@ -92,7 +92,7 @@ export default function IdentityCard({
           <div className="flex flex-wrap items-center justify-start gap-2">
             <h1 className="font-display text-xl font-bold text-app md:text-2xl">{name}</h1>
             {/* role badge */}
-            <span className="gradient-primary flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold text-white shadow-sm">
+            <span className="gradient-primary flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold shadow-sm">
               <BadgeCheck size={12} />
               {role === "admin" ? t("مشرف", "Admin") : t("عضو", "Member")}
             </span>

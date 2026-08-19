@@ -317,7 +317,7 @@ export default function MangaDetail() {
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
         <div
           className="animate-blob-a absolute -top-[8vw] end-[-6vw] h-[32vw] w-[32vw] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(224,86,31,0.4), transparent 65%)", filter: "blur(80px)" }}
+          style={{ background: "radial-gradient(circle, rgba(244,241,236,0.4), transparent 65%)", filter: "blur(80px)" }}
         />
       </div>
 

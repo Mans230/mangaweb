@@ -110,7 +110,7 @@ export default function AdvancedFilters({
                     aria-pressed={selected}
                     className={`glass-chip !px-3.5 !py-1.5 text-xs font-semibold transition-all ${
                       selected
-                        ? "gradient-primary !border-transparent !text-white shadow-[0_4px_14px_rgba(224,86,31,0.35)]"
+                        ? "gradient-primary !border-transparent shadow-[0_4px_14px_rgba(244,241,236,0.35)]"
                         : ""
                     }`}
                   >

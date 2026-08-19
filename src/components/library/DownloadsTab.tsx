@@ -88,7 +88,7 @@ export default function DownloadsTab() {
                 transition={{ duration: 0.3, ease: EASE, delay: Math.min(i, 8) * 0.03 }}
                 className="glass group flex items-center gap-3 !rounded-2xl p-3"
               >
-                <span className="gradient-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white">
+                <span className="gradient-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                   <Download size={16} />
                 </span>
                 <div className="min-w-0 flex-1">

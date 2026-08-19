@@ -255,7 +255,7 @@ export default function MergeDuplicates() {
                         <motion.span
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          className="gradient-primary absolute -top-2.5 start-4 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white"
+                          className="gradient-primary absolute -top-2.5 start-4 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold"
                         >
                           <Star size={10} /> {t("الأساسية", "Primary")}
                         </motion.span>

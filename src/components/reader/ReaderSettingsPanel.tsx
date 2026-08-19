@@ -185,7 +185,7 @@ function Segment<T extends string>({
             onClick={() => onSelect(opt.value)}
             className={`flex-1 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all ${
               value === opt.value
-                ? "gradient-primary text-white shadow"
+                ? "gradient-primary shadow"
                 : "text-app-2 hover:text-app"
             }`}
           >

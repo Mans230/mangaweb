@@ -251,7 +251,7 @@ export default function AnalyticsDashboard() {
                     <stop offset="100%" stopColor="#D9A441" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(224,86,31,0.12)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(244,241,236,0.12)" vertical={false} />
                 <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} interval={4} />
                 <YAxis tickLine={false} axisLine={false} fontSize={10} width={36} allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -268,7 +268,7 @@ export default function AnalyticsDashboard() {
           ) : (
             <ChartContainer config={hoursConfig} className="!aspect-auto h-64 w-full">
               <BarChart data={peakHours.data ?? []} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(224,86,31,0.12)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(244,241,236,0.12)" vertical={false} />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} fontSize={10} interval={2} />
                 <YAxis tickLine={false} axisLine={false} fontSize={10} width={36} allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />

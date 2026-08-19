@@ -189,7 +189,7 @@ export default function ReaderChrome({
           >
             <MessageSquareText size={18} />
             {commentsCount > 0 && (
-              <span className="gradient-primary absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white">
+              <span className="gradient-primary absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold">
                 {commentsCount > 99 ? "99+" : commentsCount}
               </span>
             )}

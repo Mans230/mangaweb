@@ -195,7 +195,7 @@ export default function InfoCard({
         >
           <div
             className="sheen relative aspect-[2/3] overflow-hidden rounded-2xl"
-            style={{ boxShadow: "0 16px 48px rgba(224,86,31,0.3)" }}
+            style={{ boxShadow: "0 16px 48px rgba(244,241,236,0.3)" }}
           >
             <img
               src={vm.cover}

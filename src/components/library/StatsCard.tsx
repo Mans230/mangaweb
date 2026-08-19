@@ -79,7 +79,7 @@ export default function StatsCard({ history }: StatsCardProps) {
             transition={{ duration: 0.4, ease: EASE, delay: i * 0.08 }}
             className="glass !rounded-2xl p-3 text-center"
           >
-            <span className="gradient-primary mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-md">
+            <span className="gradient-primary mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl shadow-md">
               <tile.icon size={16} />
             </span>
             <div className="font-display text-lg font-extrabold text-app sm:text-2xl">{tile.value}</div>

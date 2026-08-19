@@ -501,7 +501,7 @@ export default function Support() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14">
       <div className="mb-6 flex items-center gap-3">
-        <span className="gradient-primary flex h-12 w-12 items-center justify-center rounded-2xl text-white">
+        <span className="gradient-primary flex h-12 w-12 items-center justify-center rounded-2xl">
           <MessageSquare size={20} />
         </span>
         <div>

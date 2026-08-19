@@ -39,7 +39,7 @@ export default function AuthPrompt({ open, onClose }: AuthPromptProps) {
               <X size={16} />
             </button>
             <div className="flex items-center gap-3">
-              <span className="gradient-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white">
+              <span className="gradient-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                 <LogIn size={18} />
               </span>
               <div>

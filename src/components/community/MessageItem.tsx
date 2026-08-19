@@ -88,7 +88,7 @@ export default function MessageItem({
         <div
           className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 sm:max-w-[65%] ${
             mine
-              ? "gradient-primary rounded-es-sm text-white shadow-md"
+              ? "gradient-primary rounded-es-sm shadow-md"
               : "glass rounded-ee-sm"
           }`}
         >

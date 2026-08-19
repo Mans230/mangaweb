@@ -121,7 +121,7 @@ export default function Communities() {
           className="flex flex-col gap-4"
         >
           <div className="flex flex-wrap items-center gap-3">
-            <span className="gradient-primary flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg">
+            <span className="gradient-primary flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg">
               <UsersRound size={22} />
             </span>
             <div className="min-w-0 flex-1">

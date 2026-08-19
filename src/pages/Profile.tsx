@@ -100,7 +100,7 @@ export default function Profile() {
               to="/admin"
               className="glass flex items-center gap-3 !rounded-3xl p-5 transition-colors hover:border-primary/50"
             >
-              <span className="gradient-primary flex h-11 w-11 items-center justify-center rounded-xl text-white">
+              <span className="gradient-primary flex h-11 w-11 items-center justify-center rounded-xl">
                 <LayoutDashboard size={19} />
               </span>
               <span className="min-w-0 flex-1">

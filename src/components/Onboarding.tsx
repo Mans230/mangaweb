@@ -97,7 +97,7 @@ export default function Onboarding() {
                 transition={{ duration: 0.3, ease: EASE }}
                 className="flex flex-col items-center gap-3 py-4"
               >
-                <span className="gradient-primary flex h-16 w-16 items-center justify-center rounded-3xl text-white shadow-lg">
+                <span className="gradient-primary flex h-16 w-16 items-center justify-center rounded-3xl shadow-lg">
                   <current.icon size={28} />
                 </span>
                 <h2 className="font-display text-xl font-extrabold text-app">{current.title}</h2>

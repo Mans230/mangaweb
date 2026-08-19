@@ -145,7 +145,7 @@ export default function ReviewsSection({ mangaId, isEn = false }: Props) {
       >
         {/* الترويسة */}
         <div className="mb-5 flex items-center gap-3">
-          <span className="gradient-primary flex h-10 w-10 items-center justify-center rounded-2xl text-white">
+          <span className="gradient-primary flex h-10 w-10 items-center justify-center rounded-2xl">
             <MessageSquareText size={18} />
           </span>
           <h2 className="font-display text-lg font-extrabold text-app">

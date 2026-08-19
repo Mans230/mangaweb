@@ -64,7 +64,7 @@ export default function PwaInstallBanner() {
           className="glass-strong fixed inset-x-3 bottom-20 z-[60] flex items-center gap-3 !rounded-2xl p-3 md:inset-x-auto md:bottom-5 md:end-5 md:w-80"
           role="status"
         >
-          <span className="gradient-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white">
+          <span className="gradient-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             <Download size={17} />
           </span>
           <span className="min-w-0 flex-1">

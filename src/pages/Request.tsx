@@ -628,7 +628,7 @@ export default function Request() {
         <div className="gradient-hero-bg absolute inset-x-0 top-0 h-[480px]" />
         <div
           className="animate-blob-a absolute -top-10 end-[-8vw] h-[320px] w-[320px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(224,86,31,0.4), transparent 65%)", filter: "blur(70px)" }}
+          style={{ background: "radial-gradient(circle, rgba(244,241,236,0.4), transparent 65%)", filter: "blur(70px)" }}
         />
         <div
           className="animate-blob-b absolute top-72 start-[-6vw] h-[260px] w-[260px] rounded-full"

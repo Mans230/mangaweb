@@ -152,8 +152,8 @@ export default function ChaptersTab({
         to={`/manga/${slug}/chapter/${fmtChapter(c.number)}`}
         className={`group flex h-[60px] items-center gap-3 rounded-2xl border px-3 transition-colors ${
           isNext
-            ? "border-[rgba(224,86,31,0.35)] bg-[rgba(224,86,31,0.12)]"
-            : "border-transparent hover:bg-[rgba(224,86,31,0.08)]"
+            ? "border-[rgba(244,241,236,0.35)] bg-[rgba(244,241,236,0.12)]"
+            : "border-transparent hover:bg-[rgba(244,241,236,0.08)]"
         } ${isRead ? "opacity-55" : ""}`}
       >
         <span
@@ -169,7 +169,7 @@ export default function ChaptersTab({
           {c.title || t(`الفصل ${fmtChapter(c.number)}`, `Chapter ${fmtChapter(c.number)}`)}
         </span>
         {isNext && (
-          <span className="gradient-primary shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white">
+          <span className="gradient-primary shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold">
             {t("تابع من هنا", "Continue here")}
           </span>
         )}

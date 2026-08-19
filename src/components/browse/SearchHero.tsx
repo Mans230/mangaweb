@@ -82,7 +82,7 @@ export default function SearchHero({
       <div
         aria-hidden
         className="animate-blob-a pointer-events-none absolute -top-16 end-[8%] h-56 w-56 rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(224,86,31,0.35), transparent 65%)", filter: "blur(60px)" }}
+        style={{ background: "radial-gradient(circle, rgba(244,241,236,0.35), transparent 65%)", filter: "blur(60px)" }}
       />
       <div
         aria-hidden
@@ -108,7 +108,7 @@ export default function SearchHero({
           transition={{ duration: 0.5, ease: EASE, delay: 0.15 }}
           className="group relative mt-6 w-full"
         >
-          <div className="glass flex h-14 items-center gap-2 !rounded-[18px] px-4 transition-shadow focus-within:shadow-[0_0_0_2px_var(--border-glow),0_10px_32px_rgba(224,86,31,0.18)]">
+          <div className="glass flex h-14 items-center gap-2 !rounded-[18px] px-4 transition-shadow focus-within:shadow-[0_0_0_2px_var(--border-glow),0_10px_32px_rgba(244,241,236,0.18)]">
             <Search size={20} className="shrink-0 text-app-3 transition-colors group-focus-within:text-primary" />
             <input
               ref={inputRef}

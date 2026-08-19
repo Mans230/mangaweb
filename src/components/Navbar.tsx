@@ -4,6 +4,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell,
+  BookOpen,
   CheckCheck,
   Coins,
   Home,
@@ -122,7 +123,7 @@ function NotificationsBell() {
                 <DropdownMenuItem
                   key={n.id}
                   onClick={() => openItem(n)}
-                  className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(224,86,31,0.16)]"
+                  className="cursor-pointer gap-3 !rounded-xl px-2 py-2 focus:bg-[rgba(244,241,236,0.16)]"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
                     <Bell size={15} />
@@ -226,7 +227,9 @@ export default function Navbar() {
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 md:px-6">
           {/* Logo */}
           <Link to="/" className="flex shrink-0 items-center gap-2.5">
-            <img src="/logo.svg" alt="zeko-manga" className="h-9 w-9 rounded-xl" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-app bg-[var(--surface-strong)] text-primary">
+              <BookOpen size={18} strokeWidth={2.4} />
+            </span>
             {/* الاسم يظهر على الشاشات الكبيرة فقط لتوفير المساحة على الهاتف */}
             <span className="font-display hidden text-lg font-bold text-primary sm:inline md:text-xl">
               {t("زيكو مانجا", "zeko-manga")}
@@ -458,7 +461,7 @@ export default function Navbar() {
                 <motion.span
                   layoutId="bottom-nav-pill"
                   className="absolute inset-0 rounded-xl"
-                  style={{ background: "rgba(224,86,31,0.18)", border: "1px solid var(--border-glow)" }}
+                  style={{ background: "rgba(244,241,236,0.18)", border: "1px solid var(--border-glow)" }}
                   transition={{ type: "spring", stiffness: 380, damping: 32 }}
                 />
               )}

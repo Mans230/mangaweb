@@ -282,7 +282,7 @@ export default function DownloadModal({ open, slug, chapterTotal, onClose }: Dow
                     type="button"
                     onClick={() => setPart(p)}
                     className={`glass-chip h-9 w-11 justify-center !px-0 text-xs font-bold ${
-                      part === p ? "gradient-primary !border-transparent text-white" : ""
+                      part === p ? "gradient-primary !border-transparent" : ""
                     }`}
                   >
                     {p}
