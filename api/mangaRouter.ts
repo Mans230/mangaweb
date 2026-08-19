@@ -192,7 +192,14 @@ export const mangaRouter = createRouter({
       }
       let pages: string[];
       try {
-        pages = await scraper.getPages(row.chapter.url);
+        // محاولتان: كثير من المصادر متقلّبة (5xx/timeout عابر) — أعد المحاولة مرة
+        try {
+          pages = await scraper.getPages(row.chapter.url);
+        } catch (first) {
+          if (stored.length) throw first; // عندنا كاش — لا تُبطئ، اسقط للكاش فوراً
+          await new Promise((r) => setTimeout(r, 1200));
+          pages = await scraper.getPages(row.chapter.url);
+        }
       } catch (e) {
         // circuit breaker / 429 / أي خطأ — ارجع بالنسخة المخزنة إن سبق جلب الفصل
         if (stored.length) {

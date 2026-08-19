@@ -141,7 +141,10 @@ async function upsertChapters(
     .select({ number: chapters.number, publishedAt: chapters.publishedAt })
     .from(chapters)
     .where(eq(chapters.mangaId, mangaId));
-  const existingNums = new Set(existing.map((r) => Number(r.number)));
+  // عمود number من نوع decimal(8,1): طابِق المفتاح على نفس دقّة الخانة العشرية الواحدة
+  // حتى لا نحاول إدراج رقمين يتصادمان بعد التقريب (سبب فشل insert المتكرر).
+  const key1 = (n: number) => Math.round(n * 10) / 10;
+  const existingNums = new Set(existing.map((r) => key1(Number(r.number))));
 
   // استيراد أولي (المانجا بلا فصول سابقة): لا تُغرق خلاصة "آخر الفصول" —
   // createdAt = publishedAt إن عُرف، وإلا نُرجعه 7 أيام للخلف.
@@ -163,19 +166,23 @@ async function upsertChapters(
       };
     });
 
-  // أزل التكرار داخل الدفعة نفسها (نفس الرقم)
+  // أزل التكرار داخل الدفعة نفسها (نفس الرقم بعد التقريب لخانة واحدة)
   const seen = new Set<number>();
   const deduped = rows.filter((r) => {
-    const key = Number(r.number);
+    const key = key1(Number(r.number));
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 
-  // أدخل الفصول الجديدة فقط — (mangaId, number) فريد
-  const fresh = deduped.filter((r) => !existingNums.has(Number(r.number)));
+  // أدخل الفصول الجديدة فقط — (mangaId, number) فريد.
+  // onDuplicateKeyUpdate كصمّام أمان: أي تصادم متبقٍّ لا يُسقط الدفعة كلها.
+  const fresh = deduped.filter((r) => !existingNums.has(key1(Number(r.number))));
   for (let i = 0; i < fresh.length; i += 200) {
-    await db.insert(chapters).values(fresh.slice(i, i + 200));
+    await db
+      .insert(chapters)
+      .values(fresh.slice(i, i + 200))
+      .onDuplicateKeyUpdate({ set: { mangaId: sql`${chapters.mangaId}` } });
   }
 
   // حدّث publishedAt للفصول الموجودة التي بلا تاريخ عندما توفر المصدر قيمة الآن
@@ -589,7 +596,38 @@ export async function refreshChapters(mangaId: number): Promise<{ chaptersAdded:
       updatedAt: new Date(),
     })
     .where(eq(manga.id, m.id));
+
+  // pre-warm: خزّن صفحات أحدث فصل جديد الآن حتى لا يفشل الفتح الأول إن تعطّل
+  // المصدر لاحقاً (best-effort — أي فشل هنا لا يُفشل التحديث).
+  if (numbers.length && scraper.getPages) {
+    try {
+      await prewarmNewestChapter(m.id, scraper);
+    } catch (e) {
+      console.warn(`[importer] prewarm ${m.id} فشل: ${(e as Error).message}`);
+    }
+  }
   return { chaptersAdded };
+}
+
+/** يجلب صفحات أحدث فصل بلا كاش ويخزّنها في cachedPages (تشغيل best-effort). */
+async function prewarmNewestChapter(
+  mangaId: number,
+  scraper: BaseScraper,
+): Promise<void> {
+  const db = getDb();
+  const [ch] = await db
+    .select({ id: chapters.id, url: chapters.url })
+    .from(chapters)
+    .where(and(eq(chapters.mangaId, mangaId), isNull(chapters.cachedPages)))
+    .orderBy(sql`${chapters.number} DESC`)
+    .limit(1);
+  if (!ch || !ch.url) return;
+  const pages = await scraper.getPages(ch.url);
+  if (!pages.length) return;
+  await db
+    .update(chapters)
+    .set({ cachedPages: pages, pagesCachedAt: new Date(), pageCount: pages.length })
+    .where(eq(chapters.id, ch.id));
 }
 
 /**

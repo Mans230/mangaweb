@@ -169,7 +169,16 @@ export class DilarScraper extends BaseScraper {
     const key = Buffer.from(crypto.hkdfSync("sha256", shared, salt, info, 32));
     const decipher = crypto.createDecipheriv("aes-256-gcm", key, fromB64u(data.iv));
     decipher.setAuthTag(fromB64u(data.tag));
-    const plain = Buffer.concat([decipher.update(fromB64u(data.ct)), decipher.final()]);
+    let plain: Buffer;
+    try {
+      plain = Buffer.concat([decipher.update(fromB64u(data.ct)), decipher.final()]);
+    } catch (e) {
+      // تشخيص: فشل فك التشفير غالباً يعني أن المصدر غيّر نظام ECIES (نسخة جديدة)
+      console.error(
+        `[dilar] فشل فك تشفير الفصل ${releaseId}: v=${data.v} e=${data.e} — ${(e as Error).message}`,
+      );
+      throw e;
+    }
     return JSON.parse(plain.toString("utf8"));
   }
 
