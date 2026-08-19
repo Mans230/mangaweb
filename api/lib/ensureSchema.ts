@@ -330,6 +330,47 @@ export async function ensureBootSchema(): Promise<void> {
     console.warn(`[ensure-schema] posts: ${(e as Error).message}`);
   }
 
+  // ===== تحديث نظام التعليقات: ردود + تصويت + حظر + بلاغات =====
+  await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `comments` ADD `parentId` bigint unsigned")),
+    "comments.parentId",
+  );
+  await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `comments` ADD `imageUrl` varchar(500)")),
+    "comments.imageUrl",
+  );
+  await ignoreDuplicateColumn(
+    db.execute(sql.raw("ALTER TABLE `reports` ADD `commentId` bigint unsigned")),
+    "reports.commentId",
+  );
+  try {
+    await ensureIndex(
+      "comments",
+      "comments_parent_idx",
+      "CREATE INDEX `comments_parent_idx` ON `comments` (`parentId`)",
+    );
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`comment_votes\` (
+	\`commentId\` bigint unsigned NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`value\` int NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`comment_votes_pk\` PRIMARY KEY(\`commentId\`, \`userId\`)
+)`));
+    await ensureIndex(
+      "comment_votes",
+      "comment_votes_comment_idx",
+      "CREATE INDEX `comment_votes_comment_idx` ON `comment_votes` (`commentId`)",
+    );
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`user_blocks\` (
+	\`blockerId\` bigint unsigned NOT NULL,
+	\`blockedId\` bigint unsigned NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`user_blocks_pk\` PRIMARY KEY(\`blockerId\`, \`blockedId\`)
+)`));
+  } catch (e) {
+    console.warn(`[ensure-schema] comments upgrade: ${(e as Error).message}`);
+  }
+
   // ===== رياكشنات المانهوا/الفصل =====
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`reactions\` (

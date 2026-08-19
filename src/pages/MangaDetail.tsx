@@ -1,6 +1,5 @@
 
 import { useMemo, useState } from "react";
-import { proxyImg } from "@/lib/manga";
 import { useParams } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { trpc } from "@/providers/trpc";
@@ -12,18 +11,17 @@ import ErrorState from "@/components/ErrorState";
 import BackdropHero from "@/components/manga/BackdropHero";
 import InfoCard from "@/components/manga/InfoCard";
 import ChaptersTab from "@/components/manga/ChaptersTab";
-import CommentsTab from "@/components/manga/CommentsTab";
+import CommentsSection from "@/components/comments/CommentsSection";
 import SimilarTab from "@/components/manga/SimilarTab";
 import ReviewsSection from "@/components/manga/ReviewsSection";
 import Reactions from "@/components/Reactions";
 import DownloadModal from "@/components/manga/DownloadModal";
 import AuthPrompt from "@/components/manga/AuthPrompt";
-import type { CommentVM, DetailVM } from "@/components/manga/types";
+import type { DetailVM } from "@/components/manga/types";
 import {
   computeReadState,
   dbChapterToVM,
   dbMangaToCard,
-  timeAgo,
 } from "@/components/manga/types";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -36,7 +34,7 @@ type TabId = "chapters" | "comments" | "similar";
 export default function MangaDetail() {
   const { slug = "" } = useParams();
   const { t, lang } = useLanguage();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   /* ================= البيانات — API فقط، بلا بدائل وهمية ================= */
   const detailQuery = trpc.manga.getBySlug.useQuery(
@@ -145,56 +143,6 @@ export default function MangaDetail() {
     if (!vm) return;
     setUserStars(stars);
     rateMutation.mutate({ mangaId: vm.id, stars });
-  };
-
-  /* ================= التعليقات ================= */
-  const [commentLimit, setCommentLimit] = useState(20);
-  const commentsQuery = trpc.engagement.listComments.useQuery(
-    { mangaId: vm?.id ?? 0, page: 1, limit: commentLimit },
-    { enabled: !!vm, retry: false },
-  );
-  const [localComments, setLocalComments] = useState<CommentVM[]>([]);
-
-  // عند فشل جلب التعليقات تُعرض قائمة فارغة حقيقية بدل تعليقات وهمية
-  const serverComments: CommentVM[] = useMemo(() => {
-    if (commentsQuery.isError) return [];
-    return (commentsQuery.data?.items ?? []).map((c) => ({
-      id: c.id,
-      author: c.user.name ?? t("مستخدم", "User"),
-      avatar: proxyImg(c.user.avatar) || "/placeholder-avatar.svg",
-      badge: "عضو",
-      timeAgo: timeAgo(c.createdAt, lang),
-      content: c.content,
-      isSpoiler: c.isSpoiler,
-      likes: 0,
-    }));
-  }, [commentsQuery.isError, commentsQuery.data, lang, t]);
-
-  const commentTotal = commentsQuery.data?.total ?? 0;
-  const allComments = [...localComments, ...serverComments];
-
-  const addCommentMutation = trpc.engagement.addComment.useMutation({
-    onSuccess: (row) => {
-      if (!row) return;
-      setLocalComments((prev) => [
-        {
-          id: row.id,
-          author: row.user.name ?? t("مستخدم", "User"),
-          avatar: proxyImg(row.user.avatar) || "/placeholder-avatar.svg",
-          badge: "عضو",
-          timeAgo: t("الآن", "now"),
-          content: row.content,
-          isSpoiler: row.isSpoiler,
-          likes: 0,
-        },
-        ...prev,
-      ]);
-    },
-  });
-
-  const submitComment = (content: string, isSpoiler: boolean) => {
-    if (!vm) return;
-    addCommentMutation.mutate({ mangaId: vm.id, content, isSpoiler });
   };
 
   /* ================= أعمال مشابهة ================= */
@@ -307,7 +255,7 @@ export default function MangaDetail() {
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "chapters", label: isEn ? `Chapters (${vm.chapterTotal})` : `${t("الفصول", "Chapters")} (${vm.chapterTotal})` },
-    { id: "comments", label: isEn ? `Comments (${commentTotal})` : `${t("التعليقات", "Comments")} (${commentTotal})` },
+    { id: "comments", label: isEn ? "Comments" : t("التعليقات", "Comments") },
     { id: "similar", label: isEn ? "Similar" : t("أعمال مشابهة", "Similar") },
   ];
 
@@ -396,19 +344,7 @@ export default function MangaDetail() {
                 onMarkAllUnread={markAllUnread}
               />
             )}
-            {activeTab === "comments" && (
-              <CommentsTab
-                isAuthenticated={isAuthenticated}
-                userAvatar={user?.avatarUrl}
-                comments={allComments}
-                total={commentTotal + localComments.length}
-                hasMore={allComments.length < commentTotal}
-                loadingMore={commentsQuery.isFetching}
-                submitPending={addCommentMutation.isPending}
-                onLoadMore={() => setCommentLimit((l) => Math.min(100, l + 20))}
-                onSubmit={submitComment}
-              />
-            )}
+            {activeTab === "comments" && <CommentsSection mangaId={vm.id} />}
             {activeTab === "similar" && <SimilarTab items={similarItems} />}
           </motion.div>
         </AnimatePresence>

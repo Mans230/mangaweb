@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { chapters, communityChatMessages, manga, reports, users } from "@db/schema";
+import { chapters, comments, communityChatMessages, manga, reports, users } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 
@@ -24,6 +24,7 @@ export const reportsRouter = createRouter({
           mangaId: z.number().int().positive().optional(),
           chapterId: z.number().int().positive().optional(),
           communityMessageId: z.number().int().positive().optional(),
+          commentId: z.number().int().positive().optional(),
           reason: reportReasonEnum,
           details: z.string().trim().max(2000).optional(),
         })
@@ -31,8 +32,9 @@ export const reportsRouter = createRouter({
           (v) =>
             v.mangaId !== undefined ||
             v.chapterId !== undefined ||
-            v.communityMessageId !== undefined,
-          { message: "يجب تحديد مانجا أو فصل أو رسالة مجتمع" },
+            v.communityMessageId !== undefined ||
+            v.commentId !== undefined,
+          { message: "يجب تحديد مانجا أو فصل أو رسالة أو تعليق" },
         ),
     )
     .mutation(async ({ ctx, input }) => {
@@ -48,6 +50,16 @@ export const reportsRouter = createRouter({
         if (!msg) {
           throw new TRPCError({ code: "NOT_FOUND", message: "الرسالة غير موجودة" });
         }
+      }
+      if (input.commentId !== undefined) {
+        const c = await db.query.comments.findFirst({
+          where: eq(comments.id, input.commentId),
+          columns: { id: true, mangaId: true },
+        });
+        if (!c) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "التعليق غير موجود" });
+        }
+        if (mangaId === null) mangaId = c.mangaId;
       }
       if (input.chapterId !== undefined) {
         const chapter = await db.query.chapters.findFirst({
@@ -83,6 +95,11 @@ export const reportsRouter = createRouter({
           ? eq(reports.communityMessageId, input.communityMessageId)
           : isNull(reports.communityMessageId),
       );
+      targetConditions.push(
+        input.commentId !== undefined
+          ? eq(reports.commentId, input.commentId)
+          : isNull(reports.commentId),
+      );
       const existing = await db.query.reports.findFirst({
         where: and(...targetConditions),
         columns: { id: true },
@@ -101,6 +118,7 @@ export const reportsRouter = createRouter({
           mangaId,
           chapterId: input.chapterId ?? null,
           communityMessageId: input.communityMessageId ?? null,
+          commentId: input.commentId ?? null,
           reason: input.reason,
           details: input.details ?? null,
         })

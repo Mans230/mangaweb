@@ -324,15 +324,48 @@ export const comments = mysqlTable(
     ),
     content: text("content").notNull(),
     isSpoiler: boolean("isSpoiler").default(false).notNull(),
+    /** ردّ على تعليق آخر (مستوى واحد) — null = تعليق رئيسي */
+    parentId: bigint("parentId", { mode: "number", unsigned: true }),
+    /** صورة مرفقة اختيارية (catbox) */
+    imageUrl: varchar("imageUrl", { length: 500 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({
     mangaIdx: index("comments_manga_idx").on(table.mangaId),
     chapterIdx: index("comments_chapter_idx").on(table.chapterId),
+    parentIdx: index("comments_parent_idx").on(table.parentId),
   }),
 );
 
 export type Comment = typeof comments.$inferSelect;
+
+/** تصويت لايك/ديسلايك على تعليق — صوت واحد لكل مستخدم لكل تعليق */
+export const commentVotes = mysqlTable(
+  "comment_votes",
+  {
+    commentId: bigint("commentId", { mode: "number", unsigned: true }).notNull(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    /** 1 = لايك، -1 = ديسلايك */
+    value: int("value").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.commentId, table.userId] }),
+  }),
+);
+
+/** حظر مستخدم لمستخدم آخر — تعليقات المحظور تختفي عن الحاظر */
+export const userBlocks = mysqlTable(
+  "user_blocks",
+  {
+    blockerId: bigint("blockerId", { mode: "number", unsigned: true }).notNull(),
+    blockedId: bigint("blockedId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.blockerId, table.blockedId] }),
+  }),
+);
 
 export const ratings = mysqlTable(
   "ratings",
@@ -456,6 +489,7 @@ export const reports = mysqlTable(
       mode: "number",
       unsigned: true,
     }).references(() => communityChatMessages.id, { onDelete: "set null" }),
+    commentId: bigint("commentId", { mode: "number", unsigned: true }),
     reason: mysqlEnum("reason", [
       "porn",
       "broken",
