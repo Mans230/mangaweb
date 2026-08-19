@@ -226,7 +226,7 @@ function HeroSlider() {
         </AnimatePresence>
 
         {/* Coverflow — الغلاف النشط في المنتصف والجانبيّة باهتة، مع انتقال متحرّك */}
-        <div className="relative mx-auto h-[300px] w-full max-w-[440px] sm:h-[360px]">
+        <div className="relative mx-auto h-[300px] w-full max-w-[440px] overflow-hidden sm:h-[360px]">
           {slides.map((s, i) => {
             let off = i - safeIndex;
             if (off > count / 2) off -= count;
