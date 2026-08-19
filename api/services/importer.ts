@@ -12,6 +12,8 @@ import {
 import { getDb } from "../queries/connection";
 import { getScraper } from "../scrapers";
 import type { BaseScraper, SeriesInfo } from "../scrapers";
+import { mirrorEnabled } from "../lib/r2";
+import { mirrorChapter } from "../lib/mirror";
 
 /** تطبيع العنوان للمطابقة بين المصادر */
 export function normalizeTitle(title: string): string {
@@ -628,6 +630,10 @@ async function prewarmNewestChapter(
     .update(chapters)
     .set({ cachedPages: pages, pagesCachedAt: new Date(), pageCount: pages.length })
     .where(eq(chapters.id, ch.id));
+  // ميرور دائم إلى R2 (eager) — يستبدل روابط المصدر بروابطنا
+  if (mirrorEnabled()) {
+    await mirrorChapter(ch.id, mangaId, pages, scraper.imageReferer);
+  }
 }
 
 /**

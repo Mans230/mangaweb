@@ -35,7 +35,7 @@ function extFromUrl(url: string): string {
 }
 
 /** جلب صورة واحدة مع timeout وحد للحجم — يعيد null عند الفشل (تُتخطَّى الصفحة) */
-async function fetchImage(
+export async function fetchImage(
   url: string,
   referer: string,
 ): Promise<{ data: Buffer; ext: string } | null> {

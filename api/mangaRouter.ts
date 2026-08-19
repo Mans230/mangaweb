@@ -11,6 +11,8 @@ import {
 import { getDb } from "./queries/connection";
 import { createRouter, publicQuery } from "./middleware";
 import { getScraper } from "./scrapers";
+import { isMirrored, mirrorEnabled } from "./lib/r2";
+import { mirrorChapter } from "./lib/mirror";
 import { arabicSourceFilter } from "./services/enImport";
 import {
   getSetting,
@@ -182,6 +184,11 @@ export const mangaRouter = createRouter({
         return { pages: stored, cached: true as const };
       };
 
+      // مُميرَّر دائماً على R2 → اخدمه فوراً بلا لمس المصدر إطلاقاً
+      if (stored.length && stored.every((u) => isMirrored(u))) {
+        return fromCache();
+      }
+
       const scraper = getScraper(row.source.name);
       if (!scraper || !scraper.enabled) {
         if (stored.length) return fromCache();
@@ -225,7 +232,7 @@ export const mangaRouter = createRouter({
         });
       }
       pagesCache.set(input.chapterId, { pages, at: Date.now() });
-      // خزّن الصفحات في القاعدة عند كل جلب ناجح (تُحدَّث تلقائياً عند إعادة الجلب)
+      // خزّن روابط المصدر مؤقتاً (كاش احتياطي) — يستبدلها الميرور بروابط R2
       await db
         .update(chapters)
         .set({
@@ -236,6 +243,15 @@ export const mangaRouter = createRouter({
             : {}),
         })
         .where(eq(chapters.id, input.chapterId));
+      // ميرور دائم إلى R2 في الخلفية (لا يُبطئ الرد) — الفتحة الجاية تُخدَم من R2
+      if (mirrorEnabled()) {
+        void mirrorChapter(
+          input.chapterId,
+          row.chapter.mangaId,
+          pages,
+          scraper.imageReferer,
+        );
+      }
       return { pages };
     }),
 

@@ -1,3 +1,4 @@
+import { env } from "../lib/env";
 import type { BaseScraper } from "./base";
 import KawaiiMangaScraper from "./kawaiimanga";
 import OlympusStaffScraper from "./olympustaff";
@@ -149,5 +150,13 @@ export function imageHostPolicy(): Map<string, string> {
   map.set("uguu.se", ""); // a.uguu.se / n.uguu.se
   map.set("kappa.lol", "");
   map.set("pomf2.lain.la", "");
+  // تخزيننا الدائم على R2 — صفحات الفصول المُميرَّرة (بلا referer)
+  if (env.r2PublicUrl) {
+    try {
+      map.set(new URL(env.r2PublicUrl).hostname.toLowerCase(), "");
+    } catch {
+      /* ignore */
+    }
+  }
   return map;
 }
