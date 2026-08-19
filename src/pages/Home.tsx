@@ -36,21 +36,6 @@ import { useAuth } from "@/hooks/useAuth";
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const AUTOPLAY_MS = 6000;
 
-/** مطابقة media query مع تحديث تفاعلي — لتفادي تحميل صور الديسكتوب على الموبايل */
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const onChange = () => setMatches(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
-}
-
 /* ================= Ticker — شريط متحرك بأحدث الفصول ================= */
 function ReleaseTicker() {
   const query = trpc.manga.latest.useQuery({ limit: 8 }, { retry: false });
@@ -112,7 +97,6 @@ function SectionHeader({
 /* ================= Hero — المثبّتة من الأدمن أولاً، وإلا الأعلى شعبية ================= */
 function HeroSlider() {
   const { t } = useLanguage();
-  const isDesktop = useMediaQuery("(min-width: 768px)");
   const featuredQuery = trpc.manga.featured.useQuery({ limit: 5 }, { retry: false });
   const popularQuery = trpc.manga.popular.useQuery({ limit: 5 }, { retry: false });
   const useFeatured = (featuredQuery.data?.length ?? 0) > 0;
@@ -241,35 +225,63 @@ function HeroSlider() {
           </motion.div>
         </AnimatePresence>
 
-        {/* الغلاف — إطار صلب بظل منزاح */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`cover-${slide.slug}`}
-            initial={{ opacity: 0, x: isDesktop ? -24 : 0 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, transition: { duration: 0.18 } }}
-            transition={{ duration: 0.5, ease: EASE }}
-          >
-            <Link
-              to={`/manga/${slide.slug}`}
-              className="group relative mx-auto block w-full max-w-[340px] border border-[var(--ed-line)] bg-[var(--ed-bg2)] p-2 transition-all duration-150 hover:-translate-x-1.5 hover:-translate-y-1.5 hover:border-[var(--ed-accent)] hover:shadow-[8px_8px_0_var(--ed-accent)]"
-            >
-              <div className="relative aspect-[2/3] overflow-hidden border border-[var(--ed-line)]">
-                <img
-                  src={slide.cover}
-                  alt={slide.title}
-                  decoding="async"
-                  fetchPriority={safeIndex === 0 ? "high" : "auto"}
-                  loading={safeIndex === 0 ? "eager" : "lazy"}
-                  className="h-full w-full object-cover object-top"
-                />
-                <span className="ed-tag absolute bottom-3 start-3">
-                  {t("فصل", "CH.")} {slide.chapters}
-                </span>
-              </div>
-            </Link>
-          </motion.div>
-        </AnimatePresence>
+        {/* Coverflow — الغلاف النشط في المنتصف والجانبيّة باهتة، مع انتقال متحرّك */}
+        <div className="relative mx-auto h-[300px] w-full max-w-[440px] sm:h-[360px]">
+          {slides.map((s, i) => {
+            let off = i - safeIndex;
+            if (off > count / 2) off -= count;
+            if (off < -count / 2) off += count;
+            const abs = Math.abs(off);
+            if (abs > 2) return null;
+            const isCenter = off === 0;
+            return (
+              <motion.div
+                key={s.slug}
+                animate={{
+                  x: `${off * 58}%`,
+                  scale: isCenter ? 1 : abs === 1 ? 0.72 : 0.5,
+                  opacity: isCenter ? 1 : abs === 1 ? 0.5 : 0.22,
+                  zIndex: 10 - abs,
+                }}
+                transition={{ duration: 0.5, ease: EASE }}
+                className="absolute inset-0 mx-auto flex items-center justify-center"
+                style={{ pointerEvents: abs > 1 ? "none" : "auto" }}
+              >
+                <Link
+                  to={`/manga/${s.slug}`}
+                  onClick={(e) => {
+                    if (!isCenter) {
+                      e.preventDefault();
+                      setIndex(i);
+                    }
+                  }}
+                  className={`relative block w-[62%] border bg-[var(--ed-bg2)] p-1.5 transition-colors ${
+                    isCenter ? "border-[var(--ed-paper)]" : "border-[var(--ed-line)]"
+                  }`}
+                >
+                  <div className="relative aspect-[2/3] overflow-hidden border border-[var(--ed-line)]">
+                    <img
+                      src={s.cover}
+                      alt={s.title}
+                      decoding="async"
+                      loading={isCenter ? "eager" : "lazy"}
+                      onError={(ev) => {
+                        if (!ev.currentTarget.src.endsWith("/placeholder-cover.svg"))
+                          ev.currentTarget.src = "/placeholder-cover.svg";
+                      }}
+                      className="h-full w-full object-cover object-top"
+                    />
+                    {isCenter && (
+                      <span className="ed-tag absolute bottom-2 start-2">
+                        {t("فصل", "CH.")} {s.chapters}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
       {/* شريط تقدم التشغيل التلقائي */}
       {count > 1 && (
