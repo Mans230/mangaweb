@@ -856,6 +856,7 @@ function HomeSectionCurator({ section, label }: { section: "gems" | "top"; label
   const toast = useAdminToast();
   const [count, setCount] = useState(10);
   const [genre, setGenre] = useState("");
+  const [lang, setLang] = useState<"ar" | "en">("ar");
   const randomize = trpc.admin.randomizeHomeSection.useMutation({
     onSuccess: (r) => toast(t(`تم اختيار ${r.count} عملاً`, `Picked ${r.count} titles`)),
     onError: (e) => toast(e.message, "danger"),
@@ -868,7 +869,24 @@ function HomeSectionCurator({ section, label }: { section: "gems" | "top"; label
 
   return (
     <div className="glass mt-2.5 !rounded-2xl p-3.5">
-      <div className="mb-2 text-sm font-semibold text-app">{label}</div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-app">{label}</span>
+        {/* مبدّل اللغة — عربي/إنجليزي منفصلان تماماً في المصدر */}
+        <div className="flex items-center gap-1 rounded-full border border-app p-0.5 text-[11px]">
+          {(["ar", "en"] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLang(l)}
+              className={`rounded-full px-2.5 py-1 font-semibold transition-colors ${
+                lang === l ? "bg-primary text-[var(--primary-ink)]" : "text-app-3"
+              }`}
+            >
+              {l === "ar" ? t("عربي", "AR") : t("إنجليزي", "EN")}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="number"
@@ -887,7 +905,7 @@ function HomeSectionCurator({ section, label }: { section: "gems" | "top"; label
         />
         <button
           type="button"
-          onClick={() => randomize.mutate({ section, count, genre: genre.trim() || undefined })}
+          onClick={() => randomize.mutate({ section, lang, count, genre: genre.trim() || undefined })}
           disabled={busy}
           className="btn-glass !px-3 !py-2 text-xs disabled:opacity-50"
         >
@@ -896,7 +914,7 @@ function HomeSectionCurator({ section, label }: { section: "gems" | "top"; label
         </button>
         <button
           type="button"
-          onClick={() => clear.mutate({ section })}
+          onClick={() => clear.mutate({ section, lang })}
           disabled={busy}
           className="btn-glass !px-3 !py-2 text-xs text-danger disabled:opacity-50"
         >

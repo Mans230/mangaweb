@@ -155,7 +155,9 @@ async function upsertChapters(
   const backdated = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const rows = list
-    .filter((c) => Number.isFinite(c.number))
+    // عمود number = decimal(8,1) — أقصى 9999999.9؛ استبعد الأرقام العبثية/خارج المدى
+    // (مانجا اختبار mangadex بأرقام مثل 99999999 كانت تُفشل إدراج الدفعة كلها).
+    .filter((c) => Number.isFinite(c.number) && c.number >= 0 && c.number <= 999999)
     .map((c) => {
       const publishedAt = parseDate(c.date);
       return {
@@ -288,8 +290,10 @@ export async function notifyNewChapters(
       });
     }
   }
+  if (!rows.length) return 0;
   for (let i = 0; i < rows.length; i += 200) {
-    await db.insert(notifications).values(rows.slice(i, i + 200));
+    const batch = rows.slice(i, i + 200);
+    if (batch.length) await db.insert(notifications).values(batch);
   }
   return rows.length;
 }

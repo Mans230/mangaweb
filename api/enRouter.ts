@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { asc, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { chapters, manga, sources } from "@db/schema";
 import { getDb } from "./queries/connection";
 import { createRouter, publicQuery } from "./middleware";
 import { enSourceFilter } from "./services/enImport";
+import { getSetting, SETTING_HOME_GEMS_IDS_EN } from "./lib/siteSettings";
 
 /** حقول بطاقة المانجا (نفس شكل manga.mostViewed الذي تتوقعه الواجهة) */
 const cardSelect = {
@@ -28,6 +29,28 @@ function enCards() {
     .from(manga)
     .innerJoin(sources, eq(manga.sourceId, sources.id))
     .where(enSourceFilter());
+}
+
+/** قائمة EN منسّقة من الأدمن (بترتيبها، مصادر EN فقط) أو null */
+async function enCurated(key: string, limit: number) {
+  const raw = await getSetting(key, "");
+  if (!raw) return null;
+  let ids: number[] = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) ids = parsed.filter((n) => Number.isInteger(n));
+  } catch {
+    return null;
+  }
+  ids = ids.slice(0, limit);
+  if (!ids.length) return null;
+  const rows = await getDb()
+    .select(cardSelect)
+    .from(manga)
+    .innerJoin(sources, eq(manga.sourceId, sources.id))
+    .where(and(inArray(manga.id, ids), enSourceFilter()));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter((r): r is (typeof rows)[number] => !!r);
 }
 
 export const enRouter = createRouter({
@@ -112,6 +135,8 @@ export const enRouter = createRouter({
   hiddenGems: publicQuery
     .input(z.object({ limit: z.number().int().min(1).max(50).default(12) }))
     .query(async ({ input }) => {
+      const curated = await enCurated(SETTING_HOME_GEMS_IDS_EN, input.limit);
+      if (curated) return curated;
       return getDb()
         .select(cardSelect)
         .from(manga)

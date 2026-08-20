@@ -18,9 +18,22 @@ export const SETTING_COMMUNITY_GROUP_URL = "ui.community_group_url";
 export const SETTING_UI_HIDE_STORE = "ui.hide_store";
 /** محتوى بطاقة تليجرام في الرئيسية (JSON: title/body/button/url/fontScale) */
 export const SETTING_CTA_TELEGRAM = "cta.telegram";
-/** قوائم منسّقة من الأدمن (JSON array من ids) — فارغة = المنطق التلقائي */
-export const SETTING_HOME_GEMS_IDS = "home.hidden_gems_ids";
-export const SETTING_HOME_TOP_IDS = "home.top_week_ids";
+/**
+ * قوائم منسّقة من الأدمن (JSON array من ids) — فارغة = المنطق التلقائي.
+ * منفصلة لكل لغة: العربية (المصادر العربية) والإنجليزية (mangadex/asura/vortex).
+ */
+export const SETTING_HOME_GEMS_IDS = "home.hidden_gems_ids"; // ar
+export const SETTING_HOME_TOP_IDS = "home.top_week_ids"; // ar
+export const SETTING_HOME_GEMS_IDS_EN = "home.hidden_gems_ids_en";
+export const SETTING_HOME_TOP_IDS_EN = "home.top_week_ids_en";
+
+/** يختار مفتاح الإعداد حسب القسم واللغة */
+export function homeSectionKey(section: "gems" | "top", lang: "ar" | "en"): string {
+  if (section === "gems") {
+    return lang === "en" ? SETTING_HOME_GEMS_IDS_EN : SETTING_HOME_GEMS_IDS;
+  }
+  return lang === "en" ? SETTING_HOME_TOP_IDS_EN : SETTING_HOME_TOP_IDS;
+}
 
 const CACHE_TTL_MS = 30 * 1000;
 

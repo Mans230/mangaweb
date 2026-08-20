@@ -96,7 +96,8 @@ async function curatedSection(key: string, limit: number) {
     .select(cardSelect)
     .from(manga)
     .innerJoin(sources, eq(manga.sourceId, sources.id))
-    .where(inArray(manga.id, ids));
+    // استبعاد أي معرّف من مصدر إنجليزي تسرّب للقائمة العربية
+    .where(and(inArray(manga.id, ids), arabicSourceFilter()));
   const byId = new Map(rows.map((r) => [r.id, r]));
   // حافظ على ترتيب الأدمن
   return ids.map((id) => byId.get(id)).filter((r): r is (typeof rows)[number] => !!r);

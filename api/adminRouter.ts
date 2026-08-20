@@ -32,8 +32,7 @@ import {
   SETTING_COMMUNITY_GROUP_URL,
   SETTING_UI_HIDE_STORE,
   SETTING_CTA_TELEGRAM,
-  SETTING_HOME_GEMS_IDS,
-  SETTING_HOME_TOP_IDS,
+  homeSectionKey,
 } from "./lib/siteSettings";
 import { generateInviteCode, uniqueSlug } from "./communitiesRouter";
 import { enabledScrapers } from "./scrapers";
@@ -43,6 +42,7 @@ import {
   normalizeTitle,
   refreshChapters,
 } from "./services/importer";
+import { arabicSourceFilter, enSourceFilter } from "./services/enImport";
 import { invalidateIpBanCache } from "./lib/ipBan";
 import { adminLogs, updateRequests } from "@db/schema";
 import { getScraper } from "./scrapers";
@@ -811,55 +811,62 @@ export const adminRouter = createRouter({
       return { success: true };
     }),
 
-  /** ضبط قائمة قسم الرئيسية (جواهر مخفية / توب10) يدوياً بمعرّفات مانجا */
+  /** ضبط قائمة قسم الرئيسية (جواهر مخفية / توب10) يدوياً بمعرّفات مانجا — لكل لغة */
   setHomeSection: adminQuery
     .input(
       z.object({
         section: z.enum(["gems", "top"]),
+        lang: z.enum(["ar", "en"]).default("ar"),
         ids: z.array(z.number().int().positive()).max(50),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const key = input.section === "gems" ? SETTING_HOME_GEMS_IDS : SETTING_HOME_TOP_IDS;
-      await setSetting(key, JSON.stringify(input.ids));
+      await setSetting(homeSectionKey(input.section, input.lang), JSON.stringify(input.ids));
       await logAdminAction(ctx.user.id, "settings.home_section", { meta: input });
       return { success: true, count: input.ids.length };
     }),
 
-  /** اختيار عشوائي (اختياري حسب التصنيف) لقسم الرئيسية */
+  /** اختيار عشوائي (اختياري حسب التصنيف) لقسم الرئيسية — يحترم لغة المصدر */
   randomizeHomeSection: adminQuery
     .input(
       z.object({
         section: z.enum(["gems", "top"]),
+        lang: z.enum(["ar", "en"]).default("ar"),
         count: z.number().int().min(1).max(20).default(10),
         genre: z.string().trim().min(1).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const conds = [sql`${manga.chapterCount} > 0`];
+      // فلتر لغة المصدر: العربية تستبعد EN، والإنجليزية تقتصر على EN فقط
+      const langFilter = input.lang === "en" ? enSourceFilter() : arabicSourceFilter();
+      const conds = [sql`${manga.chapterCount} > 0`, langFilter];
       if (input.genre) {
         conds.push(sql`JSON_CONTAINS(${manga.genres}, JSON_QUOTE(${input.genre}))`);
       }
       const rows = await db
         .select({ id: manga.id })
         .from(manga)
+        .innerJoin(sources, eq(manga.sourceId, sources.id))
         .where(and(...conds))
         .orderBy(sql`RAND()`)
         .limit(input.count);
       const ids = rows.map((r) => r.id);
-      const key = input.section === "gems" ? SETTING_HOME_GEMS_IDS : SETTING_HOME_TOP_IDS;
-      await setSetting(key, JSON.stringify(ids));
+      await setSetting(homeSectionKey(input.section, input.lang), JSON.stringify(ids));
       await logAdminAction(ctx.user.id, "settings.home_section_random", { meta: { ...input, ids } });
       return { success: true, count: ids.length };
     }),
 
-  /** مسح القائمة المنسّقة (رجوع للمنطق التلقائي) */
+  /** مسح القائمة المنسّقة (رجوع للمنطق التلقائي) — لكل لغة */
   clearHomeSection: adminQuery
-    .input(z.object({ section: z.enum(["gems", "top"]) }))
+    .input(
+      z.object({
+        section: z.enum(["gems", "top"]),
+        lang: z.enum(["ar", "en"]).default("ar"),
+      }),
+    )
     .mutation(async ({ input }) => {
-      const key = input.section === "gems" ? SETTING_HOME_GEMS_IDS : SETTING_HOME_TOP_IDS;
-      await setSetting(key, "");
+      await setSetting(homeSectionKey(input.section, input.lang), "");
       return { success: true };
     }),
 
