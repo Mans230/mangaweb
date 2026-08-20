@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, count, desc, eq, like } from "drizzle-orm";
+import { and, count, desc, eq, like, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   bannedIps,
@@ -30,6 +30,10 @@ import {
   SETTING_UI_HIDE_COMMUNITIES,
   SETTING_UI_HIDE_REELS,
   SETTING_COMMUNITY_GROUP_URL,
+  SETTING_UI_HIDE_STORE,
+  SETTING_CTA_TELEGRAM,
+  SETTING_HOME_GEMS_IDS,
+  SETTING_HOME_TOP_IDS,
 } from "./lib/siteSettings";
 import { generateInviteCode, uniqueSlug } from "./communitiesRouter";
 import { enabledScrapers } from "./scrapers";
@@ -743,15 +747,28 @@ export const adminRouter = createRouter({
 
   /** مفاتيح إخفاء أقسام الواجهة (المجتمعات/الريلز) — قراءة */
   getUiToggles: adminQuery.query(async () => {
-    const [hideCommunities, hideReels, communityGroupUrl] = await Promise.all([
-      getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
-      getSetting(SETTING_UI_HIDE_REELS, "0"),
-      getSetting(SETTING_COMMUNITY_GROUP_URL, ""),
-    ]);
+    const [hideCommunities, hideReels, communityGroupUrl, hideStore, ctaRaw] =
+      await Promise.all([
+        getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
+        getSetting(SETTING_UI_HIDE_REELS, "0"),
+        getSetting(SETTING_COMMUNITY_GROUP_URL, ""),
+        getSetting(SETTING_UI_HIDE_STORE, "0"),
+        getSetting(SETTING_CTA_TELEGRAM, ""),
+      ]);
+    let telegramCta: Record<string, unknown> = {};
+    if (ctaRaw) {
+      try {
+        telegramCta = JSON.parse(ctaRaw);
+      } catch {
+        /* تجاهل */
+      }
+    }
     return {
       hideCommunities: hideCommunities === "1",
       hideReels: hideReels === "1",
+      hideStore: hideStore === "1",
       communityGroupUrl: communityGroupUrl ?? "",
+      telegramCta,
     };
   }),
 
@@ -761,7 +778,17 @@ export const adminRouter = createRouter({
       z.object({
         hideCommunities: z.boolean().optional(),
         hideReels: z.boolean().optional(),
+        hideStore: z.boolean().optional(),
         communityGroupUrl: z.string().trim().max(500).optional(),
+        telegramCta: z
+          .object({
+            title: z.string().trim().max(120).optional(),
+            body: z.string().trim().max(240).optional(),
+            button: z.string().trim().max(60).optional(),
+            url: z.string().trim().url().max(300).optional().or(z.literal("")),
+            fontScale: z.number().min(0.8).max(1.6).optional(),
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -771,10 +798,68 @@ export const adminRouter = createRouter({
       if (input.hideReels !== undefined) {
         await setSetting(SETTING_UI_HIDE_REELS, input.hideReels ? "1" : "0");
       }
+      if (input.hideStore !== undefined) {
+        await setSetting(SETTING_UI_HIDE_STORE, input.hideStore ? "1" : "0");
+      }
       if (input.communityGroupUrl !== undefined) {
         await setSetting(SETTING_COMMUNITY_GROUP_URL, input.communityGroupUrl);
       }
+      if (input.telegramCta !== undefined) {
+        await setSetting(SETTING_CTA_TELEGRAM, JSON.stringify(input.telegramCta));
+      }
       await logAdminAction(ctx.user.id, "settings.ui_toggles", { meta: input });
+      return { success: true };
+    }),
+
+  /** ضبط قائمة قسم الرئيسية (جواهر مخفية / توب10) يدوياً بمعرّفات مانجا */
+  setHomeSection: adminQuery
+    .input(
+      z.object({
+        section: z.enum(["gems", "top"]),
+        ids: z.array(z.number().int().positive()).max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = input.section === "gems" ? SETTING_HOME_GEMS_IDS : SETTING_HOME_TOP_IDS;
+      await setSetting(key, JSON.stringify(input.ids));
+      await logAdminAction(ctx.user.id, "settings.home_section", { meta: input });
+      return { success: true, count: input.ids.length };
+    }),
+
+  /** اختيار عشوائي (اختياري حسب التصنيف) لقسم الرئيسية */
+  randomizeHomeSection: adminQuery
+    .input(
+      z.object({
+        section: z.enum(["gems", "top"]),
+        count: z.number().int().min(1).max(20).default(10),
+        genre: z.string().trim().min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const conds = [sql`${manga.chapterCount} > 0`];
+      if (input.genre) {
+        conds.push(sql`JSON_CONTAINS(${manga.genres}, JSON_QUOTE(${input.genre}))`);
+      }
+      const rows = await db
+        .select({ id: manga.id })
+        .from(manga)
+        .where(and(...conds))
+        .orderBy(sql`RAND()`)
+        .limit(input.count);
+      const ids = rows.map((r) => r.id);
+      const key = input.section === "gems" ? SETTING_HOME_GEMS_IDS : SETTING_HOME_TOP_IDS;
+      await setSetting(key, JSON.stringify(ids));
+      await logAdminAction(ctx.user.id, "settings.home_section_random", { meta: { ...input, ids } });
+      return { success: true, count: ids.length };
+    }),
+
+  /** مسح القائمة المنسّقة (رجوع للمنطق التلقائي) */
+  clearHomeSection: adminQuery
+    .input(z.object({ section: z.enum(["gems", "top"]) }))
+    .mutation(async ({ input }) => {
+      const key = input.section === "gems" ? SETTING_HOME_GEMS_IDS : SETTING_HOME_TOP_IDS;
+      await setSetting(key, "");
       return { success: true };
     }),
 

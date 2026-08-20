@@ -31,6 +31,7 @@ import LazySection from "@/components/LazySection";
 import ContinueReading from "@/components/ContinueReading";
 import AgeGateModal, { isAgeConfirmed } from "@/components/AgeGateModal";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useUiToggles } from "@/lib/uiToggles";
 import { useAuth } from "@/hooks/useAuth";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -883,6 +884,16 @@ function SourcesStrip() {
 /* ================= Telegram CTA ================= */
 function TelegramCTA() {
   const { t } = useLanguage();
+  const { telegramCta } = useUiToggles();
+  const cta = {
+    title: telegramCta?.title || t("لا يفوتك أي فصل جديد", "Never miss a new chapter"),
+    body:
+      telegramCta?.body ||
+      t("إشعار فوري بالغلاف والرابط على تليجرام", "Instant Telegram notification with cover and link"),
+    button: telegramCta?.button || t("اشترك الآن", "Subscribe"),
+    url: telegramCta?.url || "https://t.me/dateranime",
+    fontScale: telegramCta?.fontScale ?? 1,
+  };
   return (
     <section className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <motion.div
@@ -896,25 +907,22 @@ function TelegramCTA() {
           <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-[var(--ed-accent)] bg-[var(--ed-accent-soft)] text-[var(--ed-accent)]">
             <Send size={20} className="rtl:-scale-x-100" />
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1" style={{ fontSize: `${cta.fontScale}em` }}>
             <h2 className="font-ed text-base font-extrabold leading-tight text-[var(--ed-paper)] md:text-xl">
-              {t("لا يفوتك أي فصل جديد", "Never miss a new chapter")}
+              {cta.title}
             </h2>
             <p className="mt-0.5 line-clamp-1 text-[12px] text-[var(--ed-dim)] md:text-sm">
-              {t(
-                "إشعار فوري بالغلاف والرابط على تليجرام",
-                "Instant Telegram notification with cover and link",
-              )}
+              {cta.body}
             </p>
           </div>
           <a
-            href="https://t.me/dateranime"
+            href={cta.url}
             target="_blank"
             rel="noreferrer"
             className="ed-btn-primary shrink-0 !px-3.5 !py-2 text-[13px] md:!px-5"
           >
             <Send size={14} className="rtl:-scale-x-100" />
-            <span className="hidden sm:inline">{t("اشترك الآن", "Subscribe")}</span>
+            <span className="hidden sm:inline">{cta.button}</span>
           </a>
         </div>
       </motion.div>

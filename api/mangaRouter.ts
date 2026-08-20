@@ -19,6 +19,8 @@ import {
   SETTING_UI_HIDE_COMMUNITIES,
   SETTING_UI_HIDE_REELS,
   SETTING_COMMUNITY_GROUP_URL,
+  SETTING_UI_HIDE_STORE,
+  SETTING_CTA_TELEGRAM,
 } from "./lib/siteSettings";
 import { TRPCError } from "@trpc/server";
 
@@ -349,15 +351,34 @@ export const mangaRouter = createRouter({
 
   /** مفاتيح إظهار/إخفاء أقسام الواجهة — عامة (بلا حساسية) حتى تخفي الواجهة الروابط */
   uiToggles: publicQuery.query(async () => {
-    const [hideCommunities, hideReels, communityGroupUrl] = await Promise.all([
-      getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
-      getSetting(SETTING_UI_HIDE_REELS, "0"),
-      getSetting(SETTING_COMMUNITY_GROUP_URL, ""),
-    ]);
+    const [hideCommunities, hideReels, communityGroupUrl, hideStore, ctaRaw] =
+      await Promise.all([
+        getSetting(SETTING_UI_HIDE_COMMUNITIES, "0"),
+        getSetting(SETTING_UI_HIDE_REELS, "0"),
+        getSetting(SETTING_COMMUNITY_GROUP_URL, ""),
+        getSetting(SETTING_UI_HIDE_STORE, "0"),
+        getSetting(SETTING_CTA_TELEGRAM, ""),
+      ]);
+    let telegramCta: {
+      title?: string;
+      body?: string;
+      button?: string;
+      url?: string;
+      fontScale?: number;
+    } | null = null;
+    if (ctaRaw) {
+      try {
+        telegramCta = JSON.parse(ctaRaw);
+      } catch {
+        /* JSON غير صالح — تجاهل واستخدم الافتراضي */
+      }
+    }
     return {
       hideCommunities: hideCommunities === "1",
       hideReels: hideReels === "1",
+      hideStore: hideStore === "1",
       communityGroupUrl: communityGroupUrl ?? "",
+      telegramCta,
     };
   }),
 

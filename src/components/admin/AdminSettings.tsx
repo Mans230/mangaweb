@@ -221,17 +221,25 @@ function UiSectionsCard() {
     onError: (e) => toast(e.message, "danger"),
   });
 
-  const toggle = (key: "hideCommunities" | "hideReels", value: boolean) =>
+  const toggle = (key: "hideCommunities" | "hideReels" | "hideStore", value: boolean) =>
     save.mutate({ [key]: value });
 
   const [groupUrl, setGroupUrl] = useState<string | null>(null);
   const groupUrlValue = groupUrl ?? query.data?.communityGroupUrl ?? "";
 
   const rows: {
-    key: "hideCommunities" | "hideReels";
+    key: "hideCommunities" | "hideReels" | "hideStore";
     title: string;
     desc: string;
   }[] = [
+    {
+      key: "hideStore",
+      title: t("إخفاء المتجر", "Hide store"),
+      desc: t(
+        "يُخفي قسم المتجر (الثيمات والمزايا) من صفحة الكوينز.",
+        "Hides the store section (themes & perks) from the coins page.",
+      ),
+    },
     {
       key: "hideCommunities",
       title: t("إخفاء المجتمعات", "Hide communities"),
@@ -730,6 +738,182 @@ function PremiumGrantCard() {
   );
 }
 
+/* ========= محتوى الرئيسية: بطاقة تليجرام + جواهر مخفية/توب10 ========= */
+function HomeContentCard() {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const query = trpc.admin.getUiToggles.useQuery(undefined, { retry: false });
+  const cta = (query.data?.telegramCta ?? {}) as {
+    title?: string;
+    body?: string;
+    button?: string;
+    url?: string;
+    fontScale?: number;
+  };
+
+  const [title, setTitle] = useState<string | null>(null);
+  const [body, setBody] = useState<string | null>(null);
+  const [button, setButton] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [fontScale, setFontScale] = useState<number | null>(null);
+
+  const save = trpc.admin.setUiToggles.useMutation({
+    onSuccess: () => {
+      toast(t("تم حفظ بطاقة تليجرام", "Telegram card saved"));
+      query.refetch();
+    },
+    onError: (e) => toast(e.message, "danger"),
+  });
+
+  const saveCta = () =>
+    save.mutate({
+      telegramCta: {
+        title: (title ?? cta.title ?? "").trim() || undefined,
+        body: (body ?? cta.body ?? "").trim() || undefined,
+        button: (button ?? cta.button ?? "").trim() || undefined,
+        url: (url ?? cta.url ?? "").trim() || "",
+        fontScale: fontScale ?? cta.fontScale ?? 1,
+      },
+    });
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.07 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-1 flex items-center gap-2 text-sm font-bold text-app">
+        <Megaphone size={16} className="text-primary" />
+        {t("محتوى الرئيسية", "Home content")}
+      </h3>
+
+      {/* بطاقة تليجرام */}
+      <div className="glass mt-3 !rounded-2xl p-3.5">
+        <div className="mb-2 text-sm font-semibold text-app">
+          {t("بطاقة تليجرام في الرئيسية", "Home telegram card")}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input
+            value={title ?? cta.title ?? ""}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t("العنوان", "Title")}
+            className="input-glass !py-2 text-xs"
+          />
+          <input
+            value={button ?? cta.button ?? ""}
+            onChange={(e) => setButton(e.target.value)}
+            placeholder={t("نص الزر", "Button label")}
+            className="input-glass !py-2 text-xs"
+          />
+          <input
+            value={body ?? cta.body ?? ""}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={t("الوصف", "Body")}
+            className="input-glass !py-2 text-xs sm:col-span-2"
+          />
+          <input
+            dir="ltr"
+            value={url ?? cta.url ?? ""}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://t.me/…"
+            className="input-glass !py-2 text-xs sm:col-span-2"
+          />
+          <label className="flex items-center gap-2 text-[11px] text-app-3">
+            {t("حجم الخط", "Font size")}
+            <input
+              type="range"
+              min={0.8}
+              max={1.6}
+              step={0.05}
+              value={fontScale ?? cta.fontScale ?? 1}
+              onChange={(e) => setFontScale(Number(e.target.value))}
+              className="flex-1"
+            />
+            <span className="tabular-nums">{(fontScale ?? cta.fontScale ?? 1).toFixed(2)}×</span>
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={saveCta}
+          disabled={save.isPending}
+          className="btn-primary mt-2.5 !px-4 !py-2 text-xs disabled:opacity-50"
+        >
+          <Save size={14} />
+          {t("حفظ", "Save")}
+        </button>
+      </div>
+
+      {/* تنسيق أقسام الرئيسية */}
+      <HomeSectionCurator section="gems" label={t("جواهر مخفية", "Hidden gems")} />
+      <HomeSectionCurator section="top" label={t("توب 10 الأسبوع", "Top 10 week")} />
+    </motion.section>
+  );
+}
+
+function HomeSectionCurator({ section, label }: { section: "gems" | "top"; label: string }) {
+  const { t } = useLanguage();
+  const toast = useAdminToast();
+  const [count, setCount] = useState(10);
+  const [genre, setGenre] = useState("");
+  const randomize = trpc.admin.randomizeHomeSection.useMutation({
+    onSuccess: (r) => toast(t(`تم اختيار ${r.count} عملاً`, `Picked ${r.count} titles`)),
+    onError: (e) => toast(e.message, "danger"),
+  });
+  const clear = trpc.admin.clearHomeSection.useMutation({
+    onSuccess: () => toast(t("رجع للاختيار التلقائي", "Reverted to automatic")),
+    onError: (e) => toast(e.message, "danger"),
+  });
+  const busy = randomize.isPending || clear.isPending;
+
+  return (
+    <div className="glass mt-2.5 !rounded-2xl p-3.5">
+      <div className="mb-2 text-sm font-semibold text-app">{label}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={count}
+          onChange={(e) => setCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+          className="input-glass w-16 !py-2 text-xs"
+          title={t("العدد", "Count")}
+        />
+        <input
+          value={genre}
+          onChange={(e) => setGenre(e.target.value)}
+          placeholder={t("تصنيف (اختياري)", "Genre (optional)")}
+          className="input-glass min-w-0 flex-1 !py-2 text-xs"
+        />
+        <button
+          type="button"
+          onClick={() => randomize.mutate({ section, count, genre: genre.trim() || undefined })}
+          disabled={busy}
+          className="btn-glass !px-3 !py-2 text-xs disabled:opacity-50"
+        >
+          <RefreshCw size={13} />
+          {t("عشوائي", "Randomize")}
+        </button>
+        <button
+          type="button"
+          onClick={() => clear.mutate({ section })}
+          disabled={busy}
+          className="btn-glass !px-3 !py-2 text-xs text-danger disabled:opacity-50"
+        >
+          <Trash2 size={13} />
+          {t("مسح", "Clear")}
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11px] text-app-3">
+        {t(
+          "«عشوائي» يختار أعمالاً عشوائية (مع تصنيف اختياري). «مسح» يرجّع الاختيار التلقائي.",
+          "Randomize picks random titles (optionally by genre). Clear reverts to automatic.",
+        )}
+      </p>
+    </div>
+  );
+}
+
 export default function AdminSettings() {
   return (
     <div className="space-y-4">
@@ -737,6 +921,7 @@ export default function AdminSettings() {
       <ScrapeTriggerCard />
       <PremiumGrantCard />
       <UiSectionsCard />
+      <HomeContentCard />
       <AnnouncementsCard />
       <MaintenanceCard />
       <AdminLogsCard />

@@ -11,6 +11,7 @@ import {
 import { getDb } from "./queries/connection";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 import { arabicSourceFilter } from "./services/enImport";
+import { getSetting, SETTING_HOME_GEMS_IDS, SETTING_HOME_TOP_IDS } from "./lib/siteSettings";
 
 /** شكل بطاقة المانجا الموحد (مطابق manga.mostViewed) */
 const cardSelect = {
@@ -76,6 +77,29 @@ async function userMangaIds(
       .where(eq(readingProgress.userId, userId)),
   ]);
   return [...new Set([...favIds, ...folIds, ...progIds].map((r) => Number(r.mangaId)))];
+}
+
+/** قائمة منسّقة من الأدمن (بترتيبها) أو null إن لم تُضبط */
+async function curatedSection(key: string, limit: number) {
+  const raw = await getSetting(key, "");
+  if (!raw) return null;
+  let ids: number[] = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) ids = parsed.filter((n) => Number.isInteger(n));
+  } catch {
+    return null;
+  }
+  ids = ids.slice(0, limit);
+  if (!ids.length) return null;
+  const rows = await getDb()
+    .select(cardSelect)
+    .from(manga)
+    .innerJoin(sources, eq(manga.sourceId, sources.id))
+    .where(inArray(manga.id, ids));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // حافظ على ترتيب الأدمن
+  return ids.map((id) => byId.get(id)).filter((r): r is (typeof rows)[number] => !!r);
 }
 
 export const recommendRouter = createRouter({
@@ -243,10 +267,12 @@ export const recommendRouter = createRouter({
     return rows[0]?.slug ?? null;
   }),
 
-  /** توب 10 هذا الأسبوع (عربي) — الرائج + الأكثر مشاهدة */
+  /** توب 10 هذا الأسبوع (عربي) — قائمة الأدمن إن وُجدت، وإلا الرائج + الأكثر مشاهدة */
   topWeek: publicQuery
     .input(z.object({ limit: z.number().int().min(1).max(20).default(10) }))
     .query(async ({ input }) => {
+      const curated = await curatedSection(SETTING_HOME_TOP_IDS, input.limit);
+      if (curated) return curated;
       return getDb()
         .select(cardSelect)
         .from(manga)
@@ -261,10 +287,12 @@ export const recommendRouter = createRouter({
         .limit(input.limit);
     }),
 
-  /** جواهر مخفية (عربي) — تقييم مرتفع ومشاهدات منخفضة */
+  /** جواهر مخفية (عربي) — قائمة الأدمن إن وُجدت، وإلا تقييم مرتفع ومشاهدات منخفضة */
   hiddenGems: publicQuery
     .input(z.object({ limit: z.number().int().min(1).max(50).default(12) }))
     .query(async ({ input }) => {
+      const curated = await curatedSection(SETTING_HOME_GEMS_IDS, input.limit);
+      if (curated) return curated;
       return getDb()
         .select(cardSelect)
         .from(manga)

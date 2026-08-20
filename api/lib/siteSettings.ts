@@ -14,6 +14,13 @@ export const SETTING_UI_HIDE_COMMUNITIES = "ui.hide_communities";
 export const SETTING_UI_HIDE_REELS = "ui.hide_reels";
 /** رابط جروب المناقشة (تليجرام/ديسكورد…) — يظهر زره في صفحة المانجا عند ضبطه */
 export const SETTING_COMMUNITY_GROUP_URL = "ui.community_group_url";
+/** إخفاء قسم المتجر (الكوينز) */
+export const SETTING_UI_HIDE_STORE = "ui.hide_store";
+/** محتوى بطاقة تليجرام في الرئيسية (JSON: title/body/button/url/fontScale) */
+export const SETTING_CTA_TELEGRAM = "cta.telegram";
+/** قوائم منسّقة من الأدمن (JSON array من ids) — فارغة = المنطق التلقائي */
+export const SETTING_HOME_GEMS_IDS = "home.hidden_gems_ids";
+export const SETTING_HOME_TOP_IDS = "home.top_week_ids";
 
 const CACHE_TTL_MS = 30 * 1000;
 

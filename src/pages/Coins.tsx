@@ -30,6 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LOGIN_PATH } from "@/const";
 import { proxyImg } from "@/lib/manga";
 import { applyShopTheme } from "@/lib/shopThemes";
+import { useUiToggles } from "@/lib/uiToggles";
 import { trpc } from "@/providers/trpc";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -185,6 +186,7 @@ export default function Coins() {
     enabled: isAuthenticated,
     retry: false,
   });
+  const { hideStore } = useUiToggles();
   const shopQ = trpc.shop.list.useQuery(undefined, { retry: false });
   const mineQ = trpc.shop.mine.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -485,7 +487,8 @@ export default function Coins() {
         )}
       </div>
 
-      {/* ===== المتجر ===== */}
+      {/* ===== المتجر ===== (يخفيه الأدمن عبر hideStore) */}
+      {!hideStore && (
       <div className="glass flex flex-col gap-4 !rounded-3xl p-5">
         <p className="flex items-center gap-2 text-sm font-bold text-app">
           <ShoppingBag size={16} className="text-primary" />
@@ -588,6 +591,7 @@ export default function Coins() {
           </div>
         )}
       </div>
+      )}
 
       {/* ===== متصدرو الأسبوع ===== */}
       <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
