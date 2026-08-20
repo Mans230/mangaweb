@@ -396,6 +396,33 @@ AND NOT EXISTS (
     console.warn(`[ensure-schema] comments upgrade: ${(e as Error).message}`);
   }
 
+  // ===== ترشيحات تحدي الأسبوع من المستخدمين =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`challenge_submissions\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`mangaIds\` json NOT NULL,
+	\`note\` varchar(300),
+	\`status\` varchar(20) NOT NULL DEFAULT 'pending',
+	\`pollId\` int,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`reviewedAt\` timestamp NULL,
+	CONSTRAINT \`challenge_submissions_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "challenge_submissions",
+      "challenge_submissions_status_idx",
+      "CREATE INDEX `challenge_submissions_status_idx` ON `challenge_submissions` (`status`)",
+    );
+    await ensureIndex(
+      "challenge_submissions",
+      "challenge_submissions_user_idx",
+      "CREATE INDEX `challenge_submissions_user_idx` ON `challenge_submissions` (`userId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] challenge_submissions: ${(e as Error).message}`);
+  }
+
   // ===== رياكشنات المانهوا/الفصل =====
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`reactions\` (

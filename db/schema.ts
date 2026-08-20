@@ -514,6 +514,33 @@ export const reports = mysqlTable(
 
 export type Report = typeof reports.$inferSelect;
 
+/** ترشيحات تحدي الأسبوع من المستخدمين (2–3 مانهوا للمقارنة) — يوافق عليها الأدمن */
+export const challengeSubmissions = mysqlTable(
+  "challenge_submissions",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    /** معرّفات المانجا المرشّحة (2–3) */
+    mangaIds: json("mangaIds").$type<number[]>().notNull(),
+    note: varchar("note", { length: 300 }),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"])
+      .default("pending")
+      .notNull(),
+    /** الاستطلاع الناتج عند الموافقة */
+    pollId: int("pollId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    reviewedAt: timestamp("reviewedAt"),
+  },
+  (table) => ({
+    statusIdx: index("challenge_submissions_status_idx").on(table.status),
+    userIdx: index("challenge_submissions_user_idx").on(table.userId),
+  }),
+);
+
+export type ChallengeSubmission = typeof challengeSubmissions.$inferSelect;
+
 export const communityMessages = mysqlTable(
   "community_messages",
   {

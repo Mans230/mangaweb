@@ -25,6 +25,7 @@ import { usersRouter } from "./usersRouter";
 import { postsRouter } from "./postsRouter";
 import { premiumRouter } from "./premiumRouter";
 import { reactionsRouter } from "./reactionsRouter";
+import { challengesRouter } from "./challengesRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -33,6 +34,7 @@ export const appRouter = createRouter({
   manga: mangaRouter,
   en: enRouter,
   rec: recommendRouter,
+  challenges: challengesRouter,
   library: libraryRouter,
   engagement: engagementRouter,
   request: requestRouter,

@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Check, Loader2 } from "lucide-react";
+import { BarChart3, Check, Loader2, Plus, Search, Send, Swords, X } from "lucide-react";
 import { Link } from "react-router";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast, ToastViewport } from "@/components/library/toast";
+import { proxyImg } from "@/lib/manga";
 import { LOGIN_PATH } from "@/const";
 import { trpc } from "@/providers/trpc";
 
@@ -127,7 +129,140 @@ export default function Polls() {
           )}
         </div>
       )}
+
+      <ChallengeSubmit />
       <ToastViewport />
     </motion.div>
+  );
+}
+
+/* ============ ترشيح تحدي الأسبوع من المستخدم (2–3 مانهوا) ============ */
+type PickedManga = { id: number; title: string; coverUrl?: string | null };
+
+function ChallengeSubmit() {
+  const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
+  const [q, setQ] = useState("");
+  const [picks, setPicks] = useState<PickedManga[]>([]);
+  const [note, setNote] = useState("");
+
+  const searchQ = trpc.manga.list.useQuery(
+    { search: q, limit: 6, sort: "popular" },
+    { enabled: q.trim().length >= 2, retry: false },
+  );
+  const mineQ = trpc.challenges.mine.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const submit = trpc.challenges.submit.useMutation({
+    onSuccess: () => {
+      toast(t("تم إرسال ترشيحك للأدمن ✅", "Submitted for admin review ✅"));
+      setPicks([]);
+      setNote("");
+      setQ("");
+      utils.challenges.mine.invalidate();
+    },
+    onError: (e) => toast(e.message, { kind: "info" }),
+  });
+
+  if (!isAuthenticated) return null;
+
+  const add = (m: PickedManga) => {
+    if (picks.length >= 3 || picks.some((p) => p.id === m.id)) return;
+    setPicks((p) => [...p, m]);
+    setQ("");
+  };
+
+  const pending = mineQ.data?.find((s) => s.status === "pending");
+
+  return (
+    <div className="glass flex flex-col gap-3 !rounded-3xl p-5">
+      <h2 className="font-display flex items-center gap-2 text-base font-bold text-app">
+        <Swords size={18} className="text-primary" />
+        {t("رشّح تحدي الأسبوع", "Nominate a weekly challenge")}
+      </h2>
+      <p className="text-xs text-app-3">
+        {t(
+          "اختر مانهوتين أو ثلاثة للمقارنة — يراجعها الأدمن وتنزل كتصويت الأسبوع.",
+          "Pick 2–3 titles to compare — an admin reviews it and it becomes the weekly poll.",
+        )}
+      </p>
+
+      {pending ? (
+        <div className="glass !rounded-2xl p-3 text-center text-xs text-warning">
+          {t("عندك ترشيح قيد المراجعة", "You have a submission under review")}
+        </div>
+      ) : (
+        <>
+          {/* المختارة */}
+          {picks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {picks.map((m) => (
+                <span key={m.id} className="glass-chip !py-1 text-xs">
+                  {m.title}
+                  <button onClick={() => setPicks((p) => p.filter((x) => x.id !== m.id))}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* بحث */}
+          {picks.length < 3 && (
+            <div className="relative">
+              <div className="input-glass flex items-center gap-2 !py-2">
+                <Search size={15} className="text-app-3" />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder={t("ابحث عن مانهوا…", "Search a title…")}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                />
+              </div>
+              {q.trim().length >= 2 && (searchQ.data?.items?.length ?? 0) > 0 && (
+                <div className="glass-strong absolute z-20 mt-1 max-h-64 w-full overflow-y-auto !rounded-2xl p-1">
+                  {searchQ.data!.items
+                    .filter((m) => !picks.some((p) => p.id === m.id))
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => add({ id: m.id, title: m.title, coverUrl: m.coverUrl })}
+                        className="flex w-full items-center gap-2 rounded-lg p-1.5 text-start hover:bg-[var(--surface)]"
+                      >
+                        <img
+                          src={proxyImg(m.coverUrl) || "/placeholder-cover.svg"}
+                          alt=""
+                          className="h-10 w-8 shrink-0 rounded object-cover"
+                        />
+                        <span className="truncate text-sm text-app">{m.title}</span>
+                        <Plus size={14} className="ms-auto shrink-0 text-primary" />
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={300}
+            placeholder={t("سبب المقارنة (اختياري)", "Why compare? (optional)")}
+            className="input-glass !py-2 text-sm"
+          />
+          <button
+            onClick={() => submit.mutate({ mangaIds: picks.map((p) => p.id), note: note.trim() || undefined })}
+            disabled={picks.length < 2 || submit.isPending}
+            className="btn-primary !py-2.5 text-sm disabled:opacity-50"
+          >
+            {submit.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            {t("أرسل الترشيح", "Submit")}
+          </button>
+        </>
+      )}
+    </div>
   );
 }

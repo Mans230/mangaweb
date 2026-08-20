@@ -9,6 +9,7 @@ import {
   Save,
   Settings2,
   Store,
+  Swords,
   Trash2,
   X,
 } from "lucide-react";
@@ -641,6 +642,80 @@ function PollsManagerCard() {
   );
 }
 
+/* ============ ترشيحات تحدي الأسبوع (موافقة/رفض) ============ */
+function ChallengesManagerCard() {
+  const listQ = trpc.challenges.list.useQuery({ status: "pending", limit: 30 }, { retry: false });
+  const utils = trpc.useUtils();
+  const approve = trpc.challenges.approve.useMutation({
+    onSuccess: () => utils.challenges.list.invalidate(),
+  });
+  const reject = trpc.challenges.reject.useMutation({
+    onSuccess: () => utils.challenges.list.invalidate(),
+  });
+  const items = listQ.data ?? [];
+  const busy = approve.isPending || reject.isPending;
+
+  return (
+    <motion.section
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="glass !rounded-2xl p-4 md:p-5"
+    >
+      <h3 className="font-display mb-3 flex items-center gap-2 text-sm font-bold text-app">
+        <Swords size={16} className="text-primary" />
+        ترشيحات تحدي الأسبوع
+        {items.length > 0 && (
+          <span className="rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning">
+            {items.length}
+          </span>
+        )}
+      </h3>
+      {listQ.isLoading ? (
+        <div className="skeleton h-24" />
+      ) : items.length === 0 ? (
+        <p className="py-4 text-center text-sm text-app-3">لا ترشيحات معلّقة</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {items.map((s) => (
+            <div key={s.id} className="glass flex flex-col gap-2 !rounded-2xl p-3">
+              <div className="flex items-center gap-2 text-[11px] text-app-3">
+                <span className="font-bold text-app">@{s.user?.username ?? s.user?.name ?? "?"}</span>
+                {s.note && <span className="truncate">— {s.note}</span>}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {s.manga.map(
+                  (m) =>
+                    m && (
+                      <span key={m.id} className="glass-chip !py-1 text-xs">
+                        {m.title}
+                      </span>
+                    ),
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => approve.mutate({ id: s.id })}
+                  disabled={busy}
+                  className="btn-primary !px-4 !py-1.5 text-xs disabled:opacity-50"
+                >
+                  قبول ونشر
+                </button>
+                <button
+                  onClick={() => reject.mutate({ id: s.id })}
+                  disabled={busy}
+                  className="btn-glass !px-4 !py-1.5 text-xs text-danger disabled:opacity-50"
+                >
+                  رفض
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
 export default function AdminCoins() {
   return (
     <div className="space-y-4">
@@ -648,6 +723,7 @@ export default function AdminCoins() {
       <GrantCoinsCard />
       <ShopManagerCard />
       <PollsManagerCard />
+      <ChallengesManagerCard />
     </div>
   );
 }
