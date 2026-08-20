@@ -290,12 +290,16 @@ export async function notifyNewChapters(
       });
     }
   }
-  if (!rows.length) return 0;
-  for (let i = 0; i < rows.length; i += 200) {
-    const batch = rows.slice(i, i + 200);
+  // Drop any null/undefined rows before insert: drizzle calls Object.keys(row)
+  // internally, which throws "Cannot convert undefined or null to object" on a
+  // null/undefined element.
+  const validRows = rows.filter((r) => r != null);
+  if (!validRows.length) return 0;
+  for (let i = 0; i < validRows.length; i += 200) {
+    const batch = validRows.slice(i, i + 200);
     if (batch.length) await db.insert(notifications).values(batch);
   }
-  return rows.length;
+  return validRows.length;
 }
 
 export interface ImportResult {
@@ -586,6 +590,8 @@ export async function refreshChapters(mangaId: number): Promise<{ chaptersAdded:
       console.warn(
         `[importer] فشل إنشاء إشعارات ${m.id}: ${(e as Error).message}`,
       );
+      // Log the stack so the real origin surfaces if this ever recurs.
+      if ((e as Error).stack) console.warn((e as Error).stack);
     }
   }
 

@@ -26,7 +26,12 @@ export function serveStaticFiles(app: App) {
 
   app.notFound((c) => {
     const accept = c.req.header("accept") ?? "";
-    if (!accept.includes("text/html")) {
+    // Asset paths (with a file extension like .js/.png) return a real 404 unless
+    // requested as HTML. SPA routes (no extension) always serve index.html — even
+    // for crawlers and shared links that send Accept: */* — so direct links don't
+    // break and search engines can index deep pages.
+    const hasFileExtension = /\.[a-zA-Z0-9]+$/.test(c.req.path);
+    if (hasFileExtension && !accept.includes("text/html")) {
       return c.json({ error: "Not Found" }, 404);
     }
     const indexPath = path.resolve(distPath, "index.html");

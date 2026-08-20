@@ -346,7 +346,11 @@ const CSP = [
   "script-src 'self' 'unsafe-eval' https://telegram.org",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src * data: blob:",
+  // Covers are hotlinked from many source domains, so they can't be pinned to a
+  // fixed host list without proxying every cover through /api/img or R2. Restrict
+  // to https only — http/ws are already blocked by mixed-content on this HTTPS/HSTS
+  // site, so there is no functional regression.
+  "img-src https: data: blob:",
   "connect-src 'self'",
   "frame-src https://telegram.org https://oauth.telegram.org",
   "frame-ancestors 'none'",
