@@ -139,7 +139,7 @@ function HeroSlider() {
       onTouchStart={() => setPaused(true)}
       onTouchEnd={() => setPaused(false)}
     >
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-[1.15fr_0.85fr] md:items-center md:px-6 md:py-14">
+      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 md:grid-cols-[1.15fr_0.85fr] md:items-center md:gap-8 md:px-6 md:py-14">
         {/* النص */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -225,8 +225,18 @@ function HeroSlider() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Coverflow — الغلاف النشط في المنتصف والجانبيّة باهتة، مع انتقال متحرّك */}
-        <div className="relative mx-auto h-[300px] w-full max-w-[440px] overflow-hidden sm:h-[360px]">
+        {/* Coverflow — الغلاف النشط في المنتصف وجانبيّتان كاملتان، سحب باللمس على الهاتف */}
+        <motion.div
+          className="relative isolate mx-auto h-[260px] w-full max-w-[460px] touch-pan-y sm:h-[340px]"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.12}
+          onDragEnd={(_, info) => {
+            // RTL: سحب لليمين = التالي
+            if (info.offset.x > 50) go(1);
+            else if (info.offset.x < -50) go(-1);
+          }}
+        >
           {slides.map((s, i) => {
             let off = i - safeIndex;
             if (off > count / 2) off -= count;
@@ -238,24 +248,26 @@ function HeroSlider() {
               <motion.div
                 key={s.slug}
                 animate={{
-                  x: `${off * 58}%`,
-                  scale: isCenter ? 1 : abs === 1 ? 0.72 : 0.5,
-                  opacity: isCenter ? 1 : abs === 1 ? 0.5 : 0.22,
+                  // إزاحات أصغر + مقاسات أكبر للجانبيّة حتى تظهر غلافان كاملان لا نصفان
+                  x: `${off * 42}%`,
+                  scale: isCenter ? 1 : abs === 1 ? 0.74 : 0.54,
+                  opacity: isCenter ? 1 : abs === 1 ? 0.6 : 0.3,
                   zIndex: 10 - abs,
                 }}
                 transition={{ duration: 0.5, ease: EASE }}
-                className="absolute inset-0 mx-auto flex items-center justify-center"
-                style={{ pointerEvents: abs > 1 ? "none" : "auto" }}
+                className="pointer-events-none absolute inset-0 mx-auto flex items-center justify-center"
               >
                 <Link
                   to={`/manga/${s.slug}`}
+                  draggable={false}
                   onClick={(e) => {
                     if (!isCenter) {
                       e.preventDefault();
                       setIndex(i);
                     }
                   }}
-                  className={`relative block w-[62%] border bg-[var(--ed-bg2)] p-1.5 transition-colors ${
+                  style={{ pointerEvents: abs > 1 ? "none" : "auto" }}
+                  className={`relative block w-[56%] border bg-[var(--ed-bg2)] p-1.5 transition-colors ${
                     isCenter ? "border-[var(--ed-paper)]" : "border-[var(--ed-line)]"
                   }`}
                 >
@@ -281,7 +293,7 @@ function HeroSlider() {
               </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       </div>
       {/* شريط تقدم التشغيل التلقائي */}
       {count > 1 && (

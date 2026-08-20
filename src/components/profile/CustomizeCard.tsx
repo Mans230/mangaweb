@@ -232,12 +232,12 @@ function ImageRow({
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-sm font-bold text-app">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-app">
             {title}
             {/* (أ) صورة تليجرام تُملأ تلقائياً من الباكند عند الربط */}
             {kind === "avatar" && telegramLinked && (
-              <span className="glass-chip !px-2.5 !py-0.5 !text-[10.5px] font-semibold text-accent-2">
-                <Send size={11} />
+              <span className="glass-chip shrink-0 whitespace-nowrap !px-2 !py-0.5 !text-[10px] font-semibold text-app-3">
+                <Send size={10} />
                 {t("متزامنة مع تليجرام", "Synced from Telegram")}
               </span>
             )}
