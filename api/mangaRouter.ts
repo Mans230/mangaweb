@@ -281,7 +281,7 @@ export const mangaRouter = createRouter({
    */
   latestGrouped: publicQuery
     .input(
-      z.object({ limit: z.number().int().min(1).max(20).default(8) }).optional(),
+      z.object({ limit: z.number().int().min(1).max(40).default(8) }).optional(),
     )
     .query(async ({ input }) => {
       const limit = input?.limit ?? 8;
@@ -295,7 +295,7 @@ export const mangaRouter = createRouter({
           desc(sql`COALESCE(${chapters.publishedAt}, ${chapters.createdAt})`),
           desc(chapters.id),
         )
-        .limit(80);
+        .limit(240);
 
       const grouped = new Map<
         number,

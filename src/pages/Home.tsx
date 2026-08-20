@@ -464,14 +464,17 @@ function LatestMangaCard({ item, index }: { item: LatestGroupedMangaData; index:
 
 function LatestChapters() {
   const { t } = useLanguage();
-  const query = trpc.manga.latestGrouped.useQuery({ limit: 8 }, { retry: false });
+  const [limit, setLimit] = useState(8);
+  const query = trpc.manga.latestGrouped.useQuery({ limit }, { retry: false });
   const items = adaptLatestGrouped(query.data ?? []);
+  // في المتاح المزيد طالما آخر جلب رجّع بعدد الحد كاملاً (وحتى السقف 40)
+  const hasMore = items.length >= limit && limit < 40;
 
-  if (query.isLoading) {
+  if (query.isLoading && items.length === 0) {
     return (
-      <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-14">
         <SectionHeader title={t("آخر الفصول", "Latest chapters")} />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:gap-4 lg:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="skeleton h-44 !rounded" />
           ))}
@@ -482,11 +485,9 @@ function LatestChapters() {
   if (items.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-14 md:px-6">
+    <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-14">
       <SectionHeader
         title={t("آخر الفصول", "Latest chapters")}
-        moreTo="/browse?sort=latest"
-        count={t("اليوم", "TODAY")}
         extra={
           <Link to="/today" className="ed-btn-ghost-sm !border-[var(--ed-accent)] !text-[var(--ed-accent)]">
             <CalendarClock size={13} />
@@ -494,11 +495,22 @@ function LatestChapters() {
           </Link>
         }
       />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:gap-4 lg:grid-cols-2">
         {items.map((item, i) => (
           <LatestMangaCard key={item.mangaId} item={item} index={i} />
         ))}
       </div>
+      {hasMore && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => setLimit((l) => Math.min(40, l + 8))}
+            disabled={query.isFetching}
+            className="ed-btn-ghost disabled:opacity-60"
+          >
+            {query.isFetching ? t("جارٍ التحميل…", "Loading…") : t("عرض المزيد", "Load more")}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -872,29 +884,26 @@ function SourcesStrip() {
 function TelegramCTA() {
   const { t } = useLanguage();
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 md:px-6">
+    <section className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-15%" }}
         transition={{ duration: 0.5, ease: EASE }}
-        className="border border-[var(--ed-line)] bg-[var(--ed-bg2)] p-8 md:p-12"
+        className="border border-[var(--ed-line)] bg-[var(--ed-bg2)] p-4 md:p-5"
       >
-        <div className="flex flex-col items-start gap-7 md:flex-row md:items-center">
-          <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center border border-[var(--ed-accent)] bg-[var(--ed-accent-soft)] text-[var(--ed-accent)]">
-            <Send size={26} className="rtl:-scale-x-100" />
+        <div className="flex flex-row items-center gap-3 md:gap-5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-[var(--ed-accent)] bg-[var(--ed-accent-soft)] text-[var(--ed-accent)]">
+            <Send size={20} className="rtl:-scale-x-100" />
           </span>
-          <div className="flex-1">
-            <span className="font-ednum text-[11px] uppercase tracking-[0.22em] text-[var(--ed-dim)]">
-              Telegram
-            </span>
-            <h2 className="font-ed mt-1 text-2xl font-extrabold text-[var(--ed-paper)] md:text-3xl">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-ed text-base font-extrabold leading-tight text-[var(--ed-paper)] md:text-xl">
               {t("لا يفوتك أي فصل جديد", "Never miss a new chapter")}
             </h2>
-            <p className="mt-2 max-w-lg text-sm leading-7 text-[var(--ed-dim)]">
+            <p className="mt-0.5 line-clamp-1 text-[12px] text-[var(--ed-dim)] md:text-sm">
               {t(
-                "اشترك بقناة تليجرام واحصل على إشعار فوري بالغلاف والرابط",
-                "Join the Telegram channel and get an instant notification with the cover and link"
+                "إشعار فوري بالغلاف والرابط على تليجرام",
+                "Instant Telegram notification with cover and link",
               )}
             </p>
           </div>
@@ -902,10 +911,10 @@ function TelegramCTA() {
             href="https://t.me/dateranime"
             target="_blank"
             rel="noreferrer"
-            className="ed-btn-primary"
+            className="ed-btn-primary shrink-0 !px-3.5 !py-2 text-[13px] md:!px-5"
           >
-            {t("اشترك الآن", "Subscribe now")}
-            <Send size={15} className="rtl:-scale-x-100" />
+            <Send size={14} className="rtl:-scale-x-100" />
+            <span className="hidden sm:inline">{t("اشترك الآن", "Subscribe")}</span>
           </a>
         </div>
       </motion.div>
