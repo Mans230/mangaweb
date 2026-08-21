@@ -18,6 +18,7 @@ import {
   readingProgress,
   reports,
   requests,
+  scrapeJobs,
   sources,
   supportTickets,
   users,
@@ -32,6 +33,7 @@ import {
   invalidateSettingsCache,
   DEFAULT_BRANDING,
   SETTING_BRANDING,
+  SETTING_SCRAPE_BLACKOUT,
   SETTING_COMMUNITY_MANGA_ENABLED,
   SETTING_COMMUNITY_USER_ENABLED,
   SETTING_UI_HIDE_COMMUNITIES,
@@ -55,6 +57,13 @@ import { adminLogs, updateRequests } from "@db/schema";
 import { getScraper } from "./scrapers";
 import { logAdminAction } from "./lib/adminLog";
 import { recordSourceHealth } from "./lib/sourceHealth";
+import {
+  startJob,
+  finishJob,
+  inBlackout,
+  MAX_SCRAPE_ATTEMPTS,
+  retryBackoffMs,
+} from "./lib/scrapeJobs";
 import { clearPagesCache } from "./mangaRouter";
 import { SETTING_BANNED_WORDS, bannedWords } from "./lib/wordFilter";
 
@@ -65,6 +74,59 @@ export const SETTING_MAINTENANCE_MESSAGE = "maintenance_message";
 let scrapeRunning = false;
 /** علم module-scope يمنع تزامن مهمتي fixMetadata */
 let fixMetadataRunning = false;
+
+/**
+ * يشغّل سكراب مصدر واحد مع تسجيل سجل الدورة (scrape_jobs) وصحّة المصدر،
+ * وعند الفشل يجدول إعادة محاولة أُسّية. يُستدعى من الدورات اليدوية ومن إعادة المحاولة.
+ */
+async function scrapeOneSource(
+  name: string,
+  trigger: "manual" | "scheduled" | "retry",
+  attempt: number,
+  opts?: { limit?: number; maxPages?: number },
+): Promise<void> {
+  const { importCatalog } = await import("./services/importer");
+  const jobId = await startJob(name, trigger, attempt);
+  try {
+    const r = await importCatalog(name, opts ?? {});
+    console.log(
+      `[scrape] ${name} (${trigger} #${attempt}): استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
+    );
+    await finishJob(jobId, true, { imported: r.imported, failed: r.failed });
+    await recordSourceHealth(name, true);
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error(`[scrape] فشل ${name} (${trigger} #${attempt}): ${msg}`);
+    await finishJob(jobId, false, {}, msg);
+    await recordSourceHealth(name, false, msg);
+    if (attempt < MAX_SCRAPE_ATTEMPTS) scheduleScrapeRetry(name, attempt + 1, opts);
+  }
+}
+
+/** يجدول إعادة محاولة سكراب مصدر بعد تأخير أُسّي — يحترم قفل التزامن ونافذة الحظر */
+function scheduleScrapeRetry(
+  name: string,
+  attempt: number,
+  opts?: { limit?: number; maxPages?: number },
+): void {
+  setTimeout(() => {
+    void (async () => {
+      // دورة أخرى تعمل الآن — أعد الجدولة بدل التصادم
+      if (scrapeRunning) return scheduleScrapeRetry(name, attempt, opts);
+      if (await inBlackout()) {
+        const jobId = await startJob(name, "retry", attempt);
+        await finishJob(jobId, false, {}, "أُلغيت: نافذة حظر السكراب");
+        return;
+      }
+      scrapeRunning = true;
+      try {
+        await scrapeOneSource(name, "retry", attempt, opts);
+      } finally {
+        scrapeRunning = false;
+      }
+    })();
+  }, retryBackoffMs(attempt));
+}
 
 /** لون HEX صالح (#rgb أو #rrggbb) أو نص فارغ = رجوع للافتراضي */
 const hexColor = z
@@ -1429,7 +1491,6 @@ export const adminRouter = createRouter({
         message: "دورة سكرابنغ تعمل حالياً — انتظر اكتمالها",
       });
     }
-    const { importCatalog } = await import("./services/importer");
     const all = enabledScrapers().map((s) => s.name);
     const active = input?.source ? all.filter((n) => n === input.source) : all;
     if (!active.length) {
@@ -1441,20 +1502,9 @@ export const adminRouter = createRouter({
     scrapeRunning = true;
     void (async () => {
       try {
+        // تشغيل يدوي صريح من الأدمن — يتجاوز نافذة الحظر (تحكم الحظر بالتلقائي فقط)
         for (const name of active) {
-          try {
-            console.log(`[admin] triggerScrape: importCatalog(${name})…`);
-            const r = await importCatalog(name);
-            console.log(
-              `[admin] triggerScrape: ${name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
-            );
-            await recordSourceHealth(name, true);
-          } catch (e) {
-            console.error(
-              `[admin] triggerScrape: فشل ${name}: ${(e as Error).message}`,
-            );
-            await recordSourceHealth(name, false, (e as Error).message);
-          }
+          await scrapeOneSource(name, "manual", 1);
         }
         console.log("[admin] triggerScrape: اكتملت الدورة اليدوية.");
       } finally {
@@ -1480,7 +1530,6 @@ export const adminRouter = createRouter({
         message: "دورة سكرابنغ تعمل حالياً — انتظر اكتمالها",
       });
     }
-    const { importCatalog } = await import("./services/importer");
     const all = enabledScrapers().map((s) => s.name);
     const active = input?.source ? all.filter((n) => n === input.source) : all;
     if (!active.length) {
@@ -1493,22 +1542,7 @@ export const adminRouter = createRouter({
     void (async () => {
       try {
         for (const name of active) {
-          try {
-            console.log(`[admin] importFullCatalog: كتالوج كامل ${name}…`);
-            const r = await importCatalog(name, {
-              limit: 100000,
-              maxPages: 500,
-            });
-            console.log(
-              `[admin] importFullCatalog: ${name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
-            );
-            await recordSourceHealth(name, true);
-          } catch (e) {
-            console.error(
-              `[admin] importFullCatalog: فشل ${name}: ${(e as Error).message}`,
-            );
-            await recordSourceHealth(name, false, (e as Error).message);
-          }
+          await scrapeOneSource(name, "manual", 1, { limit: 100000, maxPages: 500 });
         }
         console.log("[admin] importFullCatalog: اكتمل السكراب الكامل.");
       } finally {
@@ -1520,6 +1554,125 @@ export const adminRouter = createRouter({
     });
     return { started: true, sources: active };
   }),
+
+  /** سجل دورات السكراب مع فلترة بالمصدر/الحالة وترقيم الصفحات */
+  listScrapeJobs: adminQuery
+    .input(
+      z.object({
+        source: z.string().trim().optional(),
+        status: z.enum(["pending", "running", "completed", "failed"]).optional(),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(30),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const conds = [];
+      if (input.source) conds.push(eq(scrapeJobs.source, input.source));
+      if (input.status) conds.push(eq(scrapeJobs.status, input.status));
+      const where = conds.length ? and(...conds) : undefined;
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select()
+          .from(scrapeJobs)
+          .where(where)
+          .orderBy(desc(scrapeJobs.id))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(scrapeJobs).where(where),
+      ]);
+      return { items: rows, total, page: input.page, limit: input.limit };
+    }),
+
+  /** إحصاءات الطابور: عمق الطابور (pending+running) وأداء كل مصدر (من صحّة المصادر) */
+  scrapeJobStats: adminQuery.query(async () => {
+    const db = getDb();
+    const [[{ pending }], [{ running }], srcRows] = await Promise.all([
+      db
+        .select({ pending: count() })
+        .from(scrapeJobs)
+        .where(eq(scrapeJobs.status, "pending")),
+      db
+        .select({ running: count() })
+        .from(scrapeJobs)
+        .where(eq(scrapeJobs.status, "running")),
+      db
+        .select({
+          name: sources.name,
+          successCount: sources.successCount,
+          errorCount: sources.errorCount,
+          lastSuccessAt: sources.lastSuccessAt,
+          lastRunAt: sources.lastRunAt,
+          lastError: sources.lastError,
+        })
+        .from(sources)
+        .orderBy(desc(sources.priority)),
+    ]);
+    return { queueDepth: pending + running, pending, running, sources: srcRows };
+  }),
+
+  /** إعادة تشغيل سكراب مصدر دورة فاشلة الآن (يدوياً) */
+  retryScrapeJob: adminQuery
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const job = await db.query.scrapeJobs.findFirst({
+        where: eq(scrapeJobs.id, input.id),
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "الدورة غير موجودة" });
+      if (scrapeRunning) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "دورة سكرابنغ تعمل حالياً — انتظر اكتمالها",
+        });
+      }
+      scrapeRunning = true;
+      void (async () => {
+        try {
+          await scrapeOneSource(job.source, "manual", 1);
+        } finally {
+          scrapeRunning = false;
+        }
+      })();
+      await logAdminAction(ctx.user.id, "scraper.retry_job", {
+        meta: { id: input.id, source: job.source },
+      });
+      return { started: true, source: job.source };
+    }),
+
+  /** قراءة نافذة حظر السكراب */
+  getScrapeBlackout: adminQuery.query(async () => {
+    const raw = await getSetting(SETTING_SCRAPE_BLACKOUT, "");
+    if (!raw) return { enabled: false, startHour: 0, endHour: 0 };
+    try {
+      const v = JSON.parse(raw) as { startHour?: number; endHour?: number };
+      return {
+        enabled: typeof v.startHour === "number" && typeof v.endHour === "number",
+        startHour: v.startHour ?? 0,
+        endHour: v.endHour ?? 0,
+      };
+    } catch {
+      return { enabled: false, startHour: 0, endHour: 0 };
+    }
+  }),
+
+  /** ضبط/تعطيل نافذة حظر السكراب (بالساعة 0-23) */
+  setScrapeBlackout: adminQuery
+    .input(
+      z.object({
+        enabled: z.boolean(),
+        startHour: z.number().int().min(0).max(23).default(0),
+        endHour: z.number().int().min(0).max(23).default(0),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const value = input.enabled
+        ? JSON.stringify({ startHour: input.startHour, endHour: input.endHour })
+        : "";
+      await setSetting(SETTING_SCRAPE_BLACKOUT, value);
+      await logAdminAction(ctx.user.id, "scraper.blackout", { meta: input });
+      return { success: true };
+    }),
 
   /**
    * تصحيح الأغلفة والأوصاف: يمر على كل المانجا على دفعات في الخلفية،

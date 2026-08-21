@@ -33,6 +33,9 @@ export const SETTING_HOME_TOP_IDS_EN = "home.top_week_ids_en";
  */
 export const SETTING_BRANDING = "branding.config";
 
+/** نافذة حظر السكراب (JSON {startHour,endHour}) — لا يعمل السكرابر داخلها */
+export const SETTING_SCRAPE_BLACKOUT = "scraper.blackout";
+
 export interface BrandingConfig {
   colors: {
     primary: string;

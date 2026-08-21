@@ -1276,3 +1276,34 @@ export const promoRedemptions = mysqlTable(
 );
 
 export type PromoRedemption = typeof promoRedemptions.$inferSelect;
+
+/**
+ * سجل تشغيل السكرابر — صف لكل دورة سكراب لمصدر (يدوي/مجدول/إعادة محاولة).
+ * status: pending | running | completed | failed
+ * trigger: manual | scheduled | retry
+ */
+export const scrapeJobs = mysqlTable(
+  "scrape_jobs",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    source: varchar("source", { length: 100 }).notNull(),
+    trigger: varchar("trigger", { length: 16 }).default("manual").notNull(),
+    status: varchar("status", { length: 16 }).default("pending").notNull(),
+    imported: int("imported").default(0).notNull(),
+    failed: int("failed").default(0).notNull(),
+    attempt: int("attempt").default(1).notNull(),
+    error: varchar("error", { length: 1000 }),
+    startedAt: timestamp("startedAt"),
+    finishedAt: timestamp("finishedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("scrape_jobs_status_idx").on(table.status),
+    sourceIdx: index("scrape_jobs_source_idx").on(table.source, table.createdAt),
+  }),
+);
+
+export type ScrapeJob = typeof scrapeJobs.$inferSelect;
+export type InsertScrapeJob = typeof scrapeJobs.$inferInsert;

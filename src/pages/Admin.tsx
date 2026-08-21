@@ -26,6 +26,7 @@ import {
   Wrench,
   Activity,
   Ticket,
+  ListChecks,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -55,9 +56,10 @@ import NotificationsManager from "@/components/admin/NotificationsManager";
 import BrokenChaptersManager from "@/components/admin/BrokenChaptersManager";
 import SystemHealth from "@/components/admin/SystemHealth";
 import Monetization from "@/components/admin/Monetization";
+import ScraperJobs from "@/components/admin/ScraperJobs";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken" | "system" | "monetization";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken" | "system" | "monetization" | "scraperJobs";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -106,6 +108,7 @@ function AdminShell() {
         { id: "manga", label: t("إدارة المانجا", "Manga"), icon: BookOpen },
         { id: "add", label: t("إضافة بلينك", "Add by link"), icon: Link2 },
         { id: "sources", label: t("المصادر", "Sources"), icon: ListMusic },
+        { id: "scraperJobs", label: t("دورات السكراب", "Scrape jobs"), icon: ListChecks },
         { id: "merge", label: t("دمج المكرر", "Merge duplicates"), icon: GitMerge },
         { id: "users", label: t("المستخدمون", "Users"), icon: Users },
         { id: "requests", label: t("الطلبات", "Requests"), icon: Inbox, badge: pendingCount },
@@ -268,6 +271,7 @@ function AdminShell() {
             {view === "broken" && <BrokenChaptersManager />}
             {view === "system" && <SystemHealth />}
             {view === "monetization" && <Monetization />}
+            {view === "scraperJobs" && <ScraperJobs />}
             {view === "comments" && <CommentsManager />}
             {view === "communities" && <CommunitiesManager />}
           </motion.div>

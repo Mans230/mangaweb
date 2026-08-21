@@ -555,6 +555,36 @@ AND NOT EXISTS (
   } catch (e) {
     console.warn(`[ensure-schema] promo_codes: ${(e as Error).message}`);
   }
+
+  // ===== سجل تشغيل السكرابر =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`scrape_jobs\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`source\` varchar(100) NOT NULL,
+	\`trigger\` varchar(16) NOT NULL DEFAULT 'manual',
+	\`status\` varchar(16) NOT NULL DEFAULT 'pending',
+	\`imported\` int NOT NULL DEFAULT 0,
+	\`failed\` int NOT NULL DEFAULT 0,
+	\`attempt\` int NOT NULL DEFAULT 1,
+	\`error\` varchar(1000),
+	\`startedAt\` timestamp NULL,
+	\`finishedAt\` timestamp NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`scrape_jobs_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "scrape_jobs",
+      "scrape_jobs_status_idx",
+      "CREATE INDEX `scrape_jobs_status_idx` ON `scrape_jobs` (`status`)",
+    );
+    await ensureIndex(
+      "scrape_jobs",
+      "scrape_jobs_source_idx",
+      "CREATE INDEX `scrape_jobs_source_idx` ON `scrape_jobs` (`source`, `createdAt`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] scrape_jobs: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {
