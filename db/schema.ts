@@ -1204,3 +1204,23 @@ export const notificationTemplates = mysqlTable(
 
 export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
 export type InsertNotificationTemplate = typeof notificationTemplates.$inferInsert;
+
+/** سجل أخطاء الخادم (500) — لعرضها في لوحة صحّة النظام */
+export const errorLogs = mysqlTable(
+  "error_logs",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    level: varchar("level", { length: 16 }).default("error").notNull(),
+    path: varchar("path", { length: 200 }),
+    message: varchar("message", { length: 1000 }).notNull(),
+    stack: text("stack"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    createdIdx: index("error_logs_created_idx").on(table.createdAt),
+  }),
+);
+
+export type ErrorLog = typeof errorLogs.$inferSelect;

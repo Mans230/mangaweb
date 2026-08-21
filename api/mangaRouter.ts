@@ -29,6 +29,13 @@ import { TRPCError } from "@trpc/server";
 const PAGES_TTL_MS = 20 * 60 * 1000;
 const pagesCache = new Map<number, { pages: string[]; at: number }>();
 
+/** تفريغ كاش صفحات الفصول (يستخدمه زر «مسح الكاش» في لوحة صحّة النظام) — يعيد عدد المفاتيح المُزالة */
+export function clearPagesCache(): number {
+  const size = pagesCache.size;
+  pagesCache.clear();
+  return size;
+}
+
 const listInput = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(50).default(20),

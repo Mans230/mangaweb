@@ -503,6 +503,26 @@ AND NOT EXISTS (
   } catch (e) {
     console.warn(`[ensure-schema] notification_templates: ${(e as Error).message}`);
   }
+
+  // ===== سجل أخطاء الخادم =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`error_logs\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`level\` varchar(16) NOT NULL DEFAULT 'error',
+	\`path\` varchar(200),
+	\`message\` varchar(1000) NOT NULL,
+	\`stack\` text,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`error_logs_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "error_logs",
+      "error_logs_created_idx",
+      "CREATE INDEX `error_logs_created_idx` ON `error_logs` (`createdAt`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] error_logs: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {

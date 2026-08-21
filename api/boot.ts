@@ -5,6 +5,7 @@ import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
+import { captureError } from "./lib/errorLog";
 import { env } from "./lib/env";
 import { linkVerifyHandler } from "./lib/link";
 import { telegramResetHandler } from "./lib/telegramReset";
@@ -434,6 +435,15 @@ app.use("/api/trpc/*", async (c) => {
     req: c.req.raw,
     router: appRouter,
     createContext,
+    onError: ({ error, path }) => {
+      // نسجّل فقط أخطاء الخادم (500) — الأخطاء المتوقّعة (4xx) ليست أعطالاً
+      if (error.code === "INTERNAL_SERVER_ERROR") {
+        void captureError(error.message, {
+          path: path ?? undefined,
+          stack: error.stack,
+        });
+      }
+    },
   });
 });
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));

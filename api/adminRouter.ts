@@ -13,6 +13,7 @@ import {
   favorites,
   follows,
   manga,
+  errorLogs,
   ratings,
   readingProgress,
   reports,
@@ -28,6 +29,7 @@ import {
   setSetting,
   getBranding,
   parseBranding,
+  invalidateSettingsCache,
   DEFAULT_BRANDING,
   SETTING_BRANDING,
   SETTING_COMMUNITY_MANGA_ENABLED,
@@ -53,6 +55,7 @@ import { adminLogs, updateRequests } from "@db/schema";
 import { getScraper } from "./scrapers";
 import { logAdminAction } from "./lib/adminLog";
 import { recordSourceHealth } from "./lib/sourceHealth";
+import { clearPagesCache } from "./mangaRouter";
 import { SETTING_BANNED_WORDS, bannedWords } from "./lib/wordFilter";
 
 export const SETTING_MAINTENANCE_MODE = "maintenance_mode";
@@ -886,6 +889,45 @@ export const adminRouter = createRouter({
     await setSetting(SETTING_BRANDING, JSON.stringify(DEFAULT_BRANDING));
     await logAdminAction(ctx.user.id, "settings.branding_reset", {});
     return parseBranding(JSON.stringify(DEFAULT_BRANDING));
+  }),
+
+  // ================= صحّة النظام (سجل الأخطاء + الكاش) =================
+
+  /** آخر أخطاء الخادم (500) مع الصفحات */
+  errorLogs: adminQuery
+    .input(
+      z.object({
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(30),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select()
+          .from(errorLogs)
+          .orderBy(desc(errorLogs.id))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(errorLogs),
+      ]);
+      return { items: rows, total, page: input.page, limit: input.limit };
+    }),
+
+  /** مسح كل سجل الأخطاء */
+  clearErrorLogs: adminQuery.mutation(async ({ ctx }) => {
+    await getDb().delete(errorLogs);
+    await logAdminAction(ctx.user.id, "system.clear_error_logs", {});
+    return { success: true };
+  }),
+
+  /** مسح كاشات الخادم في الذاكرة (صفحات الفصول + إعدادات الموقع) — «purge» بضغطة */
+  purgeCaches: adminQuery.mutation(async ({ ctx }) => {
+    const pages = clearPagesCache();
+    invalidateSettingsCache();
+    await logAdminAction(ctx.user.id, "system.purge_caches", { meta: { pages } });
+    return { success: true, pagesCleared: pages };
   }),
 
   /** ضبط قائمة قسم الرئيسية (جواهر مخفية / توب10) يدوياً بمعرّفات مانجا — لكل لغة */

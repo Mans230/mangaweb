@@ -51,7 +51,12 @@ Legend: ✅ done · 🟡 partial (exists, gaps listed) · 🔴 new
   chapter reads (e.g. `mangaRouter` manga-detail at line ~107) don't filter `hiddenAt`
   or future `publishedAt` — so scheduling needs a broader chapter-visibility pass across
   ~8 read queries, best done as its own change with runtime verification.
-- Phase 6 — System health: error-log viewer + CDN purge (Tool 10 gap)
+- **Phase 6 — System health: error-log viewer + cache purge (Tool 10 gap)** — ✅ done
+  `error_logs` table (+ ensureSchema), best-effort `captureError()` wired into the
+  tRPC `onError` hook in boot.ts (500-class only), `admin.errorLogs`/`clearErrorLogs`,
+  and `admin.purgeCaches` (clears in-memory chapter-pages + settings caches via new
+  `clearPagesCache()` + `invalidateSettingsCache()`). `SystemHealth.tsx` viewer + purge
+  button, new "System health" tab.
 - Phase 7 — Monetization: promo codes + refund log (Tool 9 gap; payment-gateway integration is a separate infra decision)
 
 Each phase follows the repo's existing conventions:
