@@ -15,6 +15,7 @@ import {
   manga,
   ratings,
   readingProgress,
+  reports,
   requests,
   sources,
   supportTickets,
@@ -1147,6 +1148,54 @@ export const adminRouter = createRouter({
           message: `فشل سحب الصفحات: ${(e as Error).message}`,
         });
       }
+    }),
+
+  /**
+   * طابور الفصول المعطوبة: تقارير المستخدمين reason="broken" مع بيانات الفصل والمانجا.
+   * سير المعالجة يُنفَّذ عبر hideChapter/unhideChapter/rescrapeChapter + reports.resolveReport.
+   */
+  listBrokenChapters: adminQuery
+    .input(
+      z.object({
+        status: z.enum(["pending", "resolved", "dismissed"]).default("pending"),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const where = and(
+        eq(reports.reason, "broken"),
+        eq(reports.status, input.status),
+      );
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            report: {
+              id: reports.id,
+              details: reports.details,
+              status: reports.status,
+              createdAt: reports.createdAt,
+            },
+            chapter: {
+              id: chapters.id,
+              number: chapters.number,
+              title: chapters.title,
+              pageCount: chapters.pageCount,
+              hiddenAt: chapters.hiddenAt,
+            },
+            manga: { id: manga.id, title: manga.title, slug: manga.slug },
+          })
+          .from(reports)
+          .leftJoin(chapters, eq(reports.chapterId, chapters.id))
+          .leftJoin(manga, eq(reports.mangaId, manga.id))
+          .where(where)
+          .orderBy(desc(reports.createdAt))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(reports).where(where),
+      ]);
+      return { items: rows, total, page: input.page, limit: input.limit };
     }),
 
   // ================= إدارة المانجا (موسّعة) =================

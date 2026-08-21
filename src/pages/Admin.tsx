@@ -23,6 +23,7 @@ import {
   UsersRound,
   BookOpen,
   Bell,
+  Wrench,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,9 +50,10 @@ import AdminEnImport from "@/components/admin/AdminEnImport";
 import ThemeBranding from "@/components/admin/ThemeBranding";
 import DmcaManager from "@/components/admin/DmcaManager";
 import NotificationsManager from "@/components/admin/NotificationsManager";
+import BrokenChaptersManager from "@/components/admin/BrokenChaptersManager";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -104,6 +106,7 @@ function AdminShell() {
         { id: "tickets", label: t("تذاكر الدعم", "Support tickets"), icon: LifeBuoy, badge: openTickets },
         { id: "reports", label: t("التبليغات", "Reports"), icon: Flag },
         { id: "dmca", label: t("DMCA", "DMCA"), icon: ShieldAlert, badge: pendingDmca },
+        { id: "broken", label: t("فصول معطوبة", "Broken chapters"), icon: Wrench },
         { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
         { id: "communities", label: t("المجتمعات", "Communities"), icon: UsersRound },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
@@ -256,6 +259,7 @@ function AdminShell() {
             {view === "tickets" && <TicketsManager />}
             {view === "reports" && <ReportsManager />}
             {view === "dmca" && <DmcaManager />}
+            {view === "broken" && <BrokenChaptersManager />}
             {view === "comments" && <CommentsManager />}
             {view === "communities" && <CommunitiesManager />}
           </motion.div>

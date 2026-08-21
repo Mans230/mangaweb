@@ -42,7 +42,15 @@ Legend: ✅ done · 🟡 partial (exists, gaps listed) · 🔴 new
   targeted `adminBroadcast` (all / premium / manga-followers, chunked insert)
   on `notificationsRouter`, plus `NotificationsManager.tsx` (compose + confirm,
   template picker, template editor) and a Notifications tab.
-- Phase 5 — Chapter scheduling + broken-chapter queue (Tool 2 gap)
+- **Phase 5 — Broken-chapter queue (Tool 2 gap)** — ✅ done
+  `admin.listBrokenChapters` (reports where `reason="broken"`, joined chapter + manga,
+  status filter + pagination) plus `BrokenChaptersManager.tsx` resolution workflow
+  reusing existing `rescrapeChapter` / `hideChapter` / `unhideChapter` /
+  `reports.resolveReport`. New "Broken chapters" tab.
+  **Chapter scheduling deferred:** chapters already carry `publishedAt`, but public
+  chapter reads (e.g. `mangaRouter` manga-detail at line ~107) don't filter `hiddenAt`
+  or future `publishedAt` — so scheduling needs a broader chapter-visibility pass across
+  ~8 read queries, best done as its own change with runtime verification.
 - Phase 6 — System health: error-log viewer + CDN purge (Tool 10 gap)
 - Phase 7 — Monetization: promo codes + refund log (Tool 9 gap; payment-gateway integration is a separate infra decision)
 
