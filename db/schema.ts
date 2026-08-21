@@ -1183,3 +1183,24 @@ export const dmcaRequests = mysqlTable(
 
 export type DmcaRequest = typeof dmcaRequests.$inferSelect;
 export type InsertDmcaRequest = typeof dmcaRequests.$inferInsert;
+
+/** قوالب الإشعارات القابلة لإعادة الاستخدام (يبنيها الأدمن للبث) */
+export const notificationTemplates = mysqlTable(
+  "notification_templates",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    body: varchar("body", { length: 500 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+);
+
+export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
+export type InsertNotificationTemplate = typeof notificationTemplates.$inferInsert;

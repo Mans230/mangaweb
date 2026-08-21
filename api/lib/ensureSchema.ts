@@ -488,6 +488,21 @@ AND NOT EXISTS (
   } catch (e) {
     console.warn(`[ensure-schema] dmca_requests: ${(e as Error).message}`);
   }
+
+  // ===== قوالب الإشعارات =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`notification_templates\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`name\` varchar(120) NOT NULL,
+	\`title\` varchar(200) NOT NULL,
+	\`body\` varchar(500) NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`notification_templates_id\` PRIMARY KEY(\`id\`)
+)`));
+  } catch (e) {
+    console.warn(`[ensure-schema] notification_templates: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {

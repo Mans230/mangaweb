@@ -37,7 +37,11 @@ Legend: ✅ done · 🟡 partial (exists, gaps listed) · 🔴 new
   idempotent `ensureSchema` ALTERs, `recordSourceHealth()` wired into `triggerScrape` + `importFullCatalog`,
   `admin.updateSourceConfig` (priority + auto toggle), rebuilt `Sources.tsx` with health badges,
   success/error counters, last-error display, priority input, and auto-scrape switch.
-- Phase 4 — Notification template builder (Tool 12 gap)
+- **Phase 4 — Notification template builder (Tool 12 gap)** — ✅ done
+  `notification_templates` table (+ ensureSchema), admin template CRUD and a
+  targeted `adminBroadcast` (all / premium / manga-followers, chunked insert)
+  on `notificationsRouter`, plus `NotificationsManager.tsx` (compose + confirm,
+  template picker, template editor) and a Notifications tab.
 - Phase 5 — Chapter scheduling + broken-chapter queue (Tool 2 gap)
 - Phase 6 — System health: error-log viewer + CDN purge (Tool 10 gap)
 - Phase 7 — Monetization: promo codes + refund log (Tool 9 gap; payment-gateway integration is a separate infra decision)

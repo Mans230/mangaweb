@@ -22,6 +22,7 @@ import {
   Users,
   UsersRound,
   BookOpen,
+  Bell,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,9 +48,10 @@ import AdminCoins from "@/components/admin/AdminCoins";
 import AdminEnImport from "@/components/admin/AdminEnImport";
 import ThemeBranding from "@/components/admin/ThemeBranding";
 import DmcaManager from "@/components/admin/DmcaManager";
+import NotificationsManager from "@/components/admin/NotificationsManager";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -89,6 +91,7 @@ function AdminShell() {
         { id: "reels", label: t("مراجعة الريلز", "Reels review"), icon: Clapperboard, badge: pendingReels },
         { id: "settings", label: t("الإعدادات", "Settings"), icon: Settings },
         { id: "branding", label: t("الثيم والهوية", "Theme & branding"), icon: Palette },
+        { id: "notifications", label: t("الإشعارات", "Notifications"), icon: Bell },
         { id: "coins", label: t("كوينز", "Coins"), icon: Coins },
         { id: "en", label: t("مانجا EN", "EN Manga"), icon: Globe },
         { id: "dashboard", label: t("لوحة المعلومات", "Dashboard"), icon: LayoutDashboard },
@@ -240,6 +243,7 @@ function AdminShell() {
             {view === "reels" && <ReelsModeration />}
             {view === "settings" && <AdminSettings />}
             {view === "branding" && <ThemeBranding />}
+            {view === "notifications" && <NotificationsManager />}
             {view === "coins" && <AdminCoins />}
             {view === "en" && <AdminEnImport />}
             {view === "dashboard" && <AdminDashboard />}
