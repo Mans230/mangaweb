@@ -1000,26 +1000,77 @@ export const adminRouter = createRouter({
 
   // ================= صحّة النظام (سجل الأخطاء + الكاش) =================
 
-  /** آخر أخطاء الخادم (500) مع الصفحات */
+  /** أخطاء الخادم/العميل مُجمّعة حسب البصمة، مع فلتر الحالة والصفحات */
   errorLogs: adminQuery
     .input(
       z.object({
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(100).default(30),
+        status: z.enum(["all", "open", "resolved", "ignored"]).default("open"),
       }),
     )
     .query(async ({ input }) => {
       const db = getDb();
+      const where =
+        input.status === "all"
+          ? undefined
+          : eq(errorLogs.status, input.status);
       const [rows, [{ total }]] = await Promise.all([
         db
           .select()
           .from(errorLogs)
-          .orderBy(desc(errorLogs.id))
+          .where(where)
+          .orderBy(desc(errorLogs.lastSeenAt))
           .limit(input.limit)
           .offset((input.page - 1) * input.limit),
-        db.select({ total: count() }).from(errorLogs),
+        db.select({ total: count() }).from(errorLogs).where(where),
       ]);
       return { items: rows, total, page: input.page, limit: input.limit };
+    }),
+
+  /** إحصاء الأخطاء حسب الحالة — لشارات تبويبات الفلتر */
+  errorLogStats: adminQuery.query(async () => {
+    const rows = await getDb()
+      .select({ status: errorLogs.status, c: count() })
+      .from(errorLogs)
+      .groupBy(errorLogs.status);
+    const stats = { open: 0, resolved: 0, ignored: 0, total: 0 };
+    for (const r of rows) {
+      const n = Number(r.c);
+      stats.total += n;
+      if (r.status === "open") stats.open += n;
+      else if (r.status === "resolved") stats.resolved += n;
+      else if (r.status === "ignored") stats.ignored += n;
+    }
+    return stats;
+  }),
+
+  /** تغيير حالة خطأ (open/resolved/ignored) */
+  updateErrorStatus: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        status: z.enum(["open", "resolved", "ignored"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const [row] = await db
+        .select({ id: errorLogs.id })
+        .from(errorLogs)
+        .where(eq(errorLogs.id, input.id))
+        .limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      await db
+        .update(errorLogs)
+        .set({ status: input.status })
+        .where(eq(errorLogs.id, input.id));
+      await logAdminAction(ctx.user.id, "system.update_error_status", {
+        targetType: "error_log",
+        targetId: input.id,
+        meta: { status: input.status },
+      });
+      return { success: true };
     }),
 
   /** مسح كل سجل الأخطاء */

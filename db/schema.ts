@@ -1205,20 +1205,35 @@ export const notificationTemplates = mysqlTable(
 export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
 export type InsertNotificationTemplate = typeof notificationTemplates.$inferInsert;
 
-/** سجل أخطاء الخادم (500) — لعرضها في لوحة صحّة النظام */
+/** سجل أخطاء الخادم/العميل — مُجمّع حسب البصمة لعرضه في لوحة صحّة النظام */
 export const errorLogs = mysqlTable(
   "error_logs",
   {
     id: bigint("id", { mode: "number", unsigned: true })
       .autoincrement()
       .primaryKey(),
+    /** بصمة تجميع الأخطاء المتشابهة (hash من الرسالة + أعلى إطار stack) */
+    fingerprint: varchar("fingerprint", { length: 64 }),
+    /** error | client */
     level: varchar("level", { length: 16 }).default("error").notNull(),
+    /** open | resolved | ignored */
+    status: varchar("status", { length: 16 }).default("open").notNull(),
+    /** عدد مرّات التكرار لنفس البصمة */
+    count: int("count").default(1).notNull(),
     path: varchar("path", { length: 200 }),
     message: varchar("message", { length: 1000 }).notNull(),
     stack: text("stack"),
+    /** أول ظهور */
     createdAt: timestamp("createdAt").defaultNow().notNull(),
+    /** آخر ظهور — يُستخدم للترتيب */
+    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
   },
   (table) => ({
+    fingerprintUq: uniqueIndex("error_logs_fingerprint_uq").on(
+      table.fingerprint,
+    ),
+    statusIdx: index("error_logs_status_idx").on(table.status),
+    lastSeenIdx: index("error_logs_lastseen_idx").on(table.lastSeenAt),
     createdIdx: index("error_logs_created_idx").on(table.createdAt),
   }),
 );

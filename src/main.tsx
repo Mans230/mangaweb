@@ -5,6 +5,9 @@ import { TRPCProvider } from "@/providers/trpc"
 import App from './App.tsx'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/components/LanguageProvider'
+import { installClientErrorReporter } from '@/lib/clientErrorReporter'
+
+if (import.meta.env.PROD) installClientErrorReporter()
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>

@@ -504,17 +504,51 @@ AND NOT EXISTS (
     console.warn(`[ensure-schema] notification_templates: ${(e as Error).message}`);
   }
 
-  // ===== سجل أخطاء الخادم =====
+  // ===== سجل أخطاء الخادم/العميل (مُجمّع حسب البصمة) =====
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`error_logs\` (
 	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`fingerprint\` varchar(64),
 	\`level\` varchar(16) NOT NULL DEFAULT 'error',
+	\`status\` varchar(16) NOT NULL DEFAULT 'open',
+	\`count\` int NOT NULL DEFAULT 1,
 	\`path\` varchar(200),
 	\`message\` varchar(1000) NOT NULL,
 	\`stack\` text,
 	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`lastSeenAt\` timestamp NOT NULL DEFAULT (now()),
 	CONSTRAINT \`error_logs_id\` PRIMARY KEY(\`id\`)
 )`));
+    // ترقية الجداول القائمة (Error-tracking upgrade)
+    for (const [col, ddl] of [
+      ["fingerprint", "ADD `fingerprint` varchar(64)"],
+      ["status", "ADD `status` varchar(16) NOT NULL DEFAULT 'open'"],
+      ["count", "ADD `count` int NOT NULL DEFAULT 1"],
+      [
+        "lastSeenAt",
+        "ADD `lastSeenAt` timestamp NOT NULL DEFAULT (now())",
+      ],
+    ] as const) {
+      await ignoreDuplicateColumn(
+        db.execute(sql.raw(`ALTER TABLE \`error_logs\` ${ddl}`)),
+        `error_logs.${col}`,
+      );
+    }
+    await ensureIndex(
+      "error_logs",
+      "error_logs_fingerprint_uq",
+      "CREATE UNIQUE INDEX `error_logs_fingerprint_uq` ON `error_logs` (`fingerprint`)",
+    );
+    await ensureIndex(
+      "error_logs",
+      "error_logs_status_idx",
+      "CREATE INDEX `error_logs_status_idx` ON `error_logs` (`status`)",
+    );
+    await ensureIndex(
+      "error_logs",
+      "error_logs_lastseen_idx",
+      "CREATE INDEX `error_logs_lastseen_idx` ON `error_logs` (`lastSeenAt`)",
+    );
     await ensureIndex(
       "error_logs",
       "error_logs_created_idx",

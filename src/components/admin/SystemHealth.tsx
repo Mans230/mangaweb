@@ -2,11 +2,14 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   AlertOctagon,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  EyeOff,
   Loader2,
   RefreshCw,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import ErrorState from "@/components/ErrorState";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -64,28 +67,69 @@ function CachePurgeCard() {
 }
 
 /* ============ سجل الأخطاء ============ */
+type ErrStatus = "open" | "resolved" | "ignored" | "all";
+const ERR_STATUSES: ErrStatus[] = ["open", "resolved", "ignored", "all"];
+
 function ErrorLogsCard() {
   const { t } = useLanguage();
   const toast = useAdminToast();
+  const [status, setStatus] = useState<ErrStatus>("open");
   const [page, setPage] = useState(1);
   const [confirming, setConfirming] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const query = trpc.admin.errorLogs.useQuery(
-    { page, limit: PAGE_SIZE },
+    { page, limit: PAGE_SIZE, status },
     { retry: false },
   );
+  const stats = trpc.admin.errorLogStats.useQuery(undefined, { retry: false });
+
+  const refetchAll = () => {
+    query.refetch();
+    stats.refetch();
+  };
+
   const clear = trpc.admin.clearErrorLogs.useMutation({
     onSuccess: () => {
       toast(t("تم مسح السجل", "Log cleared"));
       setConfirming(false);
       setPage(1);
-      query.refetch();
+      refetchAll();
     },
     onError: (e) => {
       toast(e.message, "danger");
       setConfirming(false);
     },
   });
+  const updateStatus = trpc.admin.updateErrorStatus.useMutation({
+    onSuccess: () => {
+      toast(t("تم تحديث الحالة", "Status updated"), "success");
+      setBusyId(null);
+      refetchAll();
+    },
+    onError: (e) => {
+      toast(e.message, "danger");
+      setBusyId(null);
+    },
+  });
+
+  const statusLabel: Record<ErrStatus, string> = {
+    open: t("مفتوح", "Open"),
+    resolved: t("محلول", "Resolved"),
+    ignored: t("متجاهَل", "Ignored"),
+    all: t("الكل", "All"),
+  };
+  const statusCount: Record<ErrStatus, number> = {
+    open: stats.data?.open ?? 0,
+    resolved: stats.data?.resolved ?? 0,
+    ignored: stats.data?.ignored ?? 0,
+    all: stats.data?.total ?? 0,
+  };
+
+  const setErrStatus = (id: number, s: "open" | "resolved" | "ignored") => {
+    setBusyId(id);
+    updateStatus.mutate({ id, status: s });
+  };
 
   const items = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
@@ -101,12 +145,12 @@ function ErrorLogsCard() {
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="font-display flex items-center gap-2 text-sm font-bold text-app">
           <AlertOctagon size={16} className="text-danger" />
-          {t("سجل أخطاء الخادم", "Server error log")}
+          {t("سجل الأخطاء", "Error log")}
           {total > 0 && <span className="text-xs text-app-3">({total})</span>}
         </h3>
         <div className="flex gap-2">
           <button
-            onClick={() => query.refetch()}
+            onClick={refetchAll}
             className="btn-ghost !p-1.5"
             aria-label={t("تحديث", "Refresh")}
           >
@@ -145,25 +189,59 @@ function ErrorLogsCard() {
         </div>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        {ERR_STATUSES.map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              setStatus(s);
+              setPage(1);
+            }}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+              status === s ? "bg-primary text-primary-ink" : "glass text-app-2 hover:text-app"
+            }`}
+          >
+            {statusLabel[s]}
+            <span className="ms-1 text-[10px] opacity-70">({statusCount[s]})</span>
+          </button>
+        ))}
+      </div>
+
       {query.isLoading ? (
         <div className="skeleton h-40" />
       ) : query.isError ? (
-        <ErrorState onRetry={() => query.refetch()} retrying={query.isRefetching} />
+        <ErrorState onRetry={refetchAll} retrying={query.isRefetching} />
       ) : items.length === 0 ? (
         <p className="py-8 text-center text-sm text-app-3">
-          {t("لا توجد أخطاء مسجّلة — النظام سليم", "No errors logged — system healthy")}
+          {t("لا توجد أخطاء في هذه الحالة", "No errors in this status")}
         </p>
       ) : (
         <div className="space-y-2">
           {items.map((log) => (
             <div key={log.id} className="rounded-xl border border-danger/20 bg-danger/5 p-3">
               <div className="flex items-center justify-between gap-2">
-                {log.path && (
-                  <span className="font-mono text-[11px] font-bold text-danger" dir="ltr">
-                    {log.path}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                      log.level === "client"
+                        ? "bg-accent/15 text-accent"
+                        : "bg-danger/15 text-danger"
+                    }`}
+                  >
+                    {log.level === "client" ? t("عميل", "client") : t("خادم", "server")}
                   </span>
-                )}
-                <span className="text-[10px] text-app-3">{timeAgo(log.createdAt)}</span>
+                  {log.count > 1 && (
+                    <span className="rounded-full bg-app-2/10 px-1.5 py-0.5 text-[9px] font-bold text-app-2">
+                      ×{log.count}
+                    </span>
+                  )}
+                  {log.path && (
+                    <span className="font-mono text-[11px] font-bold text-danger" dir="ltr">
+                      {log.path}
+                    </span>
+                  )}
+                </div>
+                <span className="shrink-0 text-[10px] text-app-3">{timeAgo(log.lastSeenAt)}</span>
               </div>
               <p className="mt-1 whitespace-pre-wrap break-words text-xs text-app" dir="ltr">
                 {log.message}
@@ -178,6 +256,42 @@ function ErrorLogsCard() {
                   </pre>
                 </details>
               )}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {log.status !== "resolved" && (
+                  <button
+                    disabled={busyId === log.id}
+                    onClick={() => setErrStatus(log.id, "resolved")}
+                    className="btn-ghost !px-2.5 !py-1 text-[11px] text-green-500 disabled:opacity-50"
+                  >
+                    {busyId === log.id ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={12} />
+                    )}
+                    {t("حلّ", "Resolve")}
+                  </button>
+                )}
+                {log.status !== "ignored" && (
+                  <button
+                    disabled={busyId === log.id}
+                    onClick={() => setErrStatus(log.id, "ignored")}
+                    className="btn-ghost !px-2.5 !py-1 text-[11px] text-app-2 disabled:opacity-50"
+                  >
+                    <EyeOff size={12} />
+                    {t("تجاهل", "Ignore")}
+                  </button>
+                )}
+                {log.status !== "open" && (
+                  <button
+                    disabled={busyId === log.id}
+                    onClick={() => setErrStatus(log.id, "open")}
+                    className="btn-ghost !px-2.5 !py-1 text-[11px] text-accent disabled:opacity-50"
+                  >
+                    <Undo2 size={12} />
+                    {t("إعادة فتح", "Reopen")}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
 

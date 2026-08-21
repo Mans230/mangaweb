@@ -10,7 +10,7 @@ import { env } from "./lib/env";
 import { linkVerifyHandler } from "./lib/link";
 import { telegramResetHandler } from "./lib/telegramReset";
 import { isIpBanned } from "./lib/ipBan";
-import { clientIp } from "./lib/rateLimit";
+import { clientIp, checkRateLimit } from "./lib/rateLimit";
 import { googleAuthStartHandler, googleCallbackHandler } from "./lib/google";
 import { downloadChapterHandler } from "./lib/download";
 import { Paths } from "@contracts/constants";
@@ -390,6 +390,43 @@ app.post("/api/auth/telegram-reset", telegramResetHandler());
 app.get("/api/download/:slug/chapter/:num", downloadChapterHandler);
 app.get("/api/img", imageProxyHandler);
 app.post("/api/upload", directUploadHandler);
+// استقبال أخطاء JS من المتصفح — عام، محميّ بحدّ معدّل + قصّ أحجام
+app.post("/api/client-error", async (c) => {
+  const ip = clientIp(c.req.raw);
+  if (!checkRateLimit(`client-error:${ip}`, 30, 60 * 1000)) {
+    return c.json({ error: "Too Many Requests" }, 429);
+  }
+  let body: {
+    message?: unknown;
+    stack?: unknown;
+    url?: unknown;
+    source?: unknown;
+    line?: unknown;
+    col?: unknown;
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Bad Request" }, 400);
+  }
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!message) return c.json({ error: "Bad Request" }, 400);
+  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+  let stack = str(body.stack);
+  const source = str(body.source);
+  const line = num(body.line);
+  const col = num(body.col);
+  // إن غاب الأثر، نركّب موقعاً تقريبياً من source:line:col للبصمة
+  if (!stack && source) stack = `at ${source}:${line ?? "?"}:${col ?? "?"}`;
+  void captureError(message.slice(0, 1000), {
+    level: "client",
+    stack: stack?.slice(0, 8000),
+    url: str(body.url)?.slice(0, 200),
+    userAgent: c.req.header("user-agent") ?? undefined,
+  });
+  return c.json({ ok: true });
+});
 // وضع الصيانة: غير الأدمن يحصل على MAINTENANCE لكل tRPC ما عدا auth.me/ping/admin.*
 app.use("/api/trpc/*", async (c, next) => {
   const { getSetting } = await import("./lib/siteSettings");
