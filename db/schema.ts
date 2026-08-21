@@ -1224,3 +1224,55 @@ export const errorLogs = mysqlTable(
 );
 
 export type ErrorLog = typeof errorLogs.$inferSelect;
+
+/** أكواد ترويجية يبنيها الأدمن — تُستبدل بأيام بريميوم أو كوينز */
+export const promoCodes = mysqlTable(
+  "promo_codes",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    code: varchar("code", { length: 40 }).notNull().unique(),
+    /** premium_days | coins */
+    rewardType: varchar("rewardType", { length: 16 }).notNull(),
+    amount: int("amount").notNull(),
+    /** 0 = بلا حد */
+    maxUses: int("maxUses").default(0).notNull(),
+    usedCount: int("usedCount").default(0).notNull(),
+    expiresAt: timestamp("expiresAt"),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+);
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = typeof promoCodes.$inferInsert;
+
+/** استبدالات الأكواد — صف لكل (كود، مستخدم) لمنع الاستبدال المكرر */
+export const promoRedemptions = mysqlTable(
+  "promo_redemptions",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    codeId: bigint("codeId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => promoCodes.id, { onDelete: "cascade" }),
+    userId: bigint("userId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    codeUserUnique: uniqueIndex("promo_redemptions_code_user_unique").on(
+      table.codeId,
+      table.userId,
+    ),
+  }),
+);
+
+export type PromoRedemption = typeof promoRedemptions.$inferSelect;

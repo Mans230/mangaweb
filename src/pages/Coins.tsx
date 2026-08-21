@@ -32,6 +32,7 @@ import { proxyImg } from "@/lib/manga";
 import { applyShopTheme } from "@/lib/shopThemes";
 import { useUiToggles } from "@/lib/uiToggles";
 import { trpc } from "@/providers/trpc";
+import PromoRedeem from "@/components/PromoRedeem";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -310,6 +311,13 @@ export default function Coins() {
         <CoinsIcon size={24} className="text-primary" />
         {t("كوينز", "Coins")}
       </h1>
+
+      <PromoRedeem
+        onRedeemed={() => {
+          void utils.coins.wallet.invalidate();
+          void utils.coins.transactions.invalidate();
+        }}
+      />
 
       {/* ===== الرصيد + المستوى ===== */}
       <div className="glass flex flex-col gap-4 !rounded-3xl p-6">

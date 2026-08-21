@@ -3,6 +3,7 @@ import { BadgeCheck, Check, Crown, Sparkles } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
+import PromoRedeem from "@/components/PromoRedeem";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -53,6 +54,11 @@ export default function Premium() {
           )}
         </div>
       )}
+
+      {/* استبدال كود ترويجي */}
+      <div className="mb-6">
+        <PromoRedeem onRedeemed={() => statusQ.refetch()} />
+      </div>
 
       {/* المزايا */}
       <div className="glass mb-6 !rounded-2xl p-5">

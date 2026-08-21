@@ -25,6 +25,7 @@ import {
   Bell,
   Wrench,
   Activity,
+  Ticket,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,9 +54,10 @@ import DmcaManager from "@/components/admin/DmcaManager";
 import NotificationsManager from "@/components/admin/NotificationsManager";
 import BrokenChaptersManager from "@/components/admin/BrokenChaptersManager";
 import SystemHealth from "@/components/admin/SystemHealth";
+import Monetization from "@/components/admin/Monetization";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken" | "system";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken" | "system" | "monetization";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -98,6 +100,7 @@ function AdminShell() {
         { id: "notifications", label: t("الإشعارات", "Notifications"), icon: Bell },
         { id: "system", label: t("صحّة النظام", "System health"), icon: Activity },
         { id: "coins", label: t("كوينز", "Coins"), icon: Coins },
+        { id: "monetization", label: t("الأكواد الترويجية", "Promo codes"), icon: Ticket },
         { id: "en", label: t("مانجا EN", "EN Manga"), icon: Globe },
         { id: "dashboard", label: t("لوحة المعلومات", "Dashboard"), icon: LayoutDashboard },
         { id: "manga", label: t("إدارة المانجا", "Manga"), icon: BookOpen },
@@ -264,6 +267,7 @@ function AdminShell() {
             {view === "dmca" && <DmcaManager />}
             {view === "broken" && <BrokenChaptersManager />}
             {view === "system" && <SystemHealth />}
+            {view === "monetization" && <Monetization />}
             {view === "comments" && <CommentsManager />}
             {view === "communities" && <CommunitiesManager />}
           </motion.div>

@@ -523,6 +523,38 @@ AND NOT EXISTS (
   } catch (e) {
     console.warn(`[ensure-schema] error_logs: ${(e as Error).message}`);
   }
+
+  // ===== الأكواد الترويجية =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`promo_codes\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`code\` varchar(40) NOT NULL,
+	\`rewardType\` varchar(16) NOT NULL,
+	\`amount\` int NOT NULL,
+	\`maxUses\` int NOT NULL DEFAULT 0,
+	\`usedCount\` int NOT NULL DEFAULT 0,
+	\`expiresAt\` timestamp NULL,
+	\`active\` boolean NOT NULL DEFAULT true,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`promo_codes_id\` PRIMARY KEY(\`id\`),
+	CONSTRAINT \`promo_codes_code_unique\` UNIQUE(\`code\`)
+)`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`promo_redemptions\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`codeId\` bigint unsigned NOT NULL,
+	\`userId\` bigint unsigned NOT NULL,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`promo_redemptions_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "promo_redemptions",
+      "promo_redemptions_code_user_unique",
+      "CREATE UNIQUE INDEX `promo_redemptions_code_user_unique` ON `promo_redemptions` (`codeId`, `userId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] promo_codes: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {

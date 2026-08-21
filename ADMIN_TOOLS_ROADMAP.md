@@ -57,7 +57,22 @@ Legend: ✅ done · 🟡 partial (exists, gaps listed) · 🔴 new
   and `admin.purgeCaches` (clears in-memory chapter-pages + settings caches via new
   `clearPagesCache()` + `invalidateSettingsCache()`). `SystemHealth.tsx` viewer + purge
   button, new "System health" tab.
-- Phase 7 — Monetization: promo codes + refund log (Tool 9 gap; payment-gateway integration is a separate infra decision)
+- **Phase 7 — Monetization: promo codes (Tool 9 gap)** — ✅ done
+  `promo_codes` + `promo_redemptions` tables (schema + idempotent ensureSchema,
+  unique (codeId,userId) index blocks double-redeem). New `promoRouter`: user
+  `redeem` (rate-limited; rejects expired/inactive/exhausted/duplicate; reuses the
+  `premiumUntil` grant logic and `awardCoins`) and admin
+  `listCodes`/`createCode`/`updateCode`/`deleteCode`. `Monetization.tsx` admin tab
+  (create/manage codes, random-code generator) and a shared `PromoRedeem.tsx`
+  wired into both `Premium.tsx` and `Coins.tsx`.
+  **Refund log dropped** and **payment-gateway integration intentionally left out**
+  — it needs real payment credentials/webhooks and is a separate infra decision.
+
+---
+
+**All planned phases complete.** Remaining known follow-ups (not in this roadmap's
+scope): chapter scheduling (needs a chapter-visibility pass), real payment-gateway
+integration, and the repo's 28 pre-existing TypeScript errors in untouched files.
 
 Each phase follows the repo's existing conventions:
 key/value settings via `getSetting`/`setSetting`, admin procedures via `adminQuery`,
