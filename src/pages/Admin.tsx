@@ -15,7 +15,9 @@ import {
   Link2,
   ListMusic,
   MessageSquare,
+  Palette,
   Settings,
+  ShieldAlert,
   ShieldX,
   Users,
   UsersRound,
@@ -43,9 +45,11 @@ import ReelsModeration from "@/components/admin/ReelsModeration";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminCoins from "@/components/admin/AdminCoins";
 import AdminEnImport from "@/components/admin/AdminEnImport";
+import ThemeBranding from "@/components/admin/ThemeBranding";
+import DmcaManager from "@/components/admin/DmcaManager";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -74,6 +78,8 @@ function AdminShell() {
   const openTickets = statsQuery.data?.openTickets ?? 0;
   const pendingReelsQuery = trpc.analytics.overview.useQuery(undefined, { retry: false });
   const pendingReels = pendingReelsQuery.data?.pendingReels ?? 0;
+  const pendingDmcaQuery = trpc.dmca.pendingCount.useQuery(undefined, { retry: false });
+  const pendingDmca = pendingDmcaQuery.data ?? 0;
 
   const tabs = useMemo(
     () =>
@@ -82,6 +88,7 @@ function AdminShell() {
         { id: "content", label: t("إدارة المحتوى", "Content"), icon: FolderCog },
         { id: "reels", label: t("مراجعة الريلز", "Reels review"), icon: Clapperboard, badge: pendingReels },
         { id: "settings", label: t("الإعدادات", "Settings"), icon: Settings },
+        { id: "branding", label: t("الثيم والهوية", "Theme & branding"), icon: Palette },
         { id: "coins", label: t("كوينز", "Coins"), icon: Coins },
         { id: "en", label: t("مانجا EN", "EN Manga"), icon: Globe },
         { id: "dashboard", label: t("لوحة المعلومات", "Dashboard"), icon: LayoutDashboard },
@@ -93,10 +100,11 @@ function AdminShell() {
         { id: "requests", label: t("الطلبات", "Requests"), icon: Inbox, badge: pendingCount },
         { id: "tickets", label: t("تذاكر الدعم", "Support tickets"), icon: LifeBuoy, badge: openTickets },
         { id: "reports", label: t("التبليغات", "Reports"), icon: Flag },
+        { id: "dmca", label: t("DMCA", "DMCA"), icon: ShieldAlert, badge: pendingDmca },
         { id: "comments", label: t("التعليقات", "Comments"), icon: MessageSquare },
         { id: "communities", label: t("المجتمعات", "Communities"), icon: UsersRound },
       ] as { id: AdminView; label: string; icon: typeof LayoutDashboard; badge?: number }[],
-    [t, pendingCount, pendingReels, openTickets],
+    [t, pendingCount, pendingReels, openTickets, pendingDmca],
   );
 
   // اختصارات لوحة المفاتيح: g ثم حرف
@@ -231,6 +239,7 @@ function AdminShell() {
             {view === "content" && <ContentManager />}
             {view === "reels" && <ReelsModeration />}
             {view === "settings" && <AdminSettings />}
+            {view === "branding" && <ThemeBranding />}
             {view === "coins" && <AdminCoins />}
             {view === "en" && <AdminEnImport />}
             {view === "dashboard" && <AdminDashboard />}
@@ -242,6 +251,7 @@ function AdminShell() {
             {view === "requests" && <RequestsManager />}
             {view === "tickets" && <TicketsManager />}
             {view === "reports" && <ReportsManager />}
+            {view === "dmca" && <DmcaManager />}
             {view === "comments" && <CommentsManager />}
             {view === "communities" && <CommunitiesManager />}
           </motion.div>

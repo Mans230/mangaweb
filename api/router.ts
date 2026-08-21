@@ -26,6 +26,7 @@ import { postsRouter } from "./postsRouter";
 import { premiumRouter } from "./premiumRouter";
 import { reactionsRouter } from "./reactionsRouter";
 import { challengesRouter } from "./challengesRouter";
+import { dmcaRouter } from "./dmcaRouter";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -58,6 +59,7 @@ export const appRouter = createRouter({
   posts: postsRouter,
   premium: premiumRouter,
   reactions: reactionsRouter,
+  dmca: dmcaRouter,
 });
 
 export type AppRouter = typeof appRouter;

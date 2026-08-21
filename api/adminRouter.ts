@@ -25,6 +25,10 @@ import { createRouter, adminQuery } from "./middleware";
 import {
   getSetting,
   setSetting,
+  getBranding,
+  parseBranding,
+  DEFAULT_BRANDING,
+  SETTING_BRANDING,
   SETTING_COMMUNITY_MANGA_ENABLED,
   SETTING_COMMUNITY_USER_ENABLED,
   SETTING_UI_HIDE_COMMUNITIES,
@@ -47,6 +51,7 @@ import { invalidateIpBanCache } from "./lib/ipBan";
 import { adminLogs, updateRequests } from "@db/schema";
 import { getScraper } from "./scrapers";
 import { logAdminAction } from "./lib/adminLog";
+import { recordSourceHealth } from "./lib/sourceHealth";
 import { SETTING_BANNED_WORDS, bannedWords } from "./lib/wordFilter";
 
 export const SETTING_MAINTENANCE_MODE = "maintenance_mode";
@@ -56,6 +61,13 @@ export const SETTING_MAINTENANCE_MESSAGE = "maintenance_message";
 let scrapeRunning = false;
 /** علم module-scope يمنع تزامن مهمتي fixMetadata */
 let fixMetadataRunning = false;
+
+/** لون HEX صالح (#rgb أو #rrggbb) أو نص فارغ = رجوع للافتراضي */
+const hexColor = z
+  .string()
+  .trim()
+  .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "لون HEX غير صالح")
+  .or(z.literal(""));
 
 const sourceStatusEnum = z.enum(["active", "paused", "blocked"]);
 const requestStatusEnum = z.enum(["pending", "added", "rejected"]);
@@ -196,6 +208,26 @@ export const adminRouter = createRouter({
         .update(sources)
         .set({ status: input.status })
         .where(eq(sources.id, input.id));
+      return { success: true };
+    }),
+
+  /** ضبط أولوية المصدر و/أو السكراب التلقائي (يدوي مقابل تلقائي) */
+  updateSourceConfig: adminQuery
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        priority: z.number().int().min(0).max(100).optional(),
+        autoScrape: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const patch: Partial<{ priority: number; autoScrape: boolean }> = {};
+      if (input.priority !== undefined) patch.priority = input.priority;
+      if (input.autoScrape !== undefined) patch.autoScrape = input.autoScrape;
+      if (Object.keys(patch).length === 0) return { success: true };
+      await db.update(sources).set(patch).where(eq(sources.id, input.id));
+      await logAdminAction(ctx.user.id, "source.config", { meta: input });
       return { success: true };
     }),
 
@@ -811,6 +843,50 @@ export const adminRouter = createRouter({
       return { success: true };
     }),
 
+  /** الهوية البصرية (الثيم/العلامة) — قراءة القيم الحالية للوحة التخصيص */
+  getBranding: adminQuery.query(() => getBranding()),
+
+  /** حفظ الهوية البصرية — يُطبَّق فوراً على كل الواجهة (متغيّرات CSS + CSS مخصّص + فافيكون) */
+  setBranding: adminQuery
+    .input(
+      z.object({
+        colors: z
+          .object({
+            primary: hexColor,
+            primarySoft: hexColor,
+            accent: hexColor,
+            accent2: hexColor,
+            primaryInk: hexColor,
+          })
+          .partial()
+          .optional(),
+        siteName: z.string().trim().max(120).optional(),
+        siteDescription: z.string().trim().max(300).optional(),
+        logoUrl: z.string().trim().max(500).url().optional().or(z.literal("")),
+        faviconEmoji: z.string().trim().max(8).optional(),
+        customCss: z.string().max(20000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // ندمج فوق القيم الحالية حتى لا يمحو حفظ جزئي بقيةَ الحقول
+      const current = await getBranding();
+      const next = {
+        ...current,
+        ...input,
+        colors: { ...current.colors, ...(input.colors ?? {}) },
+      };
+      await setSetting(SETTING_BRANDING, JSON.stringify(next));
+      await logAdminAction(ctx.user.id, "settings.branding", { meta: input });
+      return { success: true };
+    }),
+
+  /** إعادة الهوية البصرية إلى الافتراضي */
+  resetBranding: adminQuery.mutation(async ({ ctx }) => {
+    await setSetting(SETTING_BRANDING, JSON.stringify(DEFAULT_BRANDING));
+    await logAdminAction(ctx.user.id, "settings.branding_reset", {});
+    return parseBranding(JSON.stringify(DEFAULT_BRANDING));
+  }),
+
   /** ضبط قائمة قسم الرئيسية (جواهر مخفية / توب10) يدوياً بمعرّفات مانجا — لكل لغة */
   setHomeSection: adminQuery
     .input(
@@ -1281,10 +1357,12 @@ export const adminRouter = createRouter({
             console.log(
               `[admin] triggerScrape: ${name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
             );
+            await recordSourceHealth(name, true);
           } catch (e) {
             console.error(
               `[admin] triggerScrape: فشل ${name}: ${(e as Error).message}`,
             );
+            await recordSourceHealth(name, false, (e as Error).message);
           }
         }
         console.log("[admin] triggerScrape: اكتملت الدورة اليدوية.");
@@ -1333,10 +1411,12 @@ export const adminRouter = createRouter({
             console.log(
               `[admin] importFullCatalog: ${name}: استُوردت ${r.imported}، تخطّى ${r.skipped}، فشلت ${r.failed}`,
             );
+            await recordSourceHealth(name, true);
           } catch (e) {
             console.error(
               `[admin] importFullCatalog: فشل ${name}: ${(e as Error).message}`,
             );
+            await recordSourceHealth(name, false, (e as Error).message);
           }
         }
         console.log("[admin] importFullCatalog: اكتمل السكراب الكامل.");

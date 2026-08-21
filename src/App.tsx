@@ -7,6 +7,7 @@ import PwaInstallBanner from "@/components/PwaInstallBanner";
 import { trpc } from "@/providers/trpc";
 import { useUiToggles } from "@/lib/uiToggles";
 import { useShopTheme } from "@/lib/shopThemes";
+import { useBranding } from "@/lib/branding";
 import Home from "@/pages/Home";
 import Browse from "@/pages/Browse";
 import MangaDetail from "@/pages/MangaDetail";
@@ -36,6 +37,8 @@ export default function App() {
   const { hideReels } = useUiToggles();
   // ثيم المتجر المُفعَّل للمستخدم الحالي (إن وجد)
   useShopTheme();
+  // الهوية البصرية العامة التي يضبطها الأدمن (ألوان/شعار/فافيكون/CSS)
+  useBranding();
 
   // تتبّع مشاهدات الصفحات بصمت (fail-safe — لا يؤثر أي خطأ على التنقل)
   useEffect(() => {

@@ -27,6 +27,63 @@ export const SETTING_HOME_TOP_IDS = "home.top_week_ids"; // ar
 export const SETTING_HOME_GEMS_IDS_EN = "home.hidden_gems_ids_en";
 export const SETTING_HOME_TOP_IDS_EN = "home.top_week_ids_en";
 
+/**
+ * إعدادات الهوية البصرية (الثيم والعلامة التجارية) — JSON واحد يتحكم به الأدمن.
+ * يُطبَّق على الواجهة عبر متغيّرات CSS + CSS مخصّص + الفافيكون.
+ */
+export const SETTING_BRANDING = "branding.config";
+
+export interface BrandingConfig {
+  colors: {
+    primary: string;
+    primarySoft: string;
+    accent: string;
+    accent2: string;
+    primaryInk: string;
+  };
+  siteName: string;
+  siteDescription: string;
+  logoUrl: string;
+  faviconEmoji: string;
+  customCss: string;
+}
+
+/** القيم الافتراضية للهوية — مطابقة لثيم shadcn الأساسي في src/index.css */
+export const DEFAULT_BRANDING: BrandingConfig = {
+  colors: {
+    primary: "",
+    primarySoft: "",
+    accent: "",
+    accent2: "",
+    primaryInk: "",
+  },
+  siteName: "",
+  siteDescription: "",
+  logoUrl: "",
+  faviconEmoji: "",
+  customCss: "",
+};
+
+/** يدمج القيم المخزَّنة فوق الافتراضية بأمان (JSON غير صالح ⇒ الافتراضي) */
+export function parseBranding(raw: string | null): BrandingConfig {
+  if (!raw) return DEFAULT_BRANDING;
+  try {
+    const parsed = JSON.parse(raw) as Partial<BrandingConfig>;
+    return {
+      ...DEFAULT_BRANDING,
+      ...parsed,
+      colors: { ...DEFAULT_BRANDING.colors, ...(parsed.colors ?? {}) },
+    };
+  } catch {
+    return DEFAULT_BRANDING;
+  }
+}
+
+/** يقرأ الهوية البصرية الحالية (مع الكاش القصير المشترك) */
+export async function getBranding(): Promise<BrandingConfig> {
+  return parseBranding(await getSetting(SETTING_BRANDING, null));
+}
+
 /** يختار مفتاح الإعداد حسب القسم واللغة */
 export function homeSectionKey(section: "gems" | "top", lang: "ar" | "en"): string {
   if (section === "gems") {

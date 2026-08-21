@@ -16,6 +16,7 @@ import { mirrorChapter } from "./lib/mirror";
 import { arabicSourceFilter } from "./services/enImport";
 import {
   getSetting,
+  getBranding,
   SETTING_UI_HIDE_COMMUNITIES,
   SETTING_UI_HIDE_REELS,
   SETTING_COMMUNITY_GROUP_URL,
@@ -381,6 +382,9 @@ export const mangaRouter = createRouter({
       telegramCta,
     };
   }),
+
+  /** الهوية البصرية العامة (ألوان/شعار/فافيكون/CSS مخصّص) — تُطبَّق على كل الواجهة */
+  branding: publicQuery.query(() => getBranding()),
 
   /** الأكثر مشاهدة — ترتيب viewCount تنازلياً، حقول البطاقات الأساسية */
   mostViewed: publicQuery

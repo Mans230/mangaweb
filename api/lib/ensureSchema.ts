@@ -33,6 +33,22 @@ export async function ensureBootSchema(): Promise<void> {
     "manga.siteViewCount",
   );
 
+  // ===== أعمدة مراقبة صحّة المصادر (Phase 3) =====
+  for (const [col, ddl] of [
+    ["lastRunAt", "ADD `lastRunAt` timestamp NULL"],
+    ["lastSuccessAt", "ADD `lastSuccessAt` timestamp NULL"],
+    ["lastError", "ADD `lastError` varchar(1000)"],
+    ["successCount", "ADD `successCount` int NOT NULL DEFAULT 0"],
+    ["errorCount", "ADD `errorCount` int NOT NULL DEFAULT 0"],
+    ["priority", "ADD `priority` int NOT NULL DEFAULT 0"],
+    ["autoScrape", "ADD `autoScrape` boolean NOT NULL DEFAULT true"],
+  ] as const) {
+    await ignoreDuplicateColumn(
+      db.execute(sql.raw(`ALTER TABLE \`sources\` ${ddl}`)),
+      `sources.${col}`,
+    );
+  }
+
   try {
     await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`support_tickets\` (
 	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
@@ -440,6 +456,37 @@ AND NOT EXISTS (
     );
   } catch (e) {
     console.warn(`[ensure-schema] reactions: ${(e as Error).message}`);
+  }
+
+  // ===== طلبات إزالة DMCA =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`dmca_requests\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`claimantName\` varchar(200) NOT NULL,
+	\`claimantEmail\` varchar(200) NOT NULL,
+	\`company\` varchar(200),
+	\`mangaId\` bigint unsigned,
+	\`targetUrl\` varchar(500) NOT NULL,
+	\`workDescription\` text NOT NULL,
+	\`status\` varchar(20) NOT NULL DEFAULT 'pending',
+	\`notes\` text,
+	\`handledBy\` bigint unsigned,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`dmca_requests_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "dmca_requests",
+      "dmca_requests_status_idx",
+      "CREATE INDEX `dmca_requests_status_idx` ON `dmca_requests` (`status`)",
+    );
+    await ensureIndex(
+      "dmca_requests",
+      "dmca_requests_manga_idx",
+      "CREATE INDEX `dmca_requests_manga_idx` ON `dmca_requests` (`mangaId`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] dmca_requests: ${(e as Error).message}`);
   }
 }
 

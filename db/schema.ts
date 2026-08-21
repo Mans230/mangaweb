@@ -137,6 +137,21 @@ export const sources = mysqlTable("sources", {
     .notNull(),
   lastScanAt: timestamp("lastScanAt"),
   mangaCount: int("mangaCount").default(0).notNull(),
+  // ===== مراقبة صحّة السكرابر (Phase 3) =====
+  /** آخر محاولة تشغيل (نجحت أو فشلت) */
+  lastRunAt: timestamp("lastRunAt"),
+  /** آخر تشغيل ناجح */
+  lastSuccessAt: timestamp("lastSuccessAt"),
+  /** رسالة آخر خطأ (مقصوصة) */
+  lastError: varchar("lastError", { length: 1000 }),
+  /** عدّاد النجاحات التراكمي */
+  successCount: int("successCount").default(0).notNull(),
+  /** عدّاد الأخطاء التراكمي */
+  errorCount: int("errorCount").default(0).notNull(),
+  /** أولوية المصدر عند تعارض المحتوى (الأعلى يفوز) */
+  priority: int("priority").default(0).notNull(),
+  /** سكراب تلقائي مفعّل (يدوي مقابل تلقائي) */
+  autoScrape: boolean("autoScrape").default(true).notNull(),
 });
 
 export type Source = typeof sources.$inferSelect;
@@ -1125,3 +1140,46 @@ export const reactions = mysqlTable(
 );
 
 export type Reaction = typeof reactions.$inferSelect;
+
+/**
+ * طلبات إزالة حقوق الملكية (DMCA) — طابور إداري لتتبّع البلاغات ومعالجتها.
+ * status: pending (جديد) | reviewing (قيد المراجعة) | actioned (أُزيل المحتوى) | rejected (مرفوض)
+ */
+export const dmcaRequests = mysqlTable(
+  "dmca_requests",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    claimantName: varchar("claimantName", { length: 200 }).notNull(),
+    claimantEmail: varchar("claimantEmail", { length: 200 }).notNull(),
+    company: varchar("company", { length: 200 }),
+    /** المانجا المُبلَّغ عنها (إن حُدِّدت) — تبقى null لو حُذفت */
+    mangaId: bigint("mangaId", { mode: "number", unsigned: true }).references(
+      () => manga.id,
+      { onDelete: "set null" },
+    ),
+    targetUrl: varchar("targetUrl", { length: 500 }).notNull(),
+    workDescription: text("workDescription").notNull(),
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    /** ملاحظات/قرار الأدمن الداخلي */
+    notes: text("notes"),
+    /** الأدمن الذي عالج الطلب */
+    handledBy: bigint("handledBy", { mode: "number", unsigned: true }).references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    statusIdx: index("dmca_requests_status_idx").on(table.status),
+    mangaIdx: index("dmca_requests_manga_idx").on(table.mangaId),
+  }),
+);
+
+export type DmcaRequest = typeof dmcaRequests.$inferSelect;
+export type InsertDmcaRequest = typeof dmcaRequests.$inferInsert;
