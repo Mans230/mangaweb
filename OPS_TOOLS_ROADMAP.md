@@ -20,9 +20,14 @@ Legend: ✅ done · 🟡 partial/exists · 🔴 planned
   and a `ScraperJobs.tsx` tab (queue-depth stats, per-source run-now with success rate, job
   log with status badges + retry, blackout-window editor). Manual runs override blackout;
   automatic retries respect it.
-- **2. Security & audit ops (spec Tool 5, feasible parts)** — 🟡 audit-log viewer already
-  exists (`admin.adminLogs` + `AdminSettings.tsx`). Planned: dedicated tab + IP-ban management
-  UI (`api/lib/ipBan.ts`) + failed-login tracking + rate-limit visibility (`api/lib/rateLimit.ts`).
+- **2. Security & audit ops (spec Tool 5, feasible parts)** — ✅ done
+  New `failed_logins` table + `api/lib/failedLogin.ts` (`recordFailedLogin` with auto-block:
+  ≥10 fails/15 min → `banned_ips`), wired into `auth-router.ts` login. `rateLimit.ts` gains
+  `rateLimitSnapshot()`. Admin procedures `listFailedLogins`/`failedLoginStats`/`rateLimitStatus`,
+  and `banIp`/`unbanIp` now audit-log. `SecurityOps.tsx` "Security & audit" tab surfaces the
+  existing audit log (`admin.adminLogs`), IP-ban management (`listBans`/`banIp`/`unbanIp`),
+  failed logins + top offenders (one-click ban), and the rate-limit snapshot.
+  **Out of scope:** IP geolocation (no geo API), WAF, bot challenges, vuln scanner, SSL monitoring.
 - **3. Error-tracking upgrade (spec Tool 8)** — 🟡 base exists (`error_logs` + `SystemHealth`,
   from the content-admin Phase 6). Planned: group by fingerprint, status workflow
   (new/investigating/fixed/ignored), browser JS-error ingestion endpoint, basic API timing.

@@ -1307,3 +1307,23 @@ export const scrapeJobs = mysqlTable(
 
 export type ScrapeJob = typeof scrapeJobs.$inferSelect;
 export type InsertScrapeJob = typeof scrapeJobs.$inferInsert;
+
+/** محاولات تسجيل الدخول الفاشلة — لتتبّع الأمان والحظر التلقائي */
+export const failedLogins = mysqlTable(
+  "failed_logins",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    ip: varchar("ip", { length: 45 }).notNull(),
+    /** المعرّف المُدخَل (بريد) — للعرض فقط */
+    email: varchar("email", { length: 255 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    createdIdx: index("failed_logins_created_idx").on(table.createdAt),
+    ipIdx: index("failed_logins_ip_idx").on(table.ip, table.createdAt),
+  }),
+);
+
+export type FailedLogin = typeof failedLogins.$inferSelect;

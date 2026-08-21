@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, count, desc, eq, like, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, like, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   bannedIps,
@@ -14,6 +14,7 @@ import {
   follows,
   manga,
   errorLogs,
+  failedLogins,
   ratings,
   readingProgress,
   reports,
@@ -57,6 +58,7 @@ import { adminLogs, updateRequests } from "@db/schema";
 import { getScraper } from "./scrapers";
 import { logAdminAction } from "./lib/adminLog";
 import { recordSourceHealth } from "./lib/sourceHealth";
+import { rateLimitSnapshot } from "./lib/rateLimit";
 import {
   startJob,
   finishJob,
@@ -473,27 +475,70 @@ export const adminRouter = createRouter({
         reason: z.string().trim().max(2000).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       await db
         .insert(bannedIps)
         .values({ ip: input.ip, reason: input.reason ?? null })
         .onDuplicateKeyUpdate({ set: { reason: input.reason ?? null } });
       invalidateIpBanCache();
+      await logAdminAction(ctx.user.id, "security.ban_ip", {
+        meta: { ip: input.ip, reason: input.reason },
+      });
       return { success: true };
     }),
 
   unbanIp: adminQuery
     .input(z.object({ ip: z.string().trim().min(3).max(45) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       await getDb().delete(bannedIps).where(eq(bannedIps.ip, input.ip));
       invalidateIpBanCache();
+      await logAdminAction(ctx.user.id, "security.unban_ip", { meta: { ip: input.ip } });
       return { success: true };
     }),
 
   listBans: adminQuery.query(() =>
     getDb().select().from(bannedIps).orderBy(desc(bannedIps.createdAt)),
   ),
+
+  /** آخر محاولات الدخول الفاشلة (مع الصفحات) */
+  listFailedLogins: adminQuery
+    .input(
+      z.object({
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(30),
+      }),
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select()
+          .from(failedLogins)
+          .orderBy(desc(failedLogins.id))
+          .limit(input.limit)
+          .offset((input.page - 1) * input.limit),
+        db.select({ total: count() }).from(failedLogins),
+      ]);
+      return { items: rows, total, page: input.page, limit: input.limit };
+    }),
+
+  /** أكثر عناوين IP فشلاً خلال آخر 24 ساعة */
+  failedLoginStats: adminQuery.query(async () => {
+    const db = getDb();
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select({ ip: failedLogins.ip, attempts: count() })
+      .from(failedLogins)
+      .where(gt(failedLogins.createdAt, since))
+      .groupBy(failedLogins.ip)
+      .orderBy(desc(count()))
+      .limit(10);
+    return { since, top: rows };
+  }),
+
+  /** لقطة حالة تحديد المعدل في الذاكرة (لهذه العملية) */
+  rateLimitStatus: adminQuery.query(() => rateLimitSnapshot()),
 
   listComments: adminQuery
     .input(

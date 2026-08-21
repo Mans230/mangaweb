@@ -36,6 +36,7 @@ import {
   updateUserProfile,
 } from "./queries/users";
 import { checkRateLimit, clientIp } from "./lib/rateLimit";
+import { recordFailedLogin } from "./lib/failedLogin";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 
 /** حد المحاولات لإجراءات auth الحساسة: 10 محاولات / 5 دقائق / IP */
@@ -387,11 +388,14 @@ export const authRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       assertAuthRateLimit("login", ctx.req);
       const user = await findUserByEmail(input.email);
-      const invalid = () =>
-        new TRPCError({
+      const invalid = () => {
+        // تتبّع أمني + حظر تلقائي عند تكرار الفشل من نفس الـ IP (لا يعطّل الرد)
+        void recordFailedLogin(clientIp(ctx.req), input.email);
+        return new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid email or password",
         });
+      };
       if (!user || !user.passwordHash) {
         throw invalid();
       }

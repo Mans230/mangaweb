@@ -585,6 +585,29 @@ AND NOT EXISTS (
   } catch (e) {
     console.warn(`[ensure-schema] scrape_jobs: ${(e as Error).message}`);
   }
+
+  // ===== محاولات الدخول الفاشلة =====
+  try {
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`failed_logins\` (
+	\`id\` bigint unsigned AUTO_INCREMENT NOT NULL,
+	\`ip\` varchar(45) NOT NULL,
+	\`email\` varchar(255),
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`failed_logins_id\` PRIMARY KEY(\`id\`)
+)`));
+    await ensureIndex(
+      "failed_logins",
+      "failed_logins_created_idx",
+      "CREATE INDEX `failed_logins_created_idx` ON `failed_logins` (`createdAt`)",
+    );
+    await ensureIndex(
+      "failed_logins",
+      "failed_logins_ip_idx",
+      "CREATE INDEX `failed_logins_ip_idx` ON `failed_logins` (`ip`, `createdAt`)",
+    );
+  } catch (e) {
+    console.warn(`[ensure-schema] failed_logins: ${(e as Error).message}`);
+  }
 }
 
 async function ensureIndex(table: string, indexName: string, ddl: string) {

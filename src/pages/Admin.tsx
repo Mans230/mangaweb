@@ -18,6 +18,7 @@ import {
   Palette,
   Settings,
   ShieldAlert,
+  ShieldCheck,
   ShieldX,
   Users,
   UsersRound,
@@ -57,9 +58,10 @@ import BrokenChaptersManager from "@/components/admin/BrokenChaptersManager";
 import SystemHealth from "@/components/admin/SystemHealth";
 import Monetization from "@/components/admin/Monetization";
 import ScraperJobs from "@/components/admin/ScraperJobs";
+import SecurityOps from "@/components/admin/SecurityOps";
 import { EASE } from "@/components/admin/adminUtils";
 
-type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken" | "system" | "monetization" | "scraperJobs";
+type AdminView = "analytics" | "content" | "reels" | "settings" | "coins" | "en" | "dashboard" | "manga" | "add" | "sources" | "merge" | "users" | "requests" | "tickets" | "reports" | "comments" | "communities" | "branding" | "dmca" | "notifications" | "broken" | "system" | "monetization" | "scraperJobs" | "security";
 
 const shortcutKeys: Record<string, AdminView> = {
   n: "analytics",
@@ -101,6 +103,7 @@ function AdminShell() {
         { id: "branding", label: t("الثيم والهوية", "Theme & branding"), icon: Palette },
         { id: "notifications", label: t("الإشعارات", "Notifications"), icon: Bell },
         { id: "system", label: t("صحّة النظام", "System health"), icon: Activity },
+        { id: "security", label: t("الأمان والتدقيق", "Security & audit"), icon: ShieldCheck },
         { id: "coins", label: t("كوينز", "Coins"), icon: Coins },
         { id: "monetization", label: t("الأكواد الترويجية", "Promo codes"), icon: Ticket },
         { id: "en", label: t("مانجا EN", "EN Manga"), icon: Globe },
@@ -272,6 +275,7 @@ function AdminShell() {
             {view === "system" && <SystemHealth />}
             {view === "monetization" && <Monetization />}
             {view === "scraperJobs" && <ScraperJobs />}
+            {view === "security" && <SecurityOps />}
             {view === "comments" && <CommentsManager />}
             {view === "communities" && <CommunitiesManager />}
           </motion.div>

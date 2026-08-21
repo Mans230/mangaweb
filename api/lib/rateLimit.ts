@@ -54,3 +54,23 @@ export function clientIp(req: Request): string {
   ).socket;
   return maybeSocket?.remoteAddress ?? "unknown";
 }
+
+/**
+ * لقطة قراءة فقط لحالة تحديد المعدل في الذاكرة (لهذه العملية فقط).
+ * تُجمّع المفاتيح حسب البادئة قبل أول ':' (مثل login/dmca/promo).
+ */
+export function rateLimitSnapshot(): {
+  activeBuckets: number;
+  top: { keyPrefix: string; count: number }[];
+} {
+  const byPrefix = new Map<string, number>();
+  for (const key of buckets.keys()) {
+    const prefix = key.split(":")[0] || key;
+    byPrefix.set(prefix, (byPrefix.get(prefix) ?? 0) + 1);
+  }
+  const top = [...byPrefix.entries()]
+    .map(([keyPrefix, count]) => ({ keyPrefix, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20);
+  return { activeBuckets: buckets.size, top };
+}
